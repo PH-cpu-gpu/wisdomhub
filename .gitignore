@@ -35,3 +35,6 @@ build/
 ### Other ###
 .claude/
 .env
+
+### 中间件插件二进制（体积大，且随 ES 版本变化）###
+docker/elasticsearch/plugins/

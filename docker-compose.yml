@@ -122,6 +122,12 @@ services:
       - "9200:9200"
     volumes:
       - es-data:/usr/share/elasticsearch/data
+      # IK 中文分词插件（任务 B0.4）。
+      # 版本必须与 ES 精确匹配，升级 ES 时要同步换插件。
+      # 插件二进制不入版本库，clone 后先执行：
+      #     bash docker/elasticsearch/install-ik.sh 8.18.8
+      # ⚠️ 该目录为空时 ES 会「静默地不加载插件」，不报任何错，务必确认装过。
+      - ./docker/elasticsearch/plugins/ik:/usr/share/elasticsearch/plugins/ik
     ulimits:
       memlock: { soft: -1, hard: -1 }
       nofile: { soft: 65536, hard: 65536 }
