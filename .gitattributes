@@ -1,2 +1,6 @@
 /mvnw text eol=lf
 *.cmd text eol=crlf
+
+# Shell 脚本会被挂载进 Linux 容器执行。若在 Windows 上被检出成 CRLF，
+# 容器内会报 "bad interpreter: No such file or directory"，且报错完全看不出是换行符问题。
+*.sh text eol=lf
