@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.5.16</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>com.wisdomhub</groupId>
+    <artifactId>wisdomhub</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+    <name>WisdomHub</name>
+    <description>WisdomHub 开发者技术知识社区平台 - Maven 父工程</description>
+
+    <properties>
+        <java.version>21</java.version>
+        <maven.compiler.release>21</maven.compiler.release>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+
+        <!-- 微服务体系 -->
+        <spring-cloud.version>2025.0.3</spring-cloud.version>
+        <spring-cloud-alibaba.version>2025.0.0.0</spring-cloud-alibaba.version>
+
+        <!-- 以下四项 Boot / Spring Cloud / SCA 的 BOM 都未覆盖，需在此统一管版本 -->
+        <mybatis-plus.version>3.5.17</mybatis-plus.version>
+        <springdoc.version>2.9.1</springdoc.version>
+        <jjwt.version>0.13.0</jjwt.version>
+        <xxl-job.version>3.4.2</xxl-job.version>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <!-- ===== BOM 导入：子模块据此获得版本管理能力 ===== -->
+            <dependency>
+                <groupId>org.springframework.cloud</groupId>
+                <artifactId>spring-cloud-dependencies</artifactId>
+                <version>${spring-cloud.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>com.alibaba.cloud</groupId>
+                <artifactId>spring-cloud-alibaba-dependencies</artifactId>
+                <version>${spring-cloud-alibaba.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <!--
+              注意：Spring Boot 自身及其生态的依赖，版本已由父 POM spring-boot-starter-parent
+              统一管理，此处不再重复声明。子模块直接写 groupId + artifactId 即可，无需写 version。
+              涵盖：spring-boot-starter-web / webflux / validation / actuator / cache /
+                    data-redis / data-mongodb / data-elasticsearch / data-neo4j / amqp /
+                    websocket / test、mybatis 无关的 mysql-connector-j、lombok、
+                    caffeine、commons-pool2、spring-security-crypto 等。
+              同样，spring-cloud-starter-gateway / openfeign / loadbalancer 由 Spring Cloud BOM 管理，
+              spring-cloud-starter-alibaba-nacos-discovery / nacos-config / seata 由 SCA BOM 管理。
+              下面只列上述 BOM 都未覆盖的第三方。
+            -->
+
+            <!-- ORM：技术文档 7.7 -->
+            <dependency>
+                <groupId>com.baomidou</groupId>
+                <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
+                <version>${mybatis-plus.version}</version>
+            </dependency>
+
+            <!-- 接口文档：任务 B1.31。Servlet 服务用 mvc，Gateway(响应式) 用 webflux -->
+            <dependency>
+                <groupId>org.springdoc</groupId>
+                <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+                <version>${springdoc.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.springdoc</groupId>
+                <artifactId>springdoc-openapi-starter-webflux-ui</artifactId>
+                <version>${springdoc.version}</version>
+            </dependency>
+
+            <!-- JWT：技术文档 7.17。三个 artifact 版本必须一致，故一并纳入管理 -->
+            <dependency>
+                <groupId>io.jsonwebtoken</groupId>
+                <artifactId>jjwt-api</artifactId>
+                <version>${jjwt.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.jsonwebtoken</groupId>
+                <artifactId>jjwt-impl</artifactId>
+                <version>${jjwt.version}</version>
+                <scope>runtime</scope>
+            </dependency>
+            <dependency>
+                <groupId>io.jsonwebtoken</groupId>
+                <artifactId>jjwt-jackson</artifactId>
+                <version>${jjwt.version}</version>
+                <scope>runtime</scope>
+            </dependency>
+
+            <!-- 定时任务：技术文档 7.15 -->
+            <dependency>
+                <groupId>com.xuxueli</groupId>
+                <artifactId>xxl-job-core</artifactId>
+                <version>${xxl-job.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <!-- 子模块目录建好后再放开这一段，目录不存在时 Maven 会直接报错 -->
+    <!--
+    <modules>
+        <module>wisdomhub-common</module>
+        <module>wisdomhub-gateway</module>
+        <module>wisdomhub-user</module>
+        <module>wisdomhub-content</module>
+        <module>wisdomhub-search</module>
+        <module>wisdomhub-knowledge</module>
+        <module>wisdomhub-recommendation</module>
+        <module>wisdomhub-notification</module>
+        <module>wisdomhub-order</module>
+        <module>wisdomhub-agent</module>
+    </modules>
+    -->
+</project>
