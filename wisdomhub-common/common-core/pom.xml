@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.wisdomhub</groupId>
+        <artifactId>wisdomhub-common</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>common-core</artifactId>
+    <name>common-core</name>
+    <description>统一返回体 R&lt;T&gt;、错误码枚举、全局异常处理器、分页封装（任务 B0.6）</description>
+
+    <dependencies>
+        <!--
+          这里刻意用 spring-web 而非 spring-boot-starter-web：
+          common-core 会被 wisdomhub-gateway 依赖，而 Gateway 是响应式（WebFlux）栈。
+          引入 starter-web 会让 Spring Boot 选择 Servlet 栈，直接破坏 Gateway。
+          spring-web 是 MVC 与 WebFlux 的共同底层，两边都安全
+          （@RestControllerAdvice / @ExceptionHandler 注解就在 spring-web 中）。
+        -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-web</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+</project>

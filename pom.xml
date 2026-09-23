@@ -111,8 +111,6 @@
         </dependencies>
     </dependencyManagement>
 
-    <!-- 子模块目录建好后再放开这一段，目录不存在时 Maven 会直接报错 -->
-    <!--
     <modules>
         <module>wisdomhub-common</module>
         <module>wisdomhub-gateway</module>
@@ -125,5 +123,4 @@
         <module>wisdomhub-order</module>
         <module>wisdomhub-agent</module>
     </modules>
-    -->
 </project>
