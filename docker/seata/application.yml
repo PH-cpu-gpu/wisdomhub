@@ -1,0 +1,64 @@
+# =============================================================================
+# Seata 2.5.0 服务端配置
+#
+# 挂载到容器内 /seata-server/config/application.yml
+#   该镜像 CWD 为 /seata-server，Spring Boot 默认配置位置包含 file:./config/，
+#   所以必须挂到 config/ 目录下才会被读取（挂到 conf/ 是无效的）。
+# 结构取自官方 server/src/main/resources/application.example.yml，
+# 只保留本项目实际需要的项（其余沿用 Seata 内置默认值，两者按属性合并）。
+# =============================================================================
+
+server:
+  port: 8091
+
+spring:
+  application:
+    name: seata-server
+  # Seata 2.x 服务端不是 Web 应用，没有 HTTP 控制台。
+  # server.port 即 RPC 服务端口，客户端连的就是它。
+  main:
+    web-application-type: none
+
+seata:
+  config:
+    type: file
+
+  # ===========================================================================
+  # ⚠️ 这里刻意用 file 而不是 nacos —— 这是完整排查后的结论，不要随手改回 nacos。
+  #
+  # 原因：Seata 2.5.0 内置 nacos-client 1.4.6（1.x 客户端），而 Nacos 3.x 服务端
+  # 官方声明不支持 1.x 客户端（Nacos 升级手册 Client Compatibility 表：1.x → No）。
+  #
+  # 具体断点：nacos-client 1.4.6 启动时要调
+  #     GET /nacos/v1/ns/operator/servers
+  # 而 Nacos 3.0.3 已移除该接口（实测返回 501 "no such api"）。
+  # 注意 /v1/ns/instance（注册）和 /v1/ns/service/list（查询）在 3.0.3 上仍然可用，
+  # 所以只测注册接口是测不出这个问题的。失败后 Seata 不写 error/warn 日志，
+  # 两个日志文件都是 0 字节，完全静默，极难排查。
+  #
+  # 官方唯一出路 nacos-api-legacy-adapter 未发布到 Maven Central（已实测），
+  # 必须克隆 alibaba/nacos 从源码构建（它依赖 Nacos 内部未发布模块），代价过高。
+  #
+  # 当前 Java 服务跑在宿主机上，直连 localhost:8091 即可，单实例开发不需要服务发现。
+  # 将来多节点 HA 部署或 B2.24 写跨服务事务时，需在下面几条路里重新决策：
+  #   1) 先验证 nacos-client 3.0.3 能否连 Nacos 2.x 服务端，再降级 Nacos
+  #   2) 自行构建 nacos-api-legacy-adapter
+  #   3) 改用 Seata 原生 NamingServer
+  # 详见 技术文档.md 第 6 章「已知版本冲突」。
+  # ===========================================================================
+  registry:
+    type: file
+
+  server:
+    service-port: 8091
+
+  # 事务会话存本地文件，开发环境够用。
+  # B2.24 若要多节点部署，再改成 db 或 redis 模式。
+  store:
+    mode: file
+    session:
+      mode: file
+    lock:
+      mode: file
+    file:
+      dir: /seata-server/sessionStore
