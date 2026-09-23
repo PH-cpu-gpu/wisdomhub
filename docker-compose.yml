@@ -1,0 +1,243 @@
+# =============================================================================
+# WisdomHub 本地开发中间件编排
+#
+#   启动      docker compose up -d
+#   查看      docker compose ps
+#   日志      docker compose logs -f <服务名>
+#   停止      docker compose down
+#   清空数据   docker compose down -v        ← 会删除所有卷，谨慎使用
+#
+# 变量取自同目录 .env（已加入 .gitignore，不进版本库）
+#
+# 服务端版本与客户端版本的对应关系（详见 技术文档.md 第 6 章）：
+#   Elasticsearch  8.18.8  必须与 ES Client 8.18.8 同 minor
+#   Neo4j          5.26    必须为 5.x，Driver 5.28.13 连不上 4.x
+#   Nacos          v3.0.3  必须为 3.0.x，对应 nacos-client 3.0.3
+#   Seata          2.5.0   必须与客户端 2.5.0 一致
+#   XXL-JOB admin  3.4.2   必须与 xxl-job-core 3.4.2 一致
+# =============================================================================
+
+name: wisdomhub
+
+services:
+
+  # ===========================================================================
+  # 批次一：MySQL + Redis
+  #   MySQL 必须先起，Nacos(可选) / XXL-JOB 都依赖它。
+  # ===========================================================================
+
+  mysql:
+    image: mysql:8.4
+    container_name: wisdomhub-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      TZ: Asia/Shanghai
+    # 注意：MySQL 8.4 已移除 --default-authentication-plugin 参数，不要再加
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      # 首次启动时按文件名顺序执行，建库建表（B0.10 的业务表脚本后续也放这里）
+      - ./docker/mysql/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      # 用 -h 127.0.0.1 走 TCP：初始化脚本执行期间 MySQL 只监听 socket，
+      # 这样能避免"健康检查通过但建表还没跑完"的竞态
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+    networks: [wisdomhub]
+
+  redis:
+    image: redis:7.4-alpine
+    container_name: wisdomhub-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks: [wisdomhub]
+
+  # ===========================================================================
+  # 批次二：MongoDB + Neo4j + Elasticsearch
+  #   三个最吃内存，合计约 2 GB。已显式限制堆大小。
+  # ===========================================================================
+
+  mongodb:
+    image: mongo:6.0.28
+    container_name: wisdomhub-mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
+      TZ: Asia/Shanghai
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    networks: [wisdomhub]
+
+  neo4j:
+    image: neo4j:5.26-community
+    container_name: wisdomhub-neo4j
+    restart: unless-stopped
+    environment:
+      # 密码长度至少 8 位，否则容器拒绝启动
+      NEO4J_AUTH: neo4j/${NEO4J_PASSWORD}
+      # Neo4j 5 配置项：命名中 __ 代表字面下划线，_ 代表点
+      # 即 NEO4J_server_memory_heap_max__size → server.memory.heap.max_size
+      NEO4J_server_memory_heap_initial__size: 512m
+      NEO4J_server_memory_heap_max__size: 512m
+      NEO4J_server_memory_pagecache_size: 512m
+    ports:
+      - "7474:7474"   # Neo4j Browser
+      - "7687:7687"   # Bolt
+    volumes:
+      - neo4j-data:/data
+      - neo4j-logs:/logs
+    networks: [wisdomhub]
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.18.8
+    container_name: wisdomhub-es
+    restart: unless-stopped
+    environment:
+      discovery.type: single-node
+      # 开发环境关闭安全认证，否则默认启用 HTTPS + 认证，curl 直接连不上
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+      TZ: Asia/Shanghai
+    ports:
+      - "9200:9200"
+    volumes:
+      - es-data:/usr/share/elasticsearch/data
+    ulimits:
+      memlock: { soft: -1, hard: -1 }
+      nofile: { soft: 65536, hard: 65536 }
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9200/_cluster/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    networks: [wisdomhub]
+
+  # ===========================================================================
+  # 批次三：RabbitMQ（带管理台）
+  # ===========================================================================
+
+  rabbitmq:
+    image: rabbitmq:4.1.8-management
+    container_name: wisdomhub-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+      TZ: Asia/Shanghai
+    ports:
+      - "5672:5672"     # AMQP
+      - "15672:15672"   # 管理台
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks: [wisdomhub]
+
+  # ===========================================================================
+  # 批次四：Nacos + Seata + XXL-JOB
+  # ===========================================================================
+
+  nacos:
+    image: nacos/nacos-server:v3.0.3
+    container_name: wisdomhub-nacos
+    restart: unless-stopped
+    environment:
+      MODE: standalone
+      PREFER_HOST_MODE: hostname
+      # Nacos 3 的认证三件套，缺一会启动失败。
+      # NACOS_AUTH_TOKEN 必须是 Base64 且原文长度 >= 32 字节。
+      # 这里是官方示例里的值，仅供本地开发，上线前必须换掉。
+      NACOS_AUTH_IDENTITY_KEY: serverIdentity
+      NACOS_AUTH_IDENTITY_VALUE: security
+      NACOS_AUTH_TOKEN: ${NACOS_AUTH_TOKEN}
+      TZ: Asia/Shanghai
+    ports:
+      - "8848:8848"     # 服务端 HTTP
+      - "9848:9848"     # gRPC（客户端用）
+      # Nacos 3 把控制台拆成了独立端口 8080。
+      # 宿主机改用 8849，避免与 XXL-JOB admin 的 8080 冲突。
+      - "8849:8080"
+    volumes:
+      - nacos-data:/home/nacos/data
+      - nacos-logs:/home/nacos/logs
+    networks: [wisdomhub]
+
+  seata:
+    image: apache/seata-server:2.5.0
+    container_name: wisdomhub-seata
+    restart: unless-stopped
+    # 全部配置来自挂载的 application.yml，不通过环境变量传参。
+    # 该镜像是 jib 构建的，启动命令由 jib 直接生成，不读 SEATA_PORT 之类的变量。
+    environment:
+      TZ: Asia/Shanghai
+    ports:
+      - "8091:8091"   # RPC 服务端口（Seata 2.x 已无 Web 控制台）
+    volumes:
+      # 必须挂到 ./config/ 而非 ./conf/：Spring Boot 只按默认位置找配置。
+      # 详见 docker/seata/application.yml 顶部注释。
+      - ./docker/seata/application.yml:/seata-server/config/application.yml:ro
+      - seata-data:/seata-server/sessionStore
+    # 无 depends_on：Seata 用 file 注册模式，不依赖 Nacos。
+    # 为什么不用 Nacos 注册，见 docker/seata/application.yml 顶部注释。
+    networks: [wisdomhub]
+
+  xxl-job-admin:
+    image: xuxueli/xxl-job-admin:3.4.2
+    container_name: wisdomhub-xxl-job
+    restart: unless-stopped
+    environment:
+      # 库表由 docker/mysql/init/10-xxl-job.sql 在 MySQL 首次启动时创建
+      PARAMS: >-
+        --spring.datasource.url=jdbc:mysql://mysql:3306/xxl_job?useUnicode=true&characterEncoding=UTF-8&autoReconnect=true&serverTimezone=Asia/Shanghai
+        --spring.datasource.username=root
+        --spring.datasource.password=${MYSQL_ROOT_PASSWORD}
+      TZ: Asia/Shanghai
+    ports:
+      - "8080:8080"
+    # 必须等 MySQL 健康后再起，否则连不上库会直接退出
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks: [wisdomhub]
+
+# =============================================================================
+networks:
+  wisdomhub:
+    driver: bridge
+
+volumes:
+  mysql-data:
+  redis-data:
+  mongo-data:
+  neo4j-data:
+  neo4j-logs:
+  es-data:
+  rabbitmq-data:
+  nacos-data:
+  nacos-logs:
+  seata-data:
