@@ -1,0 +1,200 @@
+/* ==========================================================================
+   设计令牌 —— WisdomHub 前端的唯一取值来源
+   --------------------------------------------------------------------------
+   规则：组件里不写死颜色 / 间距 / 字号，一律引用这里的变量。
+   换主题、调色阶都只改这一个文件。
+
+   主题口径：
+     :root       亮色（基础值）
+     html.dark   暗色覆盖
+
+   「暗色优先」不是靠 CSS 顺序实现的，而是靠 index.html 上预设的 class="dark"
+   —— 首屏直接就是暗色，不需要等 JS 加载完再切。同一份口径写在 index.html 的
+   内联脚本与 src/stores/app.ts 里，三处取值必须一致（dark | light | system）。
+
+   为什么用 CSS 变量而不是 SCSS 变量：变量要在运行时随主题切换，SCSS 变量在
+   编译期就被替换成固定值了，做不了运行时换肤。
+   ========================================================================== */
+
+/* ==========================================================================
+   1. 与主题无关的常量（字体、字阶、间距、圆角、动效、层级、布局）
+   ========================================================================== */
+:root {
+  /* ---- 字体 -------------------------------------------------------------
+     Latin 用自托管的 IBM Plex（@fontsource，见 main.ts 的导入），
+     中文走系统栈：IBM Plex 没有中文字形，且 CJK 网络字体动辄数 MB，不做自托管。
+     中文放在 Latin 之后，浏览器逐字符回退，混排时中英各自用各自的字形。 */
+  --wh-font-sans:
+    'IBM Plex Sans', 'PingFang SC', 'HarmonyOS Sans SC', 'Microsoft YaHei',
+    'Noto Sans SC', system-ui, -apple-system, sans-serif;
+  --wh-font-mono:
+    'IBM Plex Mono', 'JetBrains Mono', 'Cascadia Code', Consolas, 'Courier New', monospace;
+
+  /* ---- 字阶 -------------------------------------------------------------
+     中文方块字比拉丁字母需要更大的字号和行高。正文取 15px / 1.7 ——
+     这个行高是为中文长文阅读调的，纯拉丁界面常见的 14px / 1.5 在这里偏挤。 */
+  --wh-text-xs: 0.75rem; /* 12px  徽章、类别标签 */
+  --wh-text-sm: 0.8125rem; /* 13px  元信息（时间、计数、作者） */
+  --wh-text-base: 0.9375rem; /* 15px  正文 */
+  --wh-text-lg: 1.0625rem; /* 17px  卡片标题、小标题 */
+  --wh-text-xl: 1.25rem; /* 20px  区块标题 */
+  --wh-text-2xl: 1.5rem; /* 24px  页面标题 */
+  --wh-text-3xl: 2rem; /* 32px  首页主标题 */
+
+  --wh-leading-tight: 1.25;
+  --wh-leading-snug: 1.4;
+  --wh-leading-normal: 1.6;
+  --wh-leading-relaxed: 1.75; /* 文章正文 */
+
+  --wh-weight-regular: 400;
+  --wh-weight-medium: 500;
+  --wh-weight-semibold: 600;
+
+  /* 标题收紧字距：IBM Plex 大字号下默认字距偏松 */
+  --wh-tracking-tight: -0.01em;
+  --wh-tracking-wide: 0.04em;
+
+  /* ---- 间距（4px 基准） ------------------------------------------------- */
+  --wh-space-1: 4px;
+  --wh-space-2: 8px;
+  --wh-space-3: 12px;
+  --wh-space-4: 16px;
+  --wh-space-5: 24px;
+  --wh-space-6: 32px;
+  --wh-space-7: 48px;
+  --wh-space-8: 64px;
+  --wh-space-9: 96px;
+
+  /* ---- 圆角 -------------------------------------------------------------
+     刻意偏小。终端 / IDE 的视觉语言是「框线分区」，不是「一片圆润的卡片」；
+     全站只用三档，避免任何元素都套同一个圆角值。 */
+  --wh-radius-xs: 2px; /* 徽章、类别标签 */
+  --wh-radius-sm: 4px; /* 输入框内部元素 */
+  --wh-radius-md: 6px; /* 卡片、按钮、输入框 */
+  --wh-radius-full: 999px; /* 只给头像 */
+
+  /* ---- 描边 -------------------------------------------------------------
+     暗色底上投影几乎不可见，用 1px 边框分区比用阴影可靠得多，
+     两个主题因此可以共用同一套布局规则。 */
+  --wh-border-width: 1px;
+
+  /* ---- 动效 ------------------------------------------------------------- */
+  --wh-duration-fast: 120ms;
+  --wh-duration-base: 200ms;
+  --wh-ease: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* ---- 层级 ------------------------------------------------------------- */
+  --wh-z-nav: 100;
+  --wh-z-overlay: 200;
+  --wh-z-toast: 300;
+
+  /* ---- 布局 ------------------------------------------------------------- */
+  --wh-container: 1200px;
+  /* 正文栏宽：约 44 个中文字 / 行。比拉丁排版常用的 60-80 字符窄，
+     因为正文以中文为主，中文一行放太多字反而难读。 */
+  --wh-reading: 42rem;
+  --wh-nav-height: 56px;
+}
+
+/* ==========================================================================
+   2. 亮色主题
+   ========================================================================== */
+:root {
+  /* 底色 */
+  --wh-bg-base: #f7f8fa; /* 页面底 */
+  --wh-bg-surface: #ffffff; /* 卡片、面板 */
+  --wh-bg-raised: #f1f3f7; /* 悬浮、输入框、代码块 */
+  --wh-bg-hover: #e8ecf3; /* 行悬停 */
+
+  /* 描边 */
+  --wh-border: #e0e5ee;
+  --wh-border-strong: #c8d0de;
+
+  /* 文本。只有三级：主要 / 次要 / 弱化。
+     再细分会出现「区别看不出来但维护成本翻倍」的中间态。 */
+  --wh-text-1: #0f1723; /* 正文、标题 */
+  --wh-text-2: #526079; /* 次要说明 */
+  --wh-text-3: #8b95a9; /* 时间、计数、占位符 */
+  --wh-text-inverse: #ffffff;
+
+  /* 主色。只用于「动作」与「焦点」：按钮、链接、激活态、focus ring。
+     信息性的着色全部让给下面的技术类别色，主色铺满会让每条信息都在喊。 */
+  --wh-accent: #047857; /* 亮底上压深，否则对比度不到 4.5:1 */
+  --wh-accent-hover: #036449;
+  /* 压在任何深色填充上的文字色。亮色主题的填充都是深的，所以是白字。 */
+  --wh-text-on-fill: #ffffff;
+
+  /* 语义色 */
+  --wh-danger: #b91c1c;
+  --wh-warning: #a16207;
+  --wh-info: #0369a1;
+
+  /* 技术类别色（对应技术文档 7.13 的 category 枚举）。
+     亮底上统一压深，保证作为文字用时对比度 ≥ 4.5:1。 */
+  --wh-cat-language: #9a6700; /* LANGUAGE    编程语言：Java / Go / Python */
+  --wh-cat-framework: #6d28d9; /* FRAMEWORK   框架：Spring / MyBatis */
+  --wh-cat-middleware: #0369a1; /* MIDDLEWARE  中间件：Redis / RabbitMQ / Kafka */
+  --wh-cat-database: #be123c; /* DATABASE    数据库：MySQL / ES / Neo4j */
+  --wh-cat-concept: #475569; /* CONCEPT     概念：AOP / MVCC / 分布式锁。故意最低饱和 ——
+                                           概念是五类里最抽象的一类 */
+}
+
+/* ==========================================================================
+   3. 暗色主题
+   —— 把每一处取值和上面亮色一一对齐；新增令牌时两边都要加。
+   ========================================================================== */
+html.dark {
+  /* 底色。用带蓝调的深色而不是纯黑 #000：
+     纯黑上放卡片只能靠加亮，层级会挤成一团；略高的底色留出加亮空间。 */
+  --wh-bg-base: #0a0e17;
+  --wh-bg-surface: #121826;
+  --wh-bg-raised: #1a2233;
+  --wh-bg-hover: #202a3d;
+
+  --wh-border: #232d42;
+  --wh-border-strong: #33405a;
+
+  --wh-text-1: #e4e9f2; /* 不用纯白：大面积纯白文字在暗底上会发光刺眼 */
+  --wh-text-2: #97a3b8;
+  --wh-text-3: #5d6b84;
+  --wh-text-inverse: #0a0e17;
+
+  --wh-accent: #6ee7b7;
+  --wh-accent-hover: #8df0c9;
+  /* 暗色主题的填充都很亮（主色 #6ee7b7、危险色 #f87171……），所以压深字。
+     暗色下沿用白字是这类主题最常见的坑：白字压亮绿只有约 1.8:1，几乎看不清。 */
+  --wh-text-on-fill: #04140d;
+
+  --wh-danger: #f87171;
+  --wh-warning: #fbbf24;
+  --wh-info: #38bdf8;
+
+  /* 技术类别色：暗底上提亮。亮度关系与亮色主题保持一致，
+     这样「FRAMEWORK 是紫的」这条认知不会随主题切换而失效。 */
+  --wh-cat-language: #f0b429;
+  --wh-cat-framework: #a78bfa;
+  --wh-cat-middleware: #38bdf8;
+  --wh-cat-database: #fb7185;
+  --wh-cat-concept: #8fa0bc;
+}
+
+/* ==========================================================================
+   4. 派生色 —— 由上面的基础令牌算出来，两个主题各自生效，不必重复写。
+   ========================================================================== */
+:root {
+  /* 类别色的浅底版本，用于徽章背景。
+     用 color-mix 而不是手写 rgba，加了新类别色不用再配一个背景色；
+     也不写死 alpha，换主题时深浅自动跟随。 */
+  --wh-cat-language-soft: color-mix(in srgb, var(--wh-cat-language) 14%, transparent);
+  --wh-cat-framework-soft: color-mix(in srgb, var(--wh-cat-framework) 14%, transparent);
+  --wh-cat-middleware-soft: color-mix(in srgb, var(--wh-cat-middleware) 14%, transparent);
+  --wh-cat-database-soft: color-mix(in srgb, var(--wh-cat-database) 14%, transparent);
+  --wh-cat-concept-soft: color-mix(in srgb, var(--wh-cat-concept) 14%, transparent);
+
+  --wh-accent-soft: color-mix(in srgb, var(--wh-accent) 14%, transparent);
+  --wh-danger-soft: color-mix(in srgb, var(--wh-danger) 14%, transparent);
+
+  /* 焦点环。引用的是 --wh-bg-base 与 --wh-accent，两者本身随主题变，
+     所以这条不需要在 html.dark 里再写一遍 —— 它自动跟着换。 */
+  --wh-focus-ring: 0 0 0 2px var(--wh-bg-base), 0 0 0 4px var(--wh-accent);
+}

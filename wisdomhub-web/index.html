@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="zh-CN" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="面向开发者的技术知识社区与知识图谱平台" />
+    <title>%VITE_APP_TITLE%</title>
+    <script>
+      // 主题必须在首次绘制之前定下来，否则会亮色一闪再切暗色。
+      // 这段刻意内联、不经打包：它要早于任何 CSS 与 JS 模块执行。
+      // 存储键与取值口径必须和 src/stores/app.ts 一致（dark | light | system）。
+      ;(function () {
+        try {
+          var saved = localStorage.getItem('wisdomhub:theme')
+          // 用户没表过态 → 暗色优先；表过态就照他选的来。
+          var isDark =
+            saved === null
+              ? true
+              : saved === 'dark' ||
+                (saved === 'system' && matchMedia('(prefers-color-scheme: dark)').matches)
+          document.documentElement.classList.toggle('dark', isDark)
+        } catch (e) {
+          /* localStorage 被禁用时保持 <html> 上预设的 dark */
+        }
+      })()
+    </script>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

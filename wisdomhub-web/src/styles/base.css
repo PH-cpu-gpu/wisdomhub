@@ -1,0 +1,239 @@
+/* ==========================================================================
+   基础层 —— 重置 + 全局排版 + 少量通用类
+   依赖 tokens.css，必须在其之后加载（见 src/styles/index.css 的顺序）。
+   ========================================================================== */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+* {
+  margin: 0;
+}
+
+html {
+  /* 主题切换时底色变化，加过渡让它不那么生硬 */
+  transition: background-color var(--wh-duration-base) var(--wh-ease);
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+
+  font-family: var(--wh-font-sans);
+  font-size: var(--wh-text-base);
+  line-height: var(--wh-leading-normal);
+  color: var(--wh-text-1);
+  background-color: var(--wh-bg-base);
+
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 暗色下浏览器默认的滚动条是亮色，非常扎眼 */
+html.dark {
+  color-scheme: dark;
+}
+
+:root {
+  color-scheme: light;
+}
+
+img,
+picture,
+svg,
+video {
+  display: block;
+  max-width: 100%;
+}
+
+input,
+button,
+textarea,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+/* 标题不做花哨处理：字号 + 字重 + 收紧的字距就够了。
+   全站只用一套无衬线家族，靠字阶与字重区分层级。 */
+h1,
+h2,
+h3,
+h4 {
+  font-weight: var(--wh-weight-semibold);
+  line-height: var(--wh-leading-tight);
+  letter-spacing: var(--wh-tracking-tight);
+  text-wrap: balance; /* 多行标题的换行位置更均衡，避免末行只剩一个字 */
+}
+
+h5,
+h6 {
+  font-weight: var(--wh-weight-medium);
+  line-height: var(--wh-leading-snug);
+}
+
+a {
+  color: var(--wh-accent);
+  text-decoration: none;
+  transition: color var(--wh-duration-fast) var(--wh-ease);
+}
+
+a:hover {
+  color: var(--wh-accent-hover);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+code,
+kbd,
+pre,
+samp {
+  font-family: var(--wh-font-mono);
+  font-size: 0.9em;
+}
+
+pre {
+  overflow: auto;
+  padding: var(--wh-space-4);
+  border: var(--wh-border-width) solid var(--wh-border);
+  border-radius: var(--wh-radius-md);
+  background-color: var(--wh-bg-raised);
+}
+
+::selection {
+  color: var(--wh-text-on-fill);
+  background-color: var(--wh-accent);
+}
+
+/* 键盘可达性：只有键盘导航才显示焦点环。
+   用 :focus-visible 而非 :focus，鼠标点击不会留下难看的框。 */
+:focus-visible {
+  outline: none;
+  box-shadow: var(--wh-focus-ring);
+  border-radius: var(--wh-radius-xs);
+}
+
+/* ==========================================================================
+   通用类
+   ========================================================================== */
+
+/* 内容容器 */
+.wh-container {
+  width: 100%;
+  max-width: var(--wh-container);
+  margin-inline: auto;
+  padding-inline: var(--wh-space-4);
+}
+
+/* 正文栏宽。长文用它限宽 —— 一行放太多字中文很难读 */
+.wh-reading {
+  max-width: var(--wh-reading);
+}
+
+/* 等宽。只给三类东西用：雪花 ID（19 位数字，等宽才对齐）、代码、计数。
+   不当作通用标签装饰 —— 到处都用等宽，等于哪里都没有重点。 */
+.wh-mono {
+  font-family: var(--wh-font-mono);
+  font-feature-settings: 'tnum'; /* 数字等宽，计数变化时不会左右抖动 */
+}
+
+/* ==========================================================================
+   技术类别 → 颜色
+   --------------------------------------------------------------------------
+   这是本设计系统的识别性元素：五类技术（LANGUAGE / FRAMEWORK / MIDDLEWARE /
+   DATABASE / CONCEPT）在全站用同一套颜色。
+
+   用法：给任意元素加 data-cat，它和它的子元素就能用 var(--wh-cat)
+   与 var(--wh-cat-soft)：
+       <span class="wh-cat" data-cat="DATABASE">MySQL</span>     徽章
+       <span data-cat="DATABASE" class="dot"></span>             一个色点
+
+   映射只写这一处。之前把映射挂在 .wh-cat 上，结果是侧边栏、图谱节点这些
+   也想着色就得各抄一份映射 —— 那正是配色会漂移的原因。
+
+   为什么用 data-cat 而不是每类一个类名（.wh-cat--database）：
+   data 属性的取值与 TS 侧的类型定义（src/config/design-tokens.ts）能直接对齐，
+   也不会出现「加了一个类别却忘了加类名」。
+
+   注意：颜色是**补充线索，不是唯一线索** —— 徽章里始终带类别文字或技术名，
+   色盲用户不靠颜色也能读。
+   ========================================================================== */
+[data-cat='LANGUAGE'] {
+  --wh-cat: var(--wh-cat-language);
+  --wh-cat-soft: var(--wh-cat-language-soft);
+}
+[data-cat='FRAMEWORK'] {
+  --wh-cat: var(--wh-cat-framework);
+  --wh-cat-soft: var(--wh-cat-framework-soft);
+}
+[data-cat='MIDDLEWARE'] {
+  --wh-cat: var(--wh-cat-middleware);
+  --wh-cat-soft: var(--wh-cat-middleware-soft);
+}
+[data-cat='DATABASE'] {
+  --wh-cat: var(--wh-cat-database);
+  --wh-cat-soft: var(--wh-cat-database-soft);
+}
+[data-cat='CONCEPT'] {
+  --wh-cat: var(--wh-cat-concept);
+  --wh-cat-soft: var(--wh-cat-concept-soft);
+}
+
+/* 类别徽章。技术文档 7.13 的 category 枚举是这里唯一的事实来源。 */
+.wh-cat {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--wh-space-2);
+
+  padding: 2px var(--wh-space-2);
+  border-radius: var(--wh-radius-xs);
+
+  font-family: var(--wh-font-mono);
+  font-size: var(--wh-text-xs);
+  letter-spacing: var(--wh-tracking-wide);
+  white-space: nowrap;
+
+  color: var(--wh-cat, var(--wh-text-2));
+  background-color: var(--wh-cat-soft, var(--wh-bg-raised));
+}
+
+/* 小圆点：颜色线索的载体，与文字并存 */
+.wh-cat::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: var(--wh-radius-full);
+  background-color: currentColor;
+}
+
+/* ==========================================================================
+   无障碍：屏幕阅读器可见、视觉隐藏
+   ========================================================================== */
+.wh-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ==========================================================================
+   尊重系统的「减弱动态效果」设置
+   ========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
