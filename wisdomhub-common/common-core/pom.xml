@@ -33,11 +33,21 @@
             <scope>provided</scope>
         </dependency>
 
-        <!-- 只为 R<T> 上的 @Schema 注解（给接口文档加字段说明）。
-             必须是 common 层，不能用 webmvc-ui：后者会拖进 spring-webmvc，
-             而 common-core 被响应式栈的 gateway 依赖——
-             spring-webmvc 一出现，Spring Boot 就不再判定 gateway 为响应式应用，直接报废。
-             与上面 spring-web 那条注释是同一类问题。 -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-autoconfigure</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
+            <optional>true</optional>
+        </dependency>
+
         <dependency>
             <groupId>org.springdoc</groupId>
             <artifactId>springdoc-openapi-starter-common</artifactId>
