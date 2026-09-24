@@ -10,10 +10,9 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 
 /**
- * 时间字段的 UTC 自动填充（技术文档 17.2）。
+ * 时间字段的 UTC 自动填充。
  *
  * <p>全项目时间按 UTC 存储，而每个实体都有 createTime / updateTime，所以填充逻辑集中在这一处，
- * 不用 4 个用 MyBatis-Plus 的服务各写一份、各忘一次。
  *
  * <p>实体字段需要标 {@code @TableField(fill = FieldFill.INSERT)}（或 INSERT_UPDATE），
  * 否则 strictXxxFill 按 MyBatis-Plus 的约定不会生效。
