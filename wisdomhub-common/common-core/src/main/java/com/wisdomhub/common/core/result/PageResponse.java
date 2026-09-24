@@ -11,7 +11,7 @@ import java.util.List;
 public class PageResponse<T> {
 
     @Schema(description = "数据总条数")
-    private Long total;
+    private Integer total;
 
     @Schema(description = "总页数")
     private Integer pages;
