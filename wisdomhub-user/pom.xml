@@ -22,11 +22,6 @@
         </dependency>
         <dependency>
             <groupId>com.wisdomhub</groupId>
-            <artifactId>common-exception</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>com.wisdomhub</groupId>
             <artifactId>common-security</artifactId>
             <version>${project.version}</version>
         </dependency>

@@ -1,3 +1,15 @@
+server:
+  port: 9090
+
 spring:
   application:
     name: gateway-service
+  profiles:
+    active: local
+  cloud:
+    nacos:
+      discovery:
+        namespace: wisdomhub
+      config:
+        namespace: wisdomhub
+        file-extension: yaml
