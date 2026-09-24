@@ -12,7 +12,7 @@
 
     <artifactId>common-core</artifactId>
     <name>common-core</name>
-    <description>统一返回体 R&lt;T&gt;、错误码枚举、全局异常处理器、分页封装（任务 B0.6）</description>
+    <description>统一返回体 R&lt;T&gt;、错误码、分页封装、业务异常基类与全局异常处理器（任务 B0.6、B0.7）</description>
 
     <dependencies>
         <!--
@@ -31,6 +31,17 @@
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
             <scope>provided</scope>
+        </dependency>
+
+        <!-- 只为 R<T> 上的 @Schema 注解（给接口文档加字段说明）。
+             必须是 common 层，不能用 webmvc-ui：后者会拖进 spring-webmvc，
+             而 common-core 被响应式栈的 gateway 依赖——
+             spring-webmvc 一出现，Spring Boot 就不再判定 gateway 为响应式应用，直接报废。
+             与上面 spring-web 那条注释是同一类问题。 -->
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-common</artifactId>
+            <optional>true</optional>
         </dependency>
     </dependencies>
 </project>

@@ -17,7 +17,6 @@
 
     <modules>
         <module>common-core</module>
-        <module>common-exception</module>
         <module>common-security</module>
         <module>common-redis</module>
         <module>common-feign</module>

@@ -82,6 +82,12 @@
                 <artifactId>springdoc-openapi-starter-webflux-ui</artifactId>
                 <version>${springdoc.version}</version>
             </dependency>
+            <!-- common-core 用它给 R<T> 提供 @Schema 注解（与 UI 栈无关，不碰 servlet） -->
+            <dependency>
+                <groupId>org.springdoc</groupId>
+                <artifactId>springdoc-openapi-starter-common</artifactId>
+                <version>${springdoc.version}</version>
+            </dependency>
 
             <!-- JWT：技术文档 7.17。三个 artifact 版本必须一致，故一并纳入管理 -->
             <dependency>
