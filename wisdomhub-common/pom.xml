@@ -14,6 +14,12 @@
     <packaging>pom</packaging>
     <name>wisdomhub-common</name>
     <description>公共能力模块聚合器（技术文档 第 17 章）</description>
+    <dependencies>
+        <dependency>
+            <groupId>cn.hutool</groupId>
+            <artifactId>hutool-all</artifactId>
+        </dependency>
+    </dependencies>
 
     <modules>
         <module>common-core</module>

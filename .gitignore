@@ -36,5 +36,9 @@ build/
 .claude/
 .env
 
+### JWT 密钥（绝不入库：私钥泄露即可伪造任意用户的 token）###
+**/src/main/resources/*.key
+/*.key
+
 ### 中间件插件二进制（体积大，且随 ES 版本变化）###
 docker/elasticsearch/plugins/

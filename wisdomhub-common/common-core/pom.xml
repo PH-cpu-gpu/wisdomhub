@@ -53,5 +53,6 @@
             <artifactId>springdoc-openapi-starter-common</artifactId>
             <optional>true</optional>
         </dependency>
+
     </dependencies>
 </project>
