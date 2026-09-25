@@ -12,7 +12,7 @@
 
     <artifactId>common-redis</artifactId>
     <name>common-redis</name>
-    <description>Redis 模板、key 规范、分布式锁（SET NX PX + Lua）（任务 B1.2）</description>
+    <description>Redis 模板与 key 规范（任务 B1.2）</description>
 
     <dependencies>
         <dependency>
@@ -24,6 +24,11 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-redis</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-json</artifactId>
         </dependency>
 
         <!-- Lettuce 连接池依赖 -->
