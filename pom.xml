@@ -32,6 +32,7 @@
         <springdoc.version>2.9.1</springdoc.version>
         <jjwt.version>0.13.0</jjwt.version>
         <xxl-job.version>3.4.2</xxl-job.version>
+        <hutool.version>5.8.47</hutool.version>
     </properties>
 
     <dependencyManagement>
@@ -113,6 +114,13 @@
                 <groupId>com.xuxueli</groupId>
                 <artifactId>xxl-job-core</artifactId>
                 <version>${xxl-job.version}</version>
+            </dependency>
+
+            <!-- hutool 工具包 -->
+            <dependency>
+                <groupId>cn.hutool</groupId>
+                <artifactId>hutool-all</artifactId>
+                <version>${hutool.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
