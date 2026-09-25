@@ -18,6 +18,8 @@ import java.util.Map;
 @Slf4j
 public class JwtUtil {
 
+    private JwtUtil() {}
+
     public static String createToken(Map<String, Object> claims, String privateKey, int dateOffset, DateField dateField) {
         RSA rsa = new RSA(privateKey, null);
         return Jwts.builder().claims(claims)
