@@ -1,0 +1,2 @@
+com.wisdomhub.common.mq.config.ExchangeConfiguration
+com.wisdomhub.common.mq.config.MqAutoConfiguration
