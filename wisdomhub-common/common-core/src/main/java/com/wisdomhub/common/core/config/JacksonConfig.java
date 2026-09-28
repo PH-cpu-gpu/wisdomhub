@@ -29,7 +29,6 @@ public class JacksonConfig {
 
 
     private static final class UtcLocalDateTimeSerializer extends JsonSerializer<LocalDateTime> {
-
         @Override
         public void serialize(LocalDateTime value, JsonGenerator gen, SerializerProvider provider) throws IOException {
             gen.writeString(value.toInstant(ZoneOffset.UTC).toString());

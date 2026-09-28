@@ -9,7 +9,6 @@ public final class RedisPrefix {
     /** 全项目统一前缀，任何 key 都必须以它开头 */
     public static final String APP = "wisdomhub";
 
-    /** 服务段在这里定义，避免出现 user / user-service / userService 几种写法 */
     public static final String USER = APP + ":user";
     public static final String CONTENT = APP + ":content";
     public static final String SEARCH = APP + ":search";
