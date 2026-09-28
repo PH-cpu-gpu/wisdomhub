@@ -1,4 +1,4 @@
-package com.wisdomhub.common.feign.config;
+package com.wisdomhub.common.feign.retryer;
 
 import feign.RetryableException;
 import feign.Retryer;

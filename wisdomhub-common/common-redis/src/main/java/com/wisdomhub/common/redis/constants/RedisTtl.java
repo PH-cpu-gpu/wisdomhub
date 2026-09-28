@@ -26,5 +26,8 @@ public final class RedisTtl {
     /** 热门榜单刷新间隔 */
     public static final Duration HOT_RANK = Duration.ofMinutes(30);
 
+    /** Spring Cache 的默认存活时间，单个 cacheName 可另行覆盖 */
+    public static final Duration CACHE_DEFAULT = Duration.ofMinutes(30);
+
     private RedisTtl() {}
 }

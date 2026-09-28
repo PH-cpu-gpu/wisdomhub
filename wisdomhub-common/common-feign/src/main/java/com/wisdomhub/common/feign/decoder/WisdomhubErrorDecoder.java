@@ -1,4 +1,4 @@
-package com.wisdomhub.common.feign.config;
+package com.wisdomhub.common.feign.decoder;
 
 import com.wisdomhub.common.core.exception.BusinessException;
 import com.wisdomhub.common.feign.exception.RemoteErrorCode;

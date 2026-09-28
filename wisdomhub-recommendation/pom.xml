@@ -51,7 +51,7 @@
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
 
-        <!-- 多级缓存：Spring Cache + Caffeine + Redis（技术文档 7.9、11） -->
+        <!-- 多级缓存：Spring Cache + Caffeine + Redis -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-cache</artifactId>
