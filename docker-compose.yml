@@ -37,7 +37,7 @@ services:
     command:
       - --character-set-server=utf8mb4
       # 业务库要求大小写敏感（用户名 Pulsar 与 pulsar 是两个账号）。
-      # 业务库自己在 docker/mysql/init/schema.sql 里显式指定了排序规则；
+      # 业务库自己在 docker/mysql/init/20-schema.sql 里显式指定了排序规则；
       # 这里保持一致，是为了让「未显式指定」的新库也落在同一套语义上，
       # 避免出现「有的库敏感、有的库不敏感」。
       - --collation-server=utf8mb4_0900_as_cs
