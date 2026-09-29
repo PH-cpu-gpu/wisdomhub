@@ -27,8 +27,9 @@
         <spring-cloud.version>2025.0.3</spring-cloud.version>
         <spring-cloud-alibaba.version>2025.0.0.0</spring-cloud-alibaba.version>
 
-        <!-- 以下四项 Boot / Spring Cloud / SCA 的 BOM 都未覆盖，需在此统一管版本 -->
+        <!-- 以下几项 Boot / Spring Cloud / SCA 的 BOM 都未覆盖，需在此统一管版本 -->
         <mybatis-plus.version>3.5.17</mybatis-plus.version>
+        <velocity.version>2.4.1</velocity.version>
         <springdoc.version>2.9.1</springdoc.version>
         <jjwt.version>0.13.0</jjwt.version>
         <xxl-job.version>3.4.2</xxl-job.version>
@@ -70,6 +71,19 @@
                 <groupId>com.baomidou</groupId>
                 <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
                 <version>${mybatis-plus.version}</version>
+            </dependency>
+
+            <!-- 代码生成器：只在 common-core 以 optional 引入，不下发给任何服务的运行时 -->
+            <dependency>
+                <groupId>com.baomidou</groupId>
+                <artifactId>mybatis-plus-generator</artifactId>
+                <version>${mybatis-plus.version}</version>
+            </dependency>
+            <!-- generator 把各模板引擎都标成了 optional，引擎得由我们显式声明 -->
+            <dependency>
+                <groupId>org.apache.velocity</groupId>
+                <artifactId>velocity-engine-core</artifactId>
+                <version>${velocity.version}</version>
             </dependency>
 
             <!-- 接口文档：任务 B1.31。Servlet 服务用 mvc，Gateway(响应式) 用 webflux -->
