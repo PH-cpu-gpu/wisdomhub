@@ -1,5 +1,6 @@
-package com.wisdomhub.common.core.exception;
+package com.wisdomhub.common.web.exception;
 
+import com.wisdomhub.common.core.exception.BusinessException;
 import com.wisdomhub.common.core.result.CommonErrorCode;
 import com.wisdomhub.common.core.result.R;
 import jakarta.validation.ConstraintViolation;
@@ -7,8 +8,10 @@ import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.MessageSourceResolvable;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.BindException;
 import org.springframework.validation.FieldError;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
@@ -32,6 +35,18 @@ public class GlobalExceptionHandler {
                 .collect(Collectors.joining("; "));
         log.warn("参数校验失败: {}", detail);
         return R.error(CommonErrorCode.BAD_REQUEST, detail);
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public R<Object> handleMissingParameter(MissingServletRequestParameterException e) {
+        log.warn("缺少请求参数: {}", e.getParameterName());
+        return R.error(CommonErrorCode.BAD_REQUEST, "缺少参数: " + e.getParameterName());
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public R<Object> handleNotReadable(HttpMessageNotReadableException e) {
+        log.warn("请求体解析失败: {}", e.getMessage());
+        return R.error(CommonErrorCode.BAD_REQUEST, "请求体格式不正确");
     }
 
     @ExceptionHandler(DuplicateKeyException.class)

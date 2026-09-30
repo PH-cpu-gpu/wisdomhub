@@ -1,0 +1,2 @@
+com.wisdomhub.common.web.exception.GlobalExceptionHandler
+com.wisdomhub.common.web.config.MybatisTimeConfig

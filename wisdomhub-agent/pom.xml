@@ -20,6 +20,12 @@
             <artifactId>common-core</artifactId>
             <version>${project.version}</version>
         </dependency>
+
+        <dependency>
+            <groupId>com.wisdomhub</groupId>
+            <artifactId>common-web</artifactId>
+            <version>${project.version}</version>
+        </dependency>
         <dependency>
             <groupId>com.wisdomhub</groupId>
             <artifactId>common-security</artifactId>

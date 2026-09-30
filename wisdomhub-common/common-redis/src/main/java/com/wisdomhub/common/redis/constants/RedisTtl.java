@@ -8,7 +8,7 @@ import java.time.Duration;
  */
 public final class RedisTtl {
 
-    /** access token 有效期，须与 JwtUtil.createToken 的取值保持一致（当前默认 2 小时） */
+    /** access token 有效期 */
     public static final Duration ACCESS_TOKEN = Duration.ofHours(2);
 
     /** refresh token 有效期 */
