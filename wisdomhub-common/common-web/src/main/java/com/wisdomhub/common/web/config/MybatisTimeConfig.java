@@ -1,4 +1,4 @@
-package com.wisdomhub.common.core.config;
+package com.wisdomhub.common.web.config;
 
 import com.baomidou.mybatisplus.core.handlers.MetaObjectHandler;
 import org.apache.ibatis.reflection.MetaObject;
@@ -17,7 +17,7 @@ import java.time.ZoneOffset;
  * <p>实体字段需要标 {@code @TableField(fill = FieldFill.INSERT)}（或 INSERT_UPDATE），
  * 否则 strictXxxFill 按 MyBatis-Plus 的约定不会生效。
  *
- * <p>激活条件放在类上：MyBatis-Plus 是 common-core 的 optional 依赖，
+ * <p>激活条件放在类上：MyBatis-Plus 是本模块的 optional 依赖，
  * 只有真正用 MP 的服务会加载本类；条件标在 @Bean 方法上会因返回类型缺失产生类加载风险。
  */
 @AutoConfiguration

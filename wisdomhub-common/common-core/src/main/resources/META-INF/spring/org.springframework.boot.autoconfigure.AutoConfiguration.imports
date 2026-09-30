@@ -1,3 +1,1 @@
-com.wisdomhub.common.core.exception.GlobalExceptionHandler
 com.wisdomhub.common.core.config.JacksonConfig
-com.wisdomhub.common.core.config.MybatisTimeConfig

@@ -12,21 +12,9 @@
 
     <artifactId>common-core</artifactId>
     <name>common-core</name>
-    <description>统一返回体 R&lt;T&gt;、错误码、分页封装、业务异常基类与全局异常处理器（任务 B0.6、B0.7）</description>
+    <description>统一返回体 R&lt;T&gt;、错误码、分页封装、业务异常基类（任务 B0.6、B0.7）</description>
 
     <dependencies>
-        <!--
-          这里刻意用 spring-web 而非 spring-boot-starter-web：
-          common-core 会被 wisdomhub-gateway 依赖，而 Gateway 是响应式（WebFlux）栈。
-          引入 starter-web 会让 Spring Boot 选择 Servlet 栈，直接破坏 Gateway。
-          spring-web 是 MVC 与 WebFlux 的共同底层，两边都安全
-          （@RestControllerAdvice / @ExceptionHandler 注解就在 spring-web 中）。
-        -->
-        <dependency>
-            <groupId>org.springframework</groupId>
-            <artifactId>spring-web</artifactId>
-        </dependency>
-
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
@@ -71,11 +59,6 @@
             <groupId>org.springdoc</groupId>
             <artifactId>springdoc-openapi-starter-common</artifactId>
             <optional>true</optional>
-        </dependency>
-
-        <dependency>
-            <groupId>org.springframework</groupId>
-            <artifactId>spring-tx</artifactId>
         </dependency>
     </dependencies>
 </project>

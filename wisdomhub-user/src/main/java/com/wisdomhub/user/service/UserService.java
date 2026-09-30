@@ -1,6 +1,7 @@
 package com.wisdomhub.user.service;
 
 import com.wisdomhub.user.dto.RegisterDTO;
+import com.wisdomhub.user.vo.LoginVO;
 
 public interface UserService {
 
@@ -8,5 +9,5 @@ public interface UserService {
 
     void sendCodeByEmail(String email);
 
-    void register(RegisterDTO registerDTO);
+    LoginVO register(RegisterDTO registerDTO);
 }
