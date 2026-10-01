@@ -1,6 +1,7 @@
 package com.wisdomhub.user.controller;
 
 import com.wisdomhub.common.core.result.R;
+import com.wisdomhub.user.dto.LoginDTO;
 import com.wisdomhub.user.dto.RegisterDTO;
 import com.wisdomhub.user.service.UserService;
 import com.wisdomhub.user.vo.LoginVO;
@@ -25,6 +26,12 @@ public class AuthController {
     @PostMapping("/register")
     public R<LoginVO> register(@Validated @RequestBody RegisterDTO registerDTO) {
         return R.success(userService.register(registerDTO));
+    }
+
+    @Operation(summary = "用户登录")
+    @PostMapping("/login")
+    public R<LoginVO> login(@Validated @RequestBody LoginDTO loginDTO) {
+        return R.success(userService.login(loginDTO));
     }
 
     // 这里先模拟验证码的实现, 先将验证码记录在日志
