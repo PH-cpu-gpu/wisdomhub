@@ -14,8 +14,10 @@ import com.wisdomhub.common.redis.constants.RedisTtl;
 import com.wisdomhub.common.security.util.JwtUtil;
 import com.wisdomhub.user.config.JwtPropertyConfig;
 import com.wisdomhub.user.constants.JwtPayloadConstants;
+import com.wisdomhub.user.dto.LoginDTO;
 import com.wisdomhub.user.dto.RegisterDTO;
 import com.wisdomhub.user.constants.RedisKeyConstants;
+import com.wisdomhub.user.dto.TokenDTO;
 import com.wisdomhub.user.entity.User;
 import com.wisdomhub.user.mapper.UserMapper;
 import com.wisdomhub.user.service.UserService;
@@ -107,19 +109,48 @@ public class UserServiceImpl implements UserService {
         stringRedisTemplate.delete(key);
 
         // 登录成功, 生成双token并返回
-        Long userId = user.getId();
-        String accessToken = JwtUtil.createToken(Map.of(JwtPayloadConstants.USER_ID, userId),
-                jwtPropertyConfig.privateKey(),
-                (int) RedisTtl.ACCESS_TOKEN.toMinutes(),
-                DateField.MINUTE);
-        String refreshToken = UUID.randomUUID().toString();
-        String refreshKey = RedisKeyConstants.REFRESH_TOKEN_KEY + userId;
-        stringRedisTemplate.opsForValue().set(refreshKey, refreshToken, RedisTtl.REFRESH_TOKEN);
+        TokenDTO tokenDTO = createTokenByUserId(user.getId());
         return LoginVO.builder()
-                .accessToken(accessToken)
-                .refreshToken(refreshToken)
+                .accessToken(tokenDTO.getAccessToken())
+                .refreshToken(tokenDTO.getRefreshToken())
                 .build();
     }
+
+    /**
+     * 根据手机号或邮箱以及密码登录
+     */
+    @Override
+    public LoginVO login(LoginDTO loginDTO) {
+        // 检查电话登录or邮箱登录
+        String phone = loginDTO.getPhone();
+        String originalEmail = loginDTO.getEmail();
+        if (StrUtil.isEmpty(phone) && StrUtil.isEmpty(originalEmail)) {
+            throw new BusinessException(CommonErrorCode.BAD_REQUEST);
+        }
+        LambdaQueryWrapper<User> wrapper;
+        if (!StrUtil.isEmpty(phone)) {
+            wrapper = new LambdaQueryWrapper<User>().eq(User::getPhone, phone);
+        } else {
+            wrapper = new LambdaQueryWrapper<User>().eq(User::getEmail, originalEmail.toLowerCase(Locale.ROOT));
+        }
+
+        // 查询用户是否存在
+        User user = userMapper.selectOne(wrapper);
+
+        // 检查密码是否正确
+        if (user == null || !passwordEncoder.matches(loginDTO.getPassword(), user.getPassword())) {
+            throw new BusinessException(CommonErrorCode.BAD_REQUEST, "账号或密码错误");
+        }
+
+        // 登录成功, 返回双token
+        TokenDTO tokenDTO = createTokenByUserId(user.getId());
+        return LoginVO.builder()
+                .accessToken(tokenDTO.getAccessToken())
+                .refreshToken(tokenDTO.getRefreshToken())
+                .build();
+    }
+
+
 
     /**
      * 根据key创建验证码
@@ -140,5 +171,19 @@ public class UserServiceImpl implements UserService {
 
         // TODO 引入短信服务
         log.info("生成验证码为: {}", code);
+    }
+
+    /**
+     * 根据userId获取用户登录双token
+     */
+    private TokenDTO createTokenByUserId(Long userId) {
+        String accessToken = JwtUtil.createToken(Map.of(JwtPayloadConstants.USER_ID, userId),
+                jwtPropertyConfig.privateKey(),
+                (int) RedisTtl.ACCESS_TOKEN.toMinutes(),
+                DateField.MINUTE);
+        String refreshToken = UUID.randomUUID().toString();
+        String refreshKey = RedisKeyConstants.REFRESH_TOKEN_KEY + userId;
+        stringRedisTemplate.opsForValue().set(refreshKey, refreshToken, RedisTtl.REFRESH_TOKEN);
+        return TokenDTO.builder().accessToken(accessToken).refreshToken(refreshToken).build();
     }
 }
