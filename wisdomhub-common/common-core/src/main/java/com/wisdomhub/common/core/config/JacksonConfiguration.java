@@ -14,7 +14,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 
 @AutoConfiguration
-public class JacksonConfig {
+public class JacksonConfiguration {
 
     @Bean
     public Module wisdomhubJsonModule() {

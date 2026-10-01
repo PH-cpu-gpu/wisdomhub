@@ -4,7 +4,7 @@ import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 
 @Data
-public class LoginOutDTO {
+public class LogoutDTO {
 
     @NotBlank(message = "accessToken不能为空")
     private String accessToken;

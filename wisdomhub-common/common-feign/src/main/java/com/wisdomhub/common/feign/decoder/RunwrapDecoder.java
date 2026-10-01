@@ -26,7 +26,7 @@ public class RunwrapDecoder implements Decoder {
     }
 
     @Override
-    public Object decode(Response response, Type type) throws IOException, DecodeException, FeignException {
+    public Object decode(Response response, Type type) throws IOException, FeignException {
         if (type == Void.class || type == Void.TYPE) {
             if (response.body() == null) {
                 return null;

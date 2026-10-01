@@ -1,2 +1,2 @@
-com.wisdomhub.common.redis.config.RedisConfig
-com.wisdomhub.common.redis.config.CacheConfig
+com.wisdomhub.common.redis.config.RedisConfiguration
+com.wisdomhub.common.redis.config.CacheConfiguration

@@ -16,22 +16,21 @@ import com.wisdomhub.common.redis.constants.RedisTtl;
 import com.wisdomhub.common.security.constants.SecurityConstants;
 import com.wisdomhub.common.security.context.UserContext;
 import com.wisdomhub.common.security.util.JwtUtil;
-import com.wisdomhub.user.config.JwtPropertyConfig;
+import com.wisdomhub.user.config.JwtPropertyConfiguration;
 import com.wisdomhub.user.constants.JwtPayloadConstants;
-import com.wisdomhub.user.dto.LoginDTO;
-import com.wisdomhub.user.dto.LoginOutDTO;
-import com.wisdomhub.user.dto.RegisterDTO;
+import com.wisdomhub.user.dto.*;
 import com.wisdomhub.user.constants.RedisKeyConstants;
-import com.wisdomhub.user.dto.TokenDTO;
 import com.wisdomhub.user.entity.User;
 import com.wisdomhub.user.mapper.UserMapper;
 import com.wisdomhub.user.service.UserService;
+import com.wisdomhub.user.util.CosUtil;
 import com.wisdomhub.user.vo.LoginVO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -43,7 +42,8 @@ public class UserServiceImpl implements UserService {
     private final StringRedisTemplate stringRedisTemplate;
     private final UserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
-    private final JwtPropertyConfig jwtPropertyConfig;
+    private final JwtPropertyConfiguration jwtPropertyConfiguration;
+    private final CosUtil cosUtil;
 
     /**
      * 根据手机号获取验证码
@@ -175,10 +175,13 @@ public class UserServiceImpl implements UserService {
                 .build();
     }
 
+    /**
+     * 注销
+     */
     @Override
-    public void loginOut(LoginOutDTO loginOutDTO) {
-        String accessToken = loginOutDTO.getAccessToken();
-        String refreshToken = loginOutDTO.getRefreshToken();
+    public void logout(LogoutDTO logoutDTO) {
+        String accessToken = logoutDTO.getAccessToken();
+        String refreshToken = logoutDTO.getRefreshToken();
 
         // 获取用户id
         Long userId = UserContext.getUserId();
@@ -192,6 +195,53 @@ public class UserServiceImpl implements UserService {
         String rawToken = StrUtil.removePrefix(accessToken, SecurityConstants.TOKEN_PREFIX);
         String blacklistKey = RedisSharedConstants.BLACKLIST_KEY + DigestUtil.sha256Hex(rawToken);
         stringRedisTemplate.opsForValue().set(blacklistKey, "1", RedisTtl.ACCESS_TOKEN);
+    }
+
+    /**
+     * 更新用户资料
+     */
+    @Override
+    public void updateProfile(ProfileDTO profileDTO) {
+        Long userId = UserContext.getUserId();
+        String username = profileDTO.getUsername();
+
+        // 预检用户名是否被别人占用
+        if (StrUtil.isNotBlank(username)
+                && userMapper.exists(new LambdaQueryWrapper<User>()
+                        .eq(User::getUsername, username)
+                        .ne(User::getId, userId))) {
+            throw new BusinessException(CommonErrorCode.CONFLICT, "用户名已被占用");
+        }
+
+        User user = User.builder()
+                .id(userId)
+                .username(username)
+                .bio(profileDTO.getBio())
+                .build();
+        userMapper.updateById(user);
+    }
+
+    /**
+     * 更新用户头像
+     */
+    @Override
+    public String updateAvatar(MultipartFile avatar) {
+        if (avatar == null || avatar.isEmpty()) {
+            throw new BusinessException(CommonErrorCode.BAD_REQUEST, "头像文件不能为空");
+        }
+        Long userId = UserContext.getUserId();
+
+        User old = userMapper.selectById(userId);
+        String oldUrl = old == null ? null : old.getAvatar();
+
+        String newUrl = cosUtil.uploadAvatar(avatar);
+        userMapper.updateById(User.builder().id(userId).avatar(newUrl).build());
+
+        // 先落库再删旧文件
+        if (StrUtil.isNotBlank(oldUrl)) {
+            cosUtil.deleteByUrl(oldUrl);
+        }
+        return newUrl;
     }
 
 
@@ -221,7 +271,7 @@ public class UserServiceImpl implements UserService {
      */
     private TokenDTO createTokenByUserId(Long userId) {
         String accessToken = JwtUtil.createToken(Map.of(JwtPayloadConstants.USER_ID, userId),
-                jwtPropertyConfig.privateKey(),
+                jwtPropertyConfiguration.privateKey(),
                 (int) RedisTtl.ACCESS_TOKEN.toMinutes(),
                 DateField.MINUTE);
         String refreshToken = UUID.randomUUID().toString();
