@@ -7,14 +7,19 @@ import java.util.concurrent.TimeUnit;
 import cn.hutool.core.date.DateField;
 import cn.hutool.core.lang.UUID;
 import cn.hutool.core.util.StrUtil;
+import cn.hutool.crypto.digest.DigestUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.wisdomhub.common.core.exception.BusinessException;
 import com.wisdomhub.common.core.result.CommonErrorCode;
+import com.wisdomhub.common.redis.constants.RedisSharedConstants;
 import com.wisdomhub.common.redis.constants.RedisTtl;
+import com.wisdomhub.common.security.constants.SecurityConstants;
+import com.wisdomhub.common.security.context.UserContext;
 import com.wisdomhub.common.security.util.JwtUtil;
 import com.wisdomhub.user.config.JwtPropertyConfig;
 import com.wisdomhub.user.constants.JwtPayloadConstants;
 import com.wisdomhub.user.dto.LoginDTO;
+import com.wisdomhub.user.dto.LoginOutDTO;
 import com.wisdomhub.user.dto.RegisterDTO;
 import com.wisdomhub.user.constants.RedisKeyConstants;
 import com.wisdomhub.user.dto.TokenDTO;
@@ -150,6 +155,44 @@ public class UserServiceImpl implements UserService {
                 .build();
     }
 
+    /**
+     * 刷新token
+     */
+    @Override
+    public LoginVO refresh(String refreshToken) {
+        String key = RedisKeyConstants.REFRESH_TOKEN_BY_TOKEN_KEY + refreshToken;
+        String value = stringRedisTemplate.opsForValue().get(key);
+        if (value == null) {
+            throw new BusinessException(CommonErrorCode.BAD_REQUEST, "refreshToken无效或已过期");
+        }
+        // refreshToken有效
+        Long userId = Long.parseLong(value);
+        TokenDTO tokenDTO = createTokenByUserId(userId);
+        stringRedisTemplate.delete(key);
+        return LoginVO.builder()
+                .accessToken(tokenDTO.getAccessToken())
+                .refreshToken(tokenDTO.getRefreshToken())
+                .build();
+    }
+
+    @Override
+    public void loginOut(LoginOutDTO loginOutDTO) {
+        String accessToken = loginOutDTO.getAccessToken();
+        String refreshToken = loginOutDTO.getRefreshToken();
+
+        // 获取用户id
+        Long userId = UserContext.getUserId();
+
+        // 删除refreshToken
+        stringRedisTemplate.delete(RedisKeyConstants.REFRESH_TOKEN_BY_TOKEN_KEY + refreshToken);
+        stringRedisTemplate.delete(RedisKeyConstants.REFRESH_TOKEN_BY_USER_KEY + userId);
+
+        // 将accessToken加入redis黑名单
+        // 因为accessToken本身较长, 这里做Hash来减少长度, 从而节约redis的内存
+        String rawToken = StrUtil.removePrefix(accessToken, SecurityConstants.TOKEN_PREFIX);
+        String blacklistKey = RedisSharedConstants.BLACKLIST_KEY + DigestUtil.sha256Hex(rawToken);
+        stringRedisTemplate.opsForValue().set(blacklistKey, "1", RedisTtl.ACCESS_TOKEN);
+    }
 
 
     /**
@@ -182,8 +225,10 @@ public class UserServiceImpl implements UserService {
                 (int) RedisTtl.ACCESS_TOKEN.toMinutes(),
                 DateField.MINUTE);
         String refreshToken = UUID.randomUUID().toString();
-        String refreshKey = RedisKeyConstants.REFRESH_TOKEN_KEY + userId;
-        stringRedisTemplate.opsForValue().set(refreshKey, refreshToken, RedisTtl.REFRESH_TOKEN);
+        String refreshUserKey = RedisKeyConstants.REFRESH_TOKEN_BY_USER_KEY + userId;
+        String refreshTokenKey = RedisKeyConstants.REFRESH_TOKEN_BY_TOKEN_KEY + refreshToken;
+        stringRedisTemplate.opsForValue().set(refreshUserKey, refreshToken, RedisTtl.REFRESH_TOKEN);
+        stringRedisTemplate.opsForValue().set(refreshTokenKey, String.valueOf(userId), RedisTtl.REFRESH_TOKEN);
         return TokenDTO.builder().accessToken(accessToken).refreshToken(refreshToken).build();
     }
 }

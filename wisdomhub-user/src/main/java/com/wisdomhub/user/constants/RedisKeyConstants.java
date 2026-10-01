@@ -8,5 +8,7 @@ public class RedisKeyConstants {
     public static final String CODE_BY_PHONE_KEY = CODE_KEY + "phone:";
     public static final String CODE_BY_EMAIL_KEY = CODE_KEY + "email:";
 
-    public static final String REFRESH_TOKEN_KEY = RedisPrefix.USER + "refresh:";
+    public static final String REFRESH_TOKEN_BY_TOKEN_KEY = RedisPrefix.USER + "refresh:token:";
+
+    public static final String REFRESH_TOKEN_BY_USER_KEY = RedisPrefix.USER + "refresh:user:";
 }

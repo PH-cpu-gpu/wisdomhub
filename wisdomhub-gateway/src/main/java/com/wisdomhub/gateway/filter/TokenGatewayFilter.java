@@ -2,13 +2,17 @@ package com.wisdomhub.gateway.filter;
 
 import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.core.util.StrUtil;
+import cn.hutool.crypto.digest.DigestUtil;
+import com.wisdomhub.common.redis.constants.RedisSharedConstants;
 import com.wisdomhub.common.security.constants.SecurityConstants;
 import com.wisdomhub.common.security.util.JwtUtil;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
 import org.springframework.core.io.buffer.DataBuffer;
+import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -24,6 +28,7 @@ import java.util.Map;
 @Component
 public class TokenGatewayFilter implements GlobalFilter, Ordered {
 
+    private final ReactiveStringRedisTemplate reactiveStringRedisTemplate;
     @Value("${jwt.public-key}")
     private String publicKey;
     @Value("${url.no-auth-paths}")
@@ -36,6 +41,11 @@ public class TokenGatewayFilter implements GlobalFilter, Ordered {
                 "data":null
             }
             """.getBytes(StandardCharsets.UTF_8);
+
+    @Autowired
+    public TokenGatewayFilter(ReactiveStringRedisTemplate reactiveStringRedisTemplate) {
+        this.reactiveStringRedisTemplate = reactiveStringRedisTemplate;
+    }
 
     @Override
     public int getOrder() {
@@ -70,7 +80,7 @@ public class TokenGatewayFilter implements GlobalFilter, Ordered {
             return chain.filter(cleanExchange);
         }
 
-        // 检验toekn是否为空
+        // 检验token是否为空
         String tokenWithPrefix = exchange.getRequest().getHeaders().getFirst(SecurityConstants.TOKEN_HEAD_NAME);
         if (StrUtil.isEmpty(tokenWithPrefix)) {
             return unauthorized(exchange);
@@ -90,12 +100,17 @@ public class TokenGatewayFilter implements GlobalFilter, Ordered {
         }
         String userId = String.valueOf(userIdObj);
 
-        //TODO 检查redis黑名单
-
         // 将用户ID存入请求头传入下游
         ServerHttpRequest requestWithUserId = cleanExchange.getRequest().mutate()
                 .header(SecurityConstants.X_USER_ID, userId)
                 .build();
-        return chain.filter(cleanExchange.mutate().request(requestWithUserId).build());
+
+        // 检查token是否位于redis黑名单; 网关是响应式栈, 必须用响应式客户端, 阻塞式会占住事件循环线程
+        String blacklistKey = RedisSharedConstants.BLACKLIST_KEY + DigestUtil.sha256Hex(token);
+        return reactiveStringRedisTemplate.hasKey(blacklistKey)
+                .defaultIfEmpty(false)
+                .flatMap(blacklisted -> Boolean.TRUE.equals(blacklisted)
+                        ? unauthorized(exchange)
+                        : chain.filter(cleanExchange.mutate().request(requestWithUserId).build()));
     }
 }

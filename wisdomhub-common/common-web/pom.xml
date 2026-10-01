@@ -47,6 +47,18 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-autoconfigure</artifactId>
         </dependency>
+        <!-- 用来解析用户ID -->
+        <dependency>
+            <groupId>com.wisdomhub</groupId>
+            <artifactId>common-security</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!-- HandlerInterceptor / WebMvcConfigurer 在 spring-webmvc，不在 spring-web -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-webmvc</artifactId>
+        </dependency>
 
         <!-- optional：只有真正用 MyBatis-Plus 的服务才会加载 MybatisTimeConfig -->
         <dependency>
