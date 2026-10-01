@@ -1,10 +1,11 @@
 package com.wisdomhub.user.service;
 
 import com.wisdomhub.user.dto.LoginDTO;
-import com.wisdomhub.user.dto.LoginOutDTO;
+import com.wisdomhub.user.dto.LogoutDTO;
+import com.wisdomhub.user.dto.ProfileDTO;
 import com.wisdomhub.user.dto.RegisterDTO;
 import com.wisdomhub.user.vo.LoginVO;
-import jakarta.validation.constraints.NotBlank;
+import org.springframework.web.multipart.MultipartFile;
 
 public interface UserService {
 
@@ -18,5 +19,9 @@ public interface UserService {
 
     LoginVO refresh(String refreshToken);
 
-    void loginOut(LoginOutDTO loginOutDTO);
+    void logout(LogoutDTO logoutDTO);
+
+    void updateProfile(ProfileDTO profileDTO);
+
+    String updateAvatar(MultipartFile avatar);
 }

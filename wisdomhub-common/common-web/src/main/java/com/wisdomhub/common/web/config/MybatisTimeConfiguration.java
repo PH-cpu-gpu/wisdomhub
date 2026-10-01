@@ -22,7 +22,7 @@ import java.time.ZoneOffset;
  */
 @AutoConfiguration
 @ConditionalOnClass(MetaObjectHandler.class)
-public class MybatisTimeConfig {
+public class MybatisTimeConfiguration {
 
     @Bean
     public MetaObjectHandler wisdomhubMetaObjectHandler() {

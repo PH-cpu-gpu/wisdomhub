@@ -8,11 +8,11 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
 @Component
-public class JwtPropertyConfig {
+public class JwtPropertyConfiguration {
 
     private final String privateKey;
 
-    public JwtPropertyConfig(@Value("classpath:private.key") Resource resource) throws IOException {
+    public JwtPropertyConfiguration(@Value("classpath:private.key") Resource resource) throws IOException {
         this.privateKey = resource.getContentAsString(StandardCharsets.UTF_8).trim();
     }
 

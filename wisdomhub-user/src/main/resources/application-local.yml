@@ -7,3 +7,5 @@ spring:
       - nacos:wisdomhub-env.yaml
       - nacos:wisdomhub-common.yaml
       - nacos:user-service.yaml
+      - nacos:cos-key.yaml
+

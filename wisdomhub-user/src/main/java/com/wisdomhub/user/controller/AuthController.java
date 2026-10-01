@@ -2,7 +2,7 @@ package com.wisdomhub.user.controller;
 
 import com.wisdomhub.common.core.result.R;
 import com.wisdomhub.user.dto.LoginDTO;
-import com.wisdomhub.user.dto.LoginOutDTO;
+import com.wisdomhub.user.dto.LogoutDTO;
 import com.wisdomhub.user.dto.RegisterDTO;
 import com.wisdomhub.user.dto.TokenDTO;
 import com.wisdomhub.user.service.UserService;
@@ -16,7 +16,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
-@Tag(name = "用户接口类")
+@Tag(name = "鉴权控制器")
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
@@ -24,7 +24,6 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     private final UserService userService;
-
 
     @Operation(summary = "用户注册")
     @PostMapping("/register")
@@ -46,8 +45,8 @@ public class AuthController {
 
     @Operation(summary = "登出")
     @PostMapping("/logout")
-    public R<Void> loginOut(@Valid @RequestBody LoginOutDTO loginOutDTO) {
-        userService.loginOut(loginOutDTO);
+    public R<Void> logout(@Valid @RequestBody LogoutDTO logoutDTO) {
+        userService.logout(logoutDTO);
         return R.success();
     }
 
