@@ -11,7 +11,6 @@ import cn.hutool.core.util.StrUtil;
 import cn.hutool.crypto.digest.DigestUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.wisdomhub.common.core.exception.BusinessException;
 import com.wisdomhub.common.core.result.CommonErrorCode;
 import com.wisdomhub.common.core.result.PageResponse;
@@ -34,6 +33,7 @@ import com.wisdomhub.user.mapper.UserFollowMapper;
 import com.wisdomhub.user.mapper.UserMapper;
 import com.wisdomhub.user.service.UserService;
 import com.wisdomhub.user.util.CosUtil;
+import com.wisdomhub.user.util.CurrentUserUtil;
 import com.wisdomhub.user.domain.vo.LoginVO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -315,7 +315,7 @@ public class UserServiceImpl implements UserService {
      */
     @Override
     public void unfollow(Long followeeId) {
-        Long followerId = currentUserId();
+        Long followerId = CurrentUserUtil.id();
         if (followeeId.equals(followerId)) {
             throw new BusinessException(CommonErrorCode.BAD_REQUEST, "不能取关自己");
         }
@@ -342,7 +342,7 @@ public class UserServiceImpl implements UserService {
      */
     @Override
     public Boolean isFollowed(Long followeeId) {
-        Long followerId = currentUserId();
+        Long followerId = CurrentUserUtil.id();
         return userFollowMapper.exists(new LambdaQueryWrapper<UserFollow>()
                 .eq(UserFollow::getFollowerId, followerId)
                 .eq(UserFollow::getFolloweeId, followeeId));
@@ -353,7 +353,7 @@ public class UserServiceImpl implements UserService {
      */
     @Override
     public PageResponse<UserBriefVO> listFollowing(Long userId, Integer page, Integer pageSize) {
-        IPage<UserBriefVO> result = userFollowMapper.selectFollowingPage(new Page<>(normalizePage(page), normalizePageSize(pageSize)), userId);
+        IPage<UserBriefVO> result = userFollowMapper.selectFollowingPage(PageUtil.of(page, pageSize), userId);
         return PageUtil.toResponse(result);
     }
 
@@ -362,29 +362,8 @@ public class UserServiceImpl implements UserService {
      */
     @Override
     public PageResponse<UserBriefVO> listFans(Long userId, Integer page, Integer pageSize) {
-        IPage<UserBriefVO> result = userFollowMapper.selectFansPage(new Page<>(normalizePage(page), normalizePageSize(pageSize)), userId);
+        IPage<UserBriefVO> result = userFollowMapper.selectFansPage(PageUtil.of(page, pageSize), userId);
         return PageUtil.toResponse(result);
-    }
-
-    /**
-     * 当前登录用户 ID, 网关保证非白名单路径一定带
-     */
-    private static Long currentUserId() {
-        Long userId = UserContext.getUserId();
-        if (userId == null) {
-            throw new BusinessException(CommonErrorCode.UNAUTHORIZED);
-        }
-        return userId;
-    }
-
-    // 页码从 1 起
-    private static int normalizePage(Integer page) {
-        return (page == null || page < 1) ? 1 : page;
-    }
-
-    // 每页上限 100, 超了按100处理
-    private static int normalizePageSize(Integer pageSize) {
-        return (pageSize == null || pageSize < 1) ? 10 : Math.min(pageSize, 100);
     }
 
     /**
