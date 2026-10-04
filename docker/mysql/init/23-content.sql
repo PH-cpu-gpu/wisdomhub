@@ -55,9 +55,6 @@ CREATE TABLE article_favorite (
     INDEX idx_article_id (article_id)
 ) ENGINE=InnoDB COMMENT='文章收藏';
 
--- 表名 column 在 MySQL 里只有 CREATE 能被无引号解析，SELECT / INSERT / UPDATE / DELETE
--- 一律要写成 `column`，否则报 1064（实测）。MyBatis-Plus 侧的对应做法是 @TableName("`column`")，
--- 手写 SQL 记得自己加反引号。
 CREATE TABLE `column` (
     id BIGINT PRIMARY KEY COMMENT '雪花 ID',
     user_id BIGINT NOT NULL COMMENT '创建者 ID',
@@ -87,7 +84,7 @@ CREATE TABLE column_purchase (
     user_id BIGINT NOT NULL COMMENT '购买者 ID',
     column_id BIGINT NOT NULL COMMENT '专栏 ID',
     order_id BIGINT NOT NULL COMMENT '订单 ID',
-    price INT NOT NULL COMMENT '成交价，单位为分，下单时的快照',
+    price INT NOT NULL COMMENT '成交价，单位为分',
     create_time DATETIME NOT NULL COMMENT '购买时间',
     UNIQUE KEY uk_user_column (user_id, column_id),
     INDEX idx_column_id (column_id),

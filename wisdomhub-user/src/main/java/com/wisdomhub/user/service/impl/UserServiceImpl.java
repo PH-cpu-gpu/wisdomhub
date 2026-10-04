@@ -33,7 +33,7 @@ import com.wisdomhub.user.mapper.UserFollowMapper;
 import com.wisdomhub.user.mapper.UserMapper;
 import com.wisdomhub.user.service.UserService;
 import com.wisdomhub.user.util.CosUtil;
-import com.wisdomhub.user.util.CurrentUserUtil;
+import com.wisdomhub.common.web.util.CurrentUserUtil;
 import com.wisdomhub.user.domain.vo.LoginVO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
