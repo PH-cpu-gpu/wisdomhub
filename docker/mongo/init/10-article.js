@@ -37,26 +37,6 @@ contentDb.createCollection('article_draft', {
     }
 });
 
-// 版本快照：主键是 (articleId, versionNo) 二元组，_id 装不下，故用自动 _id + 唯一复合索引。
-// 只增不改，没有 updateTime。
-contentDb.createCollection('article_version_content', {
-    validator: {
-        $jsonSchema: {
-            bsonType: 'object',
-            required: ['articleId', 'versionNo', 'markdown', 'html', 'wordCount', 'createTime'],
-            properties: {
-                articleId: { bsonType: 'long', description: '雪花 ID' },
-                versionNo: { bsonType: 'int', description: '版本号' },
-                markdown: { bsonType: 'string', description: 'Markdown 原文' },
-                html: { bsonType: 'string', description: '渲染后 HTML' },
-                wordCount: { bsonType: 'int', description: '字数' },
-                createTime: { bsonType: 'date' }
-            }
-        }
-    }
-});
-
-contentDb.article_version_content.createIndex(
-    { articleId: 1, versionNo: 1 },
-    { unique: true, name: 'uk_article_version' }
-);
+// 版本快照已取消（2026-10-05）：只保留正文与草稿两个 collection。
+// 见技术文档 7.12 与任务表 B1.19 —— 理由是没有 diff 界面的版本历史价值极低，
+// 而它把一次发布从两处写变成四处写。

@@ -60,7 +60,7 @@
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
 
-        <!-- MySQL 存元数据，MongoDB 存正文 / 草稿 / 版本快照（技术文档 5.3、7.12） -->
+        <!-- MySQL 存元数据，MongoDB 存正文 / 草稿（技术文档 5.3、7.12） -->
         <dependency>
             <groupId>com.baomidou</groupId>
             <artifactId>mybatis-plus-spring-boot3-starter</artifactId>

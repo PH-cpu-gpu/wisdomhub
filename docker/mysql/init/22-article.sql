@@ -21,14 +21,3 @@ CREATE TABLE article (
     INDEX idx_author_state (author_id, state, create_time),
     INDEX idx_state_publish (state, publish_time)
 ) ENGINE=InnoDB COMMENT='文章';
-
-CREATE TABLE article_version (
-    id BIGINT PRIMARY KEY COMMENT '雪花 ID',
-    article_id BIGINT NOT NULL COMMENT '文章 ID',
-    version_no INT NOT NULL COMMENT '版本号，同一文章内从 1 递增',
-    author_id BIGINT NOT NULL COMMENT '作者 ID',
-    change_note VARCHAR(255) NOT NULL DEFAULT '' COMMENT '变更说明',
-    word_count INT NOT NULL DEFAULT 0 COMMENT '字数',
-    create_time DATETIME NOT NULL COMMENT '创建时间',
-    UNIQUE KEY uk_article_version (article_id, version_no)
-) ENGINE=InnoDB COMMENT='文章版本元数据';
