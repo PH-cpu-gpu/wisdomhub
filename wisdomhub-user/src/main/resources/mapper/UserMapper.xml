@@ -3,7 +3,7 @@
 <mapper namespace="com.wisdomhub.user.mapper.UserMapper">
 
     <!-- 通用查询映射结果 -->
-    <resultMap id="BaseResultMap" type="com.wisdomhub.user.entity.User">
+    <resultMap id="BaseResultMap" type="com.wisdomhub.user.domain.entity.User">
         <id column="id" property="id" />
         <result column="username" property="username" />
         <result column="email" property="email" />

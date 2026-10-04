@@ -1,12 +1,11 @@
 package com.wisdomhub.user.controller;
 
 import com.wisdomhub.common.core.result.R;
-import com.wisdomhub.user.dto.LoginDTO;
-import com.wisdomhub.user.dto.LogoutDTO;
-import com.wisdomhub.user.dto.RegisterDTO;
-import com.wisdomhub.user.dto.TokenDTO;
+import com.wisdomhub.user.domain.dto.LoginDTO;
+import com.wisdomhub.user.domain.dto.LogoutDTO;
+import com.wisdomhub.user.domain.dto.RegisterDTO;
 import com.wisdomhub.user.service.UserService;
-import com.wisdomhub.user.vo.LoginVO;
+import com.wisdomhub.user.domain.vo.LoginVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -16,7 +15,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
-@Tag(name = "鉴权控制器")
+@Tag(name = "鉴权controller")
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor

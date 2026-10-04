@@ -1,4 +1,4 @@
-package com.wisdomhub.user.entity;
+package com.wisdomhub.user.domain.entity;
 
 import com.baomidou.mybatisplus.annotation.FieldFill;
 import com.baomidou.mybatisplus.annotation.IdType;

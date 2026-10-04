@@ -1,4 +1,4 @@
-package com.wisdomhub.user.dto;
+package com.wisdomhub.user.domain.dto;
 
 import jakarta.validation.constraints.Size;
 import lombok.Data;
