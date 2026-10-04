@@ -20,3 +20,12 @@ CREATE TABLE user (
     UNIQUE KEY uk_phone (phone),
     UNIQUE KEY uk_username (username)
 ) ENGINE=InnoDB COMMENT='用户';
+
+CREATE TABLE user_follow (
+                             id BIGINT PRIMARY KEY COMMENT '雪花 ID',
+                             follower_id BIGINT NOT NULL COMMENT '关注者 ID',
+                             followee_id BIGINT NOT NULL COMMENT '被关注者 ID',
+                             create_time DATETIME NOT NULL COMMENT '创建时间',
+                             UNIQUE KEY uk_follower_followee (follower_id, followee_id),
+                             INDEX idx_followee_id (followee_id)
+) ENGINE=InnoDB COMMENT='用户关注关系';

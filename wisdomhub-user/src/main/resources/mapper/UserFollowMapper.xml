@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.wisdomhub.user.mapper.UserFollowMapper">
+
+    <resultMap id="UserBriefResultMap" type="com.wisdomhub.user.domain.vo.UserBriefVO">
+        <id column="id" property="userId" />
+        <result column="username" property="username" />
+        <result column="avatar" property="avatar" />
+        <result column="bio" property="bio" />
+    </resultMap>
+
+    <!-- 排序用 f.id, 它是雪花 ID 时间有序, 等价于按关注时间倒序 -->
+    <select id="selectFollowingPage" resultMap="UserBriefResultMap">
+        SELECT u.id, u.username, u.avatar, u.bio
+        FROM user_follow f
+        JOIN `user` u ON u.id = f.followee_id
+        WHERE f.follower_id = #{userId}
+        ORDER BY f.id DESC
+    </select>
+
+    <select id="selectFansPage" resultMap="UserBriefResultMap">
+        SELECT u.id, u.username, u.avatar, u.bio
+        FROM user_follow f
+        JOIN `user` u ON u.id = f.follower_id
+        WHERE f.followee_id = #{userId}
+        ORDER BY f.id DESC
+    </select>
+
+</mapper>

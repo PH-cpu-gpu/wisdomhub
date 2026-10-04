@@ -73,6 +73,14 @@
                 <version>${mybatis-plus.version}</version>
             </dependency>
 
+            <!-- MP 把依赖 jsqlparser 的 inner interceptor（含 PaginationInnerInterceptor）拆到了这个模块，
+                 只引 starter 拿不到，selectPage 会静默退化成查全表 -->
+            <dependency>
+                <groupId>com.baomidou</groupId>
+                <artifactId>mybatis-plus-jsqlparser</artifactId>
+                <version>${mybatis-plus.version}</version>
+            </dependency>
+
             <!-- 代码生成器：只在 common-core 以 optional 引入，不下发给任何服务的运行时 -->
             <dependency>
                 <groupId>com.baomidou</groupId>

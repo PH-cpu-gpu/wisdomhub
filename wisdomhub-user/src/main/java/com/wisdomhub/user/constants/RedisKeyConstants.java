@@ -9,6 +9,8 @@ public class RedisKeyConstants {
     public static final String CODE_BY_EMAIL_KEY = CODE_KEY + "email:";
 
     public static final String REFRESH_TOKEN_BY_TOKEN_KEY = RedisPrefix.USER + "refresh:token:";
-
     public static final String REFRESH_TOKEN_BY_USER_KEY = RedisPrefix.USER + "refresh:user:";
+
+    public static final String FOLLOW_COUNT_KEY = RedisPrefix.USER + "follow:count:";
+    public static final String FANS_COUNT_KEY = RedisPrefix.USER + "fans:count:";
 }

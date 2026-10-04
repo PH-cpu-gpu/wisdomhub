@@ -31,7 +31,7 @@ public final class CodeGenerator {
     /** 模块的包后缀，com.wisdomhub.&lt;这个&gt;。 */
     private static final String PACKAGE = "user";
     /** 要生成哪些表，表名。 */
-    private static final List<String> TABLES = List.of("user");
+    private static final List<String> TABLES = List.of("user_follow");
 
     private static final String DATABASE = "wisdomhub_user";
     /** 时区参数按技术文档 17.2：与会话时区一起钉死成 UTC。 */

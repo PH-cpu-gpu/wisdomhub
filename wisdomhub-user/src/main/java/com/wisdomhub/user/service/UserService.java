@@ -1,10 +1,14 @@
 package com.wisdomhub.user.service;
 
-import com.wisdomhub.user.dto.LoginDTO;
-import com.wisdomhub.user.dto.LogoutDTO;
-import com.wisdomhub.user.dto.ProfileDTO;
-import com.wisdomhub.user.dto.RegisterDTO;
-import com.wisdomhub.user.vo.LoginVO;
+import com.wisdomhub.common.core.result.PageResponse;
+import com.wisdomhub.user.domain.dto.LoginDTO;
+import com.wisdomhub.user.domain.dto.LogoutDTO;
+import com.wisdomhub.user.domain.dto.ProfileDTO;
+import com.wisdomhub.user.domain.dto.RegisterDTO;
+import com.wisdomhub.user.domain.vo.LoginVO;
+import com.wisdomhub.user.domain.vo.UserBriefVO;
+import com.wisdomhub.user.domain.vo.UserProfileVO;
+import jakarta.validation.constraints.NotNull;
 import org.springframework.web.multipart.MultipartFile;
 
 public interface UserService {
@@ -24,4 +28,16 @@ public interface UserService {
     void updateProfile(ProfileDTO profileDTO);
 
     String updateAvatar(MultipartFile avatar);
+
+    UserProfileVO getUserProfile(Long userId);
+
+    void follow(@NotNull Long userId);
+
+    void unfollow(Long followeeId);
+
+    Boolean isFollowed(Long followeeId);
+
+    PageResponse<UserBriefVO> listFollowing(Long userId, Integer page, Integer pageSize);
+
+    PageResponse<UserBriefVO> listFans(Long userId, Integer page, Integer pageSize);
 }

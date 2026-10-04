@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.wisdomhub.content.mapper.ArticleMapper">
+
+    <!-- 通用查询映射结果 -->
+    <resultMap id="BaseResultMap" type="com.wisdomhub.content.domain.entity.Article">
+        <id column="id" property="id" />
+        <result column="author_id" property="authorId" />
+        <result column="title" property="title" />
+        <result column="summary" property="summary" />
+        <result column="state" property="state" />
+        <result column="view_count" property="viewCount" />
+        <result column="like_count" property="likeCount" />
+        <result column="comment_count" property="commentCount" />
+        <result column="favorite_count" property="favoriteCount" />
+        <result column="publish_time" property="publishTime" />
+        <result column="deleted" property="deleted" />
+        <result column="create_time" property="createTime" />
+        <result column="update_time" property="updateTime" />
+    </resultMap>
+
+    <!-- 通用查询结果列 -->
+    <sql id="Base_Column_List">
+        id, author_id, title, summary, state, view_count, like_count, comment_count, favorite_count, publish_time, deleted, create_time, update_time
+    </sql>
+
+</mapper>

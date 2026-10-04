@@ -67,6 +67,13 @@
             <optional>true</optional>
         </dependency>
 
+        <!-- 分页插件 PaginationInnerInterceptor 在本模块的自动配置里被引用，故不设 optional：
+             设了的话，服务漏声明就变成「分页静默失效」，不是编译错误 -->
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-jsqlparser</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>

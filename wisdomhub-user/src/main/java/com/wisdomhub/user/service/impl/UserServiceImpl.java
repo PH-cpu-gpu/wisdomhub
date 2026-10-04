@@ -4,43 +4,57 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.date.DateField;
 import cn.hutool.core.lang.UUID;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.crypto.digest.DigestUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.wisdomhub.common.core.exception.BusinessException;
 import com.wisdomhub.common.core.result.CommonErrorCode;
+import com.wisdomhub.common.core.result.PageResponse;
+import com.wisdomhub.common.web.util.PageUtil;
 import com.wisdomhub.common.redis.constants.RedisSharedConstants;
 import com.wisdomhub.common.redis.constants.RedisTtl;
 import com.wisdomhub.common.security.constants.SecurityConstants;
 import com.wisdomhub.common.security.context.UserContext;
 import com.wisdomhub.common.security.util.JwtUtil;
+import com.wisdomhub.user.api.ArticleFeign;
 import com.wisdomhub.user.config.JwtPropertyConfiguration;
 import com.wisdomhub.user.constants.JwtPayloadConstants;
-import com.wisdomhub.user.dto.*;
+import com.wisdomhub.user.domain.dto.*;
 import com.wisdomhub.user.constants.RedisKeyConstants;
-import com.wisdomhub.user.entity.User;
+import com.wisdomhub.user.domain.entity.User;
+import com.wisdomhub.user.domain.entity.UserFollow;
+import com.wisdomhub.user.domain.vo.UserBriefVO;
+import com.wisdomhub.user.domain.vo.UserProfileVO;
+import com.wisdomhub.user.mapper.UserFollowMapper;
 import com.wisdomhub.user.mapper.UserMapper;
 import com.wisdomhub.user.service.UserService;
 import com.wisdomhub.user.util.CosUtil;
-import com.wisdomhub.user.vo.LoginVO;
+import com.wisdomhub.user.domain.vo.LoginVO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.function.Supplier;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class UserServiceImpl implements UserService {
 
-    private final StringRedisTemplate stringRedisTemplate;
     private final UserMapper userMapper;
+    private final UserFollowMapper userFollowMapper;
+    private final ArticleFeign articleFeign;
+    private final StringRedisTemplate stringRedisTemplate;
     private final PasswordEncoder passwordEncoder;
     private final JwtPropertyConfiguration jwtPropertyConfiguration;
     private final CosUtil cosUtil;
@@ -244,6 +258,134 @@ public class UserServiceImpl implements UserService {
         return newUrl;
     }
 
+    /**
+     * 查询用户简介
+     */
+    @Override
+    public UserProfileVO getUserProfile(Long userId) {
+        User user = userMapper.selectById(userId);
+        if (user == null) {
+            throw new BusinessException(CommonErrorCode.NOT_FOUND, "用户不存在");
+        }
+        UserProfileVO userProfile = BeanUtil.copyProperties(user, UserProfileVO.class);
+        userProfile.setUserId(userId);
+        Long articleCount = articleFeign.countArticle(userId);
+        userProfile.setArticleCount(Math.toIntExact(articleCount));
+        return userProfile;
+    }
+
+    /**
+     * 关注用户
+     */
+    @Override
+    public void follow(Long followeeId) {
+        Long followerId = UserContext.getUserId();
+        if (followerId.equals(followeeId)) {
+            throw new BusinessException(CommonErrorCode.BAD_REQUEST, "不能关注自己");
+        }
+        String followKey = RedisKeyConstants.FOLLOW_COUNT_KEY + followerId;
+        String fansKey = RedisKeyConstants.FANS_COUNT_KEY + followeeId;
+        // 先确保两个key存在
+        ensureCount(followKey, () -> userFollowMapper.selectCount(
+                new LambdaQueryWrapper<UserFollow>().eq(UserFollow::getFollowerId, followerId)));
+        ensureCount(fansKey, () -> userFollowMapper.selectCount(
+                new LambdaQueryWrapper<UserFollow>().eq(UserFollow::getFolloweeId, followeeId)));
+        // 向数据库中插入数据
+        try {
+            userFollowMapper.insert(UserFollow.builder().followerId(followerId).followeeId(followeeId).build());
+        } catch (DuplicateKeyException e) {
+            return;
+        }
+        stringRedisTemplate.opsForValue().increment(followKey);
+        stringRedisTemplate.opsForValue().increment(fansKey);
+    }
+
+    /**
+     * 确保关注数/粉丝数key存在, 如果不存在从数据库重建
+     */
+    private void ensureCount(String key, Supplier<Long> dbCount) {
+        if (stringRedisTemplate.hasKey(key)) {
+            return;
+        }
+        stringRedisTemplate.opsForValue().setIfAbsent(key, String.valueOf(dbCount.get()));
+    }
+
+    /**
+     * 取关
+     */
+    @Override
+    public void unfollow(Long followeeId) {
+        Long followerId = currentUserId();
+        if (followeeId.equals(followerId)) {
+            throw new BusinessException(CommonErrorCode.BAD_REQUEST, "不能取关自己");
+        }
+        String followKey = RedisKeyConstants.FOLLOW_COUNT_KEY + followerId;
+        String fansKey = RedisKeyConstants.FANS_COUNT_KEY + followeeId;
+        // 先确保两个key存在, 此时 COUNT(*) 仍包含待删的这条
+        ensureCount(followKey, () -> userFollowMapper.selectCount(
+                new LambdaQueryWrapper<UserFollow>().eq(UserFollow::getFollowerId, followerId)));
+        ensureCount(fansKey, () -> userFollowMapper.selectCount(
+                new LambdaQueryWrapper<UserFollow>().eq(UserFollow::getFolloweeId, followeeId)));
+        // 先删库, 确实删到行才减计数
+        int deleted = userFollowMapper.delete(new LambdaQueryWrapper<UserFollow>()
+                .eq(UserFollow::getFollowerId, followerId)
+                .eq(UserFollow::getFolloweeId, followeeId));
+        if (deleted == 0) {
+            return;
+        }
+        stringRedisTemplate.opsForValue().decrement(followKey);
+        stringRedisTemplate.opsForValue().decrement(fansKey);
+    }
+
+    /**
+     * 当前登录用户是否已关注某人
+     */
+    @Override
+    public Boolean isFollowed(Long followeeId) {
+        Long followerId = currentUserId();
+        return userFollowMapper.exists(new LambdaQueryWrapper<UserFollow>()
+                .eq(UserFollow::getFollowerId, followerId)
+                .eq(UserFollow::getFolloweeId, followeeId));
+    }
+
+    /**
+     * 某人的关注列表
+     */
+    @Override
+    public PageResponse<UserBriefVO> listFollowing(Long userId, Integer page, Integer pageSize) {
+        IPage<UserBriefVO> result = userFollowMapper.selectFollowingPage(new Page<>(normalizePage(page), normalizePageSize(pageSize)), userId);
+        return PageUtil.toResponse(result);
+    }
+
+    /**
+     * 某人的粉丝列表
+     */
+    @Override
+    public PageResponse<UserBriefVO> listFans(Long userId, Integer page, Integer pageSize) {
+        IPage<UserBriefVO> result = userFollowMapper.selectFansPage(new Page<>(normalizePage(page), normalizePageSize(pageSize)), userId);
+        return PageUtil.toResponse(result);
+    }
+
+    /**
+     * 当前登录用户 ID, 网关保证非白名单路径一定带
+     */
+    private static Long currentUserId() {
+        Long userId = UserContext.getUserId();
+        if (userId == null) {
+            throw new BusinessException(CommonErrorCode.UNAUTHORIZED);
+        }
+        return userId;
+    }
+
+    // 页码从 1 起
+    private static int normalizePage(Integer page) {
+        return (page == null || page < 1) ? 1 : page;
+    }
+
+    // 每页上限 100, 超了按100处理
+    private static int normalizePageSize(Integer pageSize) {
+        return (pageSize == null || pageSize < 1) ? 10 : Math.min(pageSize, 100);
+    }
 
     /**
      * 根据key创建验证码

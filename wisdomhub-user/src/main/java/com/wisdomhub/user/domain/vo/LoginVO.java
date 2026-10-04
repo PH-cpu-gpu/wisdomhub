@@ -1,4 +1,4 @@
-package com.wisdomhub.user.vo;
+package com.wisdomhub.user.domain.vo;
 
 import lombok.Builder;
 import lombok.Data;
