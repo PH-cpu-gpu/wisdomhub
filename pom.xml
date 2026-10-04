@@ -34,6 +34,8 @@
         <jjwt.version>0.13.0</jjwt.version>
         <xxl-job.version>3.4.2</xxl-job.version>
         <hutool.version>5.8.47</hutool.version>
+        <flexmark.version>0.64.8</flexmark.version>
+        <jsoup.version>1.18.3</jsoup.version>
     </properties>
 
     <dependencyManagement>
@@ -143,6 +145,35 @@
                 <groupId>cn.hutool</groupId>
                 <artifactId>hutool-all</artifactId>
                 <version>${hutool.version}</version>
+            </dependency>
+
+            <!-- Markdown 渲染（B1.18）：只引需要的扩展，不用 flexmark-all 那套全家桶 -->
+            <dependency>
+                <groupId>com.vladsch.flexmark</groupId>
+                <artifactId>flexmark</artifactId>
+                <version>${flexmark.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.vladsch.flexmark</groupId>
+                <artifactId>flexmark-ext-tables</artifactId>
+                <version>${flexmark.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.vladsch.flexmark</groupId>
+                <artifactId>flexmark-ext-gfm-strikethrough</artifactId>
+                <version>${flexmark.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.vladsch.flexmark</groupId>
+                <artifactId>flexmark-ext-autolink</artifactId>
+                <version>${flexmark.version}</version>
+            </dependency>
+
+            <!-- HTML 白名单消毒（B1.18）：Markdown 渲染完要过一遍，否则内联 <script> 会被存库并原样返回 -->
+            <dependency>
+                <groupId>org.jsoup</groupId>
+                <artifactId>jsoup</artifactId>
+                <version>${jsoup.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

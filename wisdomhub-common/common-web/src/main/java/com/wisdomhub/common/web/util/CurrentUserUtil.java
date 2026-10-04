@@ -1,4 +1,4 @@
-package com.wisdomhub.user.util;
+package com.wisdomhub.common.web.util;
 
 import com.wisdomhub.common.core.exception.BusinessException;
 import com.wisdomhub.common.core.result.CommonErrorCode;

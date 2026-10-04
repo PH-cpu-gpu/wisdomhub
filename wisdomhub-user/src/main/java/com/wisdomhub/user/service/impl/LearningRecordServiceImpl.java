@@ -11,7 +11,7 @@ import com.wisdomhub.user.domain.entity.UserLearningRecord;
 import com.wisdomhub.user.domain.vo.LearningRecordVO;
 import com.wisdomhub.user.mapper.UserLearningRecordMapper;
 import com.wisdomhub.user.service.LearningRecordService;
-import com.wisdomhub.user.util.CurrentUserUtil;
+import com.wisdomhub.common.web.util.CurrentUserUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;

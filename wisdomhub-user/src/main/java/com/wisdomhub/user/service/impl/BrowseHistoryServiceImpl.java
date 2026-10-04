@@ -11,7 +11,7 @@ import com.wisdomhub.user.domain.entity.UserBrowseHistory;
 import com.wisdomhub.user.domain.vo.BrowseHistoryVO;
 import com.wisdomhub.user.mapper.UserBrowseHistoryMapper;
 import com.wisdomhub.user.service.BrowseHistoryService;
-import com.wisdomhub.user.util.CurrentUserUtil;
+import com.wisdomhub.common.web.util.CurrentUserUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
