@@ -96,6 +96,13 @@
             <version>5.6.281</version>
         </dependency>
 
+        <!-- xxl-job：版本由根 pom 的 dependencyManagement 统一管理，
+             必须与 docker-compose 里的 admin 版本一致（见 compose 顶部注释） -->
+        <dependency>
+            <groupId>com.xuxueli</groupId>
+            <artifactId>xxl-job-core</artifactId>
+        </dependency>
+
     </dependencies>
 
     <build>

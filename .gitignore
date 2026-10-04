@@ -42,3 +42,6 @@ build/
 
 ### 中间件插件二进制（体积大，且随 ES 版本变化）###
 docker/elasticsearch/plugins/
+
+### XXL-JOB 执行器运行时日志（按 xxl.job.executor.log-path 落在仓库根下）###
+logs/

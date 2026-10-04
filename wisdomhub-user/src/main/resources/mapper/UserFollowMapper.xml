@@ -26,4 +26,18 @@
         ORDER BY f.id DESC
     </select>
 
+    <!-- 计数对账用：一次拿到所有人的真值，避免逐个用户 COUNT(*)。
+         注意 GROUP BY 不会给出计数为 0 的用户，调用方要用 getOrDefault(id, 0) -->
+    <select id="countGroupByFollower" resultType="java.util.Map">
+        SELECT follower_id AS userId, COUNT(*) AS cnt
+        FROM user_follow
+        GROUP BY follower_id
+    </select>
+
+    <select id="countGroupByFollowee" resultType="java.util.Map">
+        SELECT followee_id AS userId, COUNT(*) AS cnt
+        FROM user_follow
+        GROUP BY followee_id
+    </select>
+
 </mapper>
