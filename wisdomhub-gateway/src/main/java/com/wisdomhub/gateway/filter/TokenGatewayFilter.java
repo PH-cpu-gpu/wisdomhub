@@ -6,8 +6,10 @@ import cn.hutool.crypto.digest.DigestUtil;
 import com.wisdomhub.common.redis.constants.RedisSharedConstants;
 import com.wisdomhub.common.security.constants.SecurityConstants;
 import com.wisdomhub.common.security.util.JwtUtil;
+import lombok.Setter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
@@ -26,13 +28,19 @@ import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
 @Component
+@ConfigurationProperties(prefix = "url")
 public class TokenGatewayFilter implements GlobalFilter, Ordered {
 
     private final ReactiveStringRedisTemplate reactiveStringRedisTemplate;
+
     @Value("${jwt.public-key}")
     private String publicKey;
-    @Value("${url.no-auth-paths}")
+    /** 免登录路径 */
+    @Setter
     private String[] noAuthPaths;
+    /** 可选登录路径 */
+    @Setter
+    private String[] optionalAuthPaths;
 
     private static final byte[] BODY = """
             {
@@ -61,6 +69,43 @@ public class TokenGatewayFilter implements GlobalFilter, Ordered {
         return response.writeWith(Mono.just(buffer));
     }
 
+    /**
+     * 是否命中可选登录名单。
+     * 跳过空白项：名单若被误配成 ""，startWith 对空前缀恒真，会把全站鉴权降成可选。
+     */
+    private boolean optionalAuthMatched(String path) {
+        if (ObjectUtil.isEmpty(optionalAuthPaths)) {
+            return false;
+        }
+        for (String prefix : optionalAuthPaths) {
+            if (StrUtil.isNotBlank(prefix) && StrUtil.startWith(path, prefix)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** 可选登录：能解析出合法且未注销的 token 就注入 X-User-Id，否则按游客放行，绝不 401 */
+    private Mono<Void> filterOptionalAuth(ServerWebExchange exchange, GatewayFilterChain chain) {
+        String tokenWithPrefix = exchange.getRequest().getHeaders().getFirst(SecurityConstants.TOKEN_HEAD_NAME);
+        if (StrUtil.isEmpty(tokenWithPrefix)) {
+            return chain.filter(exchange);
+        }
+        String token = StrUtil.removePrefix(tokenWithPrefix, SecurityConstants.TOKEN_PREFIX);
+        Map<String, Object> claims = JwtUtil.parseToken(token, publicKey);
+        Object userIdObj = ObjectUtil.isEmpty(claims) ? null : claims.get(SecurityConstants.USER_ID);
+        if (userIdObj == null) {
+            return chain.filter(exchange);
+        }
+        String blacklistKey = RedisSharedConstants.BLACKLIST_KEY + DigestUtil.sha256Hex(token);
+        return reactiveStringRedisTemplate.hasKey(blacklistKey)
+                .defaultIfEmpty(false)
+                .flatMap(blacklisted -> Boolean.TRUE.equals(blacklisted)
+                        ? chain.filter(exchange)
+                        : chain.filter(exchange.mutate().request(exchange.getRequest().mutate()
+                                .header(SecurityConstants.X_USER_ID, String.valueOf(userIdObj)).build()).build()));
+    }
+
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         // 无条件剥离请求的X-USER-ID
@@ -74,10 +119,16 @@ public class TokenGatewayFilter implements GlobalFilter, Ordered {
             return chain.filter(cleanExchange);
         }
 
-        // 检验白名单
         String path = exchange.getRequest().getPath().toString();
+
+        // 检验白名单：明确声明的免登录路径，连 token 都不解析
         if (StrUtil.startWithAny(path, noAuthPaths)) {
             return chain.filter(cleanExchange);
+        }
+
+        // 可选登录：游客放行，带合法 token 才透传 X-User-Id
+        if (optionalAuthMatched(path)) {
+            return filterOptionalAuth(cleanExchange, chain);
         }
 
         // 检验token是否为空

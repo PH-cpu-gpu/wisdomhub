@@ -17,11 +17,14 @@ public final class RedisTtl {
     /** 验证码 */
     public static final Duration CAPTCHA = Duration.ofMinutes(5);
 
-    /** /internal/** Nonce 去重窗口，必须与签名的时间戳窗口一致（技术文档 15.5：±300s） */
+    /** /internal/** Nonce 去重窗口，必须与签名的时间戳窗口一致 */
     public static final Duration INTERNAL_NONCE = Duration.ofMinutes(5);
 
     /** 点赞 / 收藏 防重前置拦截 */
     public static final Duration LIKE_ONCE = Duration.ofHours(1);
+
+    /** 阅读防重窗口：同一用户对同一文章 N 小时内只计一次阅读量 */
+    public static final Duration VIEW_ONCE = Duration.ofHours(1);
 
     /** 热门榜单刷新间隔 */
     public static final Duration HOT_RANK = Duration.ofMinutes(30);
