@@ -8,7 +8,6 @@ import lombok.Data;
 public class ArticlePublishDTO {
 
     /**
-     * 可选。带了表示发布/覆盖这篇已存在的文章（将来的草稿转发布走这条）；
      * 不带则新分配雪花 ID。带了就必须是本人写的文章，否则 403
      */
     private Long articleId;
