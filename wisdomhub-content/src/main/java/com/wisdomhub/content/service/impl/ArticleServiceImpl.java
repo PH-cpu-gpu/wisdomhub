@@ -19,14 +19,17 @@ import com.wisdomhub.content.domain.document.ArticleContent;
 import com.wisdomhub.content.domain.dto.ArticleDraftDTO;
 import com.wisdomhub.content.domain.dto.ArticlePublishDTO;
 import com.wisdomhub.content.domain.entity.Article;
+import com.wisdomhub.content.domain.entity.ArticleTag;
 import com.wisdomhub.content.domain.vo.ArticleBriefVO;
 import com.wisdomhub.content.domain.vo.ArticleDetailVO;
 import com.wisdomhub.content.domain.vo.ArticleListItemVO;
 import com.wisdomhub.content.domain.vo.ArticleSourceVO;
 import com.wisdomhub.content.domain.vo.DraftBriefVO;
 import com.wisdomhub.content.mapper.ArticleMapper;
+import com.wisdomhub.content.mapper.ArticleTagMapper;
 import com.wisdomhub.content.repository.ArticleContentRepository;
 import com.wisdomhub.content.service.ArticleService;
+import com.wisdomhub.content.service.TagService;
 import com.wisdomhub.content.util.MarkdownRenderer;
 import com.wisdomhub.content.util.WordCountUtil;
 import lombok.RequiredArgsConstructor;
@@ -38,6 +41,7 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.function.Supplier;
@@ -55,9 +59,11 @@ public class ArticleServiceImpl implements ArticleService {
     private static final String SORT_HOT = "hot";
 
     private final ArticleMapper articleMapper;
+    private final ArticleTagMapper articleTagMapper;
     private final ArticleContentRepository articleContentRepository;
     private final MarkdownRenderer markdownRenderer;
     private final StringRedisTemplate stringRedisTemplate;
+    private final TagService tagService;
 
     /**
      * 根据用户Id查询其已发布未删除的文章数量
@@ -151,17 +157,22 @@ public class ArticleServiceImpl implements ArticleService {
         Long authorId = CurrentUserUtil.id();
         String html = markdownRenderer.render(dto.getMarkdown());
         int wordCount = WordCountUtil.count(markdownRenderer.toPlainText(html));
+        // null 与 [] 的区分必须保留 —— null 表示"覆盖发布时不改标签"，[] 表示"清空"
+        List<Long> tagIds = dto.getTagIds() == null ? null : tagService.normalizeTagIds(dto.getTagIds());
         // 带了 articleId：覆盖已存在文章（草稿转发布走这条）；没带：全新发布
         if (dto.getArticleId() == null) {
-            return createArticle(authorId, dto.getTitle(), dto.getSummary(), dto.getMarkdown(), html, wordCount);
+            return createArticle(authorId, dto.getTitle(), dto.getSummary(), dto.getMarkdown(),
+                    html, wordCount, tagIds);
         }
-        return overwriteArticle(dto.getArticleId(), dto.getTitle(), dto.getSummary(), dto.getMarkdown(), html, wordCount);
+        return overwriteArticle(dto.getArticleId(), dto.getTitle(), dto.getSummary(), dto.getMarkdown(),
+                html, wordCount, tagIds);
     }
 
     /**
      * 新建并发布。ID 必须在应用侧先算出来，否则"先写正文"这个顺序不成立。
      */
-    private Long createArticle(Long authorId, String title, String summary, String markdown, String html, int wordCount) {
+    private Long createArticle(Long authorId, String title, String summary, String markdown, String html,
+                               int wordCount, List<Long> tagIds) {
         long articleId = IdWorker.getId();
         writeBody(articleId, markdown, html, wordCount, null, Instant.now().truncatedTo(ChronoUnit.MILLIS));
         try {
@@ -173,18 +184,23 @@ public class ArticleServiceImpl implements ArticleService {
                     .state(ArticleConstants.PUBLISH.byteValue())
                     .publishTime(LocalDateTime.now(ZoneOffset.UTC))
                     .build());
+            saveArticleTags(articleId, tagIds);
         } catch (RuntimeException e) {
-            // 补偿：元数据没落成, 刚写的正文就是孤儿, 需要删掉它
+            // 补偿：文章行是本次刚插的、还没被任何人引用，把三样一起删掉就回到"什么都没发生"
+            articleTagMapper.delete(new LambdaQueryWrapper<ArticleTag>().eq(ArticleTag::getArticleId, articleId));
+            articleMapper.deleteById(articleId);
             articleContentRepository.deleteById(articleId);
             throw e;
         }
+        tagService.evictHotTags();
         return articleId;
     }
 
     /**
      * 覆盖并发布已存在的文章（含草稿转发布）。
      */
-    private Long overwriteArticle(Long articleId, String title, String summary, String markdown, String html, int wordCount) {
+    private Long overwriteArticle(Long articleId, String title, String summary, String markdown, String html,
+                                  int wordCount, List<Long> tagIds) {
         Article existing = articleMapper.selectById(articleId);
         if (existing == null || existing.getDeleted() == ArticleConstants.DELETED.byteValue()) {
             throw new BusinessException(CommonErrorCode.NOT_FOUND, "文章不存在");
@@ -193,11 +209,18 @@ public class ArticleServiceImpl implements ArticleService {
         OwnerUtil.assertOwner(existing.getAuthorId());
 
         ArticleContent previous = articleContentRepository.findById(articleId).orElse(null);
+        // tagIds == null 表示"不改标签"，那就不需要关联的快照
+        List<Long> previousTags = tagIds == null ? null : selectTagIds(articleId);
         Instant now = Instant.now().truncatedTo(ChronoUnit.MILLIS);
         writeBody(articleId, markdown, html, wordCount, previous, now);
 
         int affected;
         try {
+            // 关联先改，article 的 UPDATE 作为唯一提交点：任一步失败时元数据都还没动，
+            // 还原关联 + 正文就能回到一致。反过来先 UPDATE 的话，失败就再也回不去了
+            if (tagIds != null) {
+                replaceArticleTags(articleId, tagIds);
+            }
             affected = articleMapper.update(null, new LambdaUpdateWrapper<Article>()
                     .set(Article::getTitle, title)
                     .set(Article::getSummary, summaryOf(summary, html))
@@ -210,13 +233,14 @@ public class ArticleServiceImpl implements ArticleService {
                     .eq(Article::getId, articleId)
                     .eq(Article::getDeleted, ArticleConstants.NOT_DELETED));
         } catch (RuntimeException e) {
-            restoreBody(articleId, previous, now);
+            restoreTagsAndBody(articleId, previousTags, previous, now);
             throw e;
         }
         if (affected == 0) {
-            restoreBody(articleId, previous, now);
+            restoreTagsAndBody(articleId, previousTags, previous, now);
             throw new BusinessException(CommonErrorCode.CONFLICT, "文章状态已变化，发布未生效");
         }
+        tagService.evictHotTags();
         return articleId;
     }
 
@@ -368,6 +392,7 @@ public class ArticleServiceImpl implements ArticleService {
                 .markdown(content.getMarkdown())
                 .state(article.getState())
                 .updateTime(article.getUpdateTime())
+                .tagIds(selectTagIds(articleId))
                 .build();
     }
 
@@ -443,6 +468,42 @@ public class ArticleServiceImpl implements ArticleService {
         int count = Math.toIntExact(dbCount.get());
         stringRedisTemplate.opsForValue().setIfAbsent(key, String.valueOf(count));
         return count;
+    }
+
+    // ==================== 标签关联辅助 ====================
+
+    /** 全量替换某文章的标签关联（先删后插）。调用方保证 tagIds 已去重且已校验存在 */
+    private void replaceArticleTags(Long articleId, List<Long> tagIds) {
+        articleTagMapper.delete(new LambdaQueryWrapper<ArticleTag>().eq(ArticleTag::getArticleId, articleId));
+        saveArticleTags(articleId, tagIds);
+    }
+
+    private void saveArticleTags(Long articleId, List<Long> tagIds) {
+        if (tagIds == null || tagIds.isEmpty()) {
+            return;
+        }
+        for (Long tagId : tagIds) {
+            articleTagMapper.insert(ArticleTag.builder().articleId(articleId).tagId(tagId).build());
+        }
+    }
+
+    private List<Long> selectTagIds(Long articleId) {
+        List<ArticleTag> rows = articleTagMapper.selectList(new LambdaQueryWrapper<ArticleTag>()
+                .select(ArticleTag::getTagId)
+                .eq(ArticleTag::getArticleId, articleId));
+        List<Long> tagIds = new ArrayList<>(rows.size());
+        for (ArticleTag row : rows) {
+            tagIds.add(row.getTagId());
+        }
+        return tagIds;
+    }
+
+    /** 覆盖发布失败时还原：previousTags 非空才说明本次确实改过关联 */
+    private void restoreTagsAndBody(Long articleId, List<Long> previousTags, ArticleContent previous, Instant now) {
+        if (previousTags != null) {
+            replaceArticleTags(articleId, previousTags);
+        }
+        restoreBody(articleId, previous, now);
     }
 
     // ==================== 双写与补偿（四条路径共用） ====================

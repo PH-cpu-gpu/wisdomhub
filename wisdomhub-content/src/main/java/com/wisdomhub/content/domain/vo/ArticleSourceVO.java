@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 /** 编辑器源数据。草稿(1)与已发布(2)/下架(3)共用；前端据 state 决定是否开自动保存（只有 1 开） */
 @Data
@@ -27,4 +28,7 @@ public class ArticleSourceVO {
     private Byte state;
 
     private LocalDateTime updateTime;
+
+    /** 已关联的标签 ID。编辑器要靠它回显，否则一提交就会把没显示出来的旧标签冲掉；草稿恒为空 */
+    private List<Long> tagIds;
 }
