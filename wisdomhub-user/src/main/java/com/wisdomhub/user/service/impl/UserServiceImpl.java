@@ -267,8 +267,22 @@ public class UserServiceImpl implements UserService {
         if (user == null) {
             throw new BusinessException(CommonErrorCode.NOT_FOUND, "用户不存在");
         }
-        UserProfileVO userProfile = BeanUtil.copyProperties(user, UserProfileVO.class);
+        // 计数优先读 Redis, 不取 user 表的快照列
+        UserProfileVO userProfile = BeanUtil.copyProperties(user, UserProfileVO.class, "followCount", "fansCount");
         userProfile.setUserId(userId);
+        try {
+            userProfile.setFollowCount(ensureCount(RedisKeyConstants.FOLLOW_COUNT_KEY + userId,
+                    () -> userFollowMapper.selectCount(new LambdaQueryWrapper<UserFollow>()
+                            .eq(UserFollow::getFollowerId, userId))));
+            userProfile.setFansCount(ensureCount(RedisKeyConstants.FANS_COUNT_KEY + userId,
+                    () -> userFollowMapper.selectCount(new LambdaQueryWrapper<UserFollow>()
+                            .eq(UserFollow::getFolloweeId, userId))));
+        } catch (Exception e) {
+            // Redis 不可用: 退回 user 表快照列(由 XXL-JOB 定期回写, 可能略旧)
+            log.warn("计数读取失败, 退回 user 表快照: userId={}", userId, e);
+            userProfile.setFollowCount(user.getFollowCount());
+            userProfile.setFansCount(user.getFansCount());
+        }
         Long articleCount = articleFeign.countArticle(userId);
         userProfile.setArticleCount(Math.toIntExact(articleCount));
         return userProfile;
@@ -301,13 +315,17 @@ public class UserServiceImpl implements UserService {
     }
 
     /**
-     * 确保关注数/粉丝数key存在, 如果不存在从数据库重建
+     * 确保关注数/粉丝数 key 存在, 不存在则从 COUNT(*) 重建, 返回当前计数
      */
-    private void ensureCount(String key, Supplier<Long> dbCount) {
-        if (stringRedisTemplate.hasKey(key)) {
-            return;
+    private int ensureCount(String key, Supplier<Long> dbCount) {
+        String cached = stringRedisTemplate.opsForValue().get(key);
+        if (cached != null) {
+            return Integer.parseInt(cached);
         }
-        stringRedisTemplate.opsForValue().setIfAbsent(key, String.valueOf(dbCount.get()));
+        int count = Math.toIntExact(dbCount.get());
+        // SETNX 回填, 并发 INCR 已经建了 key 时不能覆盖它
+        stringRedisTemplate.opsForValue().setIfAbsent(key, String.valueOf(count));
+        return count;
     }
 
     /**
