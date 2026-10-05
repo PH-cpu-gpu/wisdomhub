@@ -23,7 +23,7 @@ public class CacheConfiguration {
     public RedisCacheManager redisCacheManager(RedisConnectionFactory redisConnectionFactory,
                                               RedisSerializer<Object> redisValueSerializer,
                                               @Value("${spring.application.name}") String applicationName) {
-        String prefix = RedisPrefix.APP + ":" + serviceOf(applicationName) + ":cache:";
+        String prefix = RedisPrefix.APP + serviceOf(applicationName) + ":cache:";
         RedisCacheConfiguration redisCacheConfiguration =
                 RedisCacheConfiguration.defaultCacheConfig()
                         .disableCachingNullValues()
