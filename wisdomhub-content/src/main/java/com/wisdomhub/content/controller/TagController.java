@@ -46,13 +46,12 @@ public class TagController {
     }
 
     /*
-    // 只有管理员能调用, 此处先不实现
+    // 写操作只有管理员能调用, 此处先不实现 —— 普通用户只能查
     @Operation(summary = "创建标签")
     @PostMapping("/tag")
     public R<Long> create(@Valid @RequestBody TagDTO tagDTO) {
         return R.success(tagService.createTag(tagDTO));
     }
-    */
 
     @Operation(summary = "修改标签")
     @PutMapping("/tag/{tagId}")
@@ -67,4 +66,5 @@ public class TagController {
         tagService.deleteTag(tagId);
         return R.success();
     }
+    */
 }
