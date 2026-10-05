@@ -5,6 +5,7 @@ import com.wisdomhub.content.domain.dto.ArticleDraftDTO;
 import com.wisdomhub.content.domain.dto.ArticlePublishDTO;
 import com.wisdomhub.content.domain.vo.ArticleBriefVO;
 import com.wisdomhub.content.domain.vo.ArticleDetailVO;
+import com.wisdomhub.content.domain.vo.ArticleListItemVO;
 import com.wisdomhub.content.domain.vo.ArticleSourceVO;
 import com.wisdomhub.content.domain.vo.DraftBriefVO;
 
@@ -37,4 +38,11 @@ public interface ArticleService {
 
     /** 文章详情：跨库组装 MySQL 元数据与 MongoDB 正文。仅 state=2 且未删除可见；登录用户按窗口累加阅读量，游客只读不计数 */
     ArticleDetailVO getDetail(Long articleId);
+
+    /**
+     * 公开文章列表：分页 + 排序（new=发布时间倒序 / hot=阅读量快照倒序）+ 可选 tagId / authorId 筛选。
+     * 只返回 state=2 且未删除；tagId 走 article_tag 半连接子查询。
+     */
+    PageResponse<ArticleListItemVO> listArticles(Integer page, Integer pageSize, String sort,
+                                                 Long tagId, Long authorId);
 }

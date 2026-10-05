@@ -20,5 +20,6 @@ CREATE TABLE article (
     update_time DATETIME NOT NULL COMMENT '更新时间',
     INDEX idx_author_state (author_id, state, create_time),
     INDEX idx_author_state_update (author_id, state, update_time),
-    INDEX idx_state_publish (state, publish_time)
+    INDEX idx_state_publish (state, publish_time),
+    INDEX idx_state_view (state, view_count)
 ) ENGINE=InnoDB COMMENT='文章';
