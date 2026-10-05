@@ -11,7 +11,7 @@ public final class PageUtil {
     private PageUtil() {
     }
 
-    /** 分页取值按技术文档 17.3：页码从 1 起，每页默认 10、上限 100，超了按 100 处理 */
+    /** 页码从 1 起，每页默认 10、上限 100，超了按 100 处理 */
     public static <T> Page<T> of(Integer page, Integer pageSize) {
         int current = (page == null || page < 1) ? 1 : page;
         int size = (pageSize == null || pageSize < 1) ? 10 : Math.min(pageSize, 100);
