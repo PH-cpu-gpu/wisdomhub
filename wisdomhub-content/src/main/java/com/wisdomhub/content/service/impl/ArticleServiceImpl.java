@@ -21,6 +21,7 @@ import com.wisdomhub.content.domain.dto.ArticlePublishDTO;
 import com.wisdomhub.content.domain.entity.Article;
 import com.wisdomhub.content.domain.vo.ArticleBriefVO;
 import com.wisdomhub.content.domain.vo.ArticleDetailVO;
+import com.wisdomhub.content.domain.vo.ArticleListItemVO;
 import com.wisdomhub.content.domain.vo.ArticleSourceVO;
 import com.wisdomhub.content.domain.vo.DraftBriefVO;
 import com.wisdomhub.content.mapper.ArticleMapper;
@@ -38,6 +39,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Locale;
 import java.util.function.Supplier;
 
 @Slf4j
@@ -47,6 +49,10 @@ public class ArticleServiceImpl implements ArticleService {
 
     /** 摘要留空时从正文纯文本截取的长度 */
     private static final int SUMMARY_MAX = 100;
+
+    /** sort 白名单枚举*/
+    private static final String SORT_NEW = "new";
+    private static final String SORT_HOT = "hot";
 
     private final ArticleMapper articleMapper;
     private final ArticleContentRepository articleContentRepository;
@@ -81,6 +87,61 @@ public class ArticleServiceImpl implements ArticleService {
                         .summary(article.getSummary())
                         .build())
                 .toList();
+    }
+
+    // ==================== 文章：公开列表 ====================
+
+    @Override
+    public PageResponse<ArticleListItemVO> listArticles(Integer page, Integer pageSize, String sort,
+                                                        Long tagId, Long authorId) {
+        LambdaQueryWrapper<Article> wrapper = new LambdaQueryWrapper<Article>()
+                .select(Article::getId, Article::getAuthorId, Article::getTitle, Article::getSummary,
+                        Article::getPublishTime, Article::getViewCount, Article::getLikeCount,
+                        Article::getCommentCount, Article::getFavoriteCount)
+                // 对外可见：已发布 + 未删除。
+                .eq(Article::getState, ArticleConstants.PUBLISH)
+                .eq(Article::getDeleted, ArticleConstants.NOT_DELETED)
+                // 可选筛选：条件为 false 时整条不拼进 SQL
+                .eq(authorId != null, Article::getAuthorId, authorId)
+                .inSql(tagId != null, Article::getId,
+                        "SELECT article_id FROM article_tag WHERE tag_id = " + tagId);
+        applySort(wrapper, sort);
+
+        Page<Article> result = articleMapper.selectPage(PageUtil.of(page, pageSize), wrapper);
+        List<ArticleListItemVO> items = result.getRecords().stream()
+                .map(this::toListItem)
+                .toList();
+        return PageUtil.toResponse(result, items);
+    }
+
+    /**
+     * sort 白名单映射只写在这里，绝不把前端传的字符串拼进 SQL：
+     * 真正决定 SQL 的是下面两个编译期 Lambda，用户串只参与 switch 比较。
+     */
+    private void applySort(LambdaQueryWrapper<Article> wrapper, String sort) {
+        String normalized = StrUtil.isBlank(sort) ? SORT_NEW : sort.trim().toLowerCase(Locale.ROOT);
+        switch (normalized) {
+            // 最新：publish_time 是秒精度 DATETIME，会重复，必须用 id 兜底否则翻页会漂移
+            case SORT_NEW -> wrapper.orderByDesc(Article::getPublishTime).orderByDesc(Article::getId);
+            // 最热：view_count 是 MySQL 快照，最多滞后 2 分钟
+            case SORT_HOT -> wrapper.orderByDesc(Article::getViewCount).orderByDesc(Article::getId);
+            // 白名单外一律 400：枚举没有「最接近的合法值」，静默回退会掩盖前端拼错
+            default -> throw new BusinessException(CommonErrorCode.BAD_REQUEST, "排序方式不合法");
+        }
+    }
+
+    private ArticleListItemVO toListItem(Article article) {
+        return ArticleListItemVO.builder()
+                .articleId(article.getId())
+                .authorId(article.getAuthorId())
+                .title(article.getTitle())
+                .summary(article.getSummary())
+                .publishTime(article.getPublishTime())
+                .viewCount(article.getViewCount())
+                .likeCount(article.getLikeCount())
+                .commentCount(article.getCommentCount())
+                .favoriteCount(article.getFavoriteCount())
+                .build();
     }
 
     // ==================== 文章：发布 ====================
