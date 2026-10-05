@@ -4,6 +4,8 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
+import java.util.List;
+
 @Data
 public class ArticlePublishDTO {
 
@@ -24,4 +26,11 @@ public class ArticlePublishDTO {
 
     @NotBlank(message = "正文不能为空")
     private String markdown;
+
+    /**
+     * 标签 ID 列表，可空。null = 覆盖发布时保持原关联不变；[] = 清空；非空 = 全量替换。
+     * 元素必须是已存在的标签，不允许随文章创建新标签
+     */
+    @Size(max = 10, message = "一篇文章最多选择10个标签")
+    private List<Long> tagIds;
 }
