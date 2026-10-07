@@ -18,6 +18,7 @@ CREATE TABLE article (
     deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除 0-未删除 1-已删除',
     create_time DATETIME NOT NULL COMMENT '创建时间',
     update_time DATETIME NOT NULL COMMENT '更新时间',
+    version INT NOT NULL DEFAULT 0 COMMENT '乐观锁版本，只有覆盖发布递增',
     INDEX idx_author_state (author_id, state, create_time),
     INDEX idx_author_state_update (author_id, state, update_time),
     INDEX idx_state_publish (state, publish_time),

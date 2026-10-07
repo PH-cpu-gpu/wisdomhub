@@ -90,4 +90,9 @@ public class Article implements Serializable {
      */
     @TableField(fill = FieldFill.INSERT_UPDATE)
     private LocalDateTime updateTime;
+
+    /**
+     * 乐观锁版本，只有覆盖发布递增
+     */
+    private Integer version;
 }

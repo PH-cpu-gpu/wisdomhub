@@ -36,6 +36,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -51,10 +52,14 @@ import java.util.function.Supplier;
 @RequiredArgsConstructor
 public class ArticleServiceImpl implements ArticleService {
 
-    /** 摘要留空时从正文纯文本截取的长度 */
+    /**
+     * 摘要留空时从正文纯文本截取的长度
+     */
     private static final int SUMMARY_MAX = 100;
 
-    /** sort 白名单枚举*/
+    /**
+     * sort 白名单枚举
+     */
     private static final String SORT_NEW = "new";
     private static final String SORT_HOT = "hot";
 
@@ -64,6 +69,7 @@ public class ArticleServiceImpl implements ArticleService {
     private final MarkdownRenderer markdownRenderer;
     private final StringRedisTemplate stringRedisTemplate;
     private final TagService tagService;
+    private final TransactionTemplate transactionTemplate;
 
     /**
      * 根据用户Id查询其已发布未删除的文章数量
@@ -176,19 +182,19 @@ public class ArticleServiceImpl implements ArticleService {
         long articleId = IdWorker.getId();
         writeBody(articleId, markdown, html, wordCount, null, Instant.now().truncatedTo(ChronoUnit.MILLIS));
         try {
-            articleMapper.insert(Article.builder()
-                    .id(articleId)
-                    .authorId(authorId)
-                    .title(title)
-                    .summary(summaryOf(summary, html))
-                    .state(ArticleConstants.PUBLISH.byteValue())
-                    .publishTime(LocalDateTime.now(ZoneOffset.UTC))
-                    .build());
-            saveArticleTags(articleId, tagIds);
+            transactionTemplate.executeWithoutResult(status -> {
+                articleMapper.insert(Article.builder()
+                        .id(articleId)
+                        .authorId(authorId)
+                        .title(title)
+                        .summary(summaryOf(summary, html))
+                        .state(ArticleConstants.PUBLISH.byteValue())
+                        .publishTime(LocalDateTime.now(ZoneOffset.UTC))
+                        .build());
+                saveArticleTags(articleId, tagIds);
+            });
         } catch (RuntimeException e) {
-            // 补偿：文章行是本次刚插的、还没被任何人引用，把三样一起删掉就回到"什么都没发生"
             articleTagMapper.delete(new LambdaQueryWrapper<ArticleTag>().eq(ArticleTag::getArticleId, articleId));
-            articleMapper.deleteById(articleId);
             articleContentRepository.deleteById(articleId);
             throw e;
         }
@@ -209,36 +215,37 @@ public class ArticleServiceImpl implements ArticleService {
         OwnerUtil.assertOwner(existing.getAuthorId());
 
         ArticleContent previous = articleContentRepository.findById(articleId).orElse(null);
-        // tagIds == null 表示"不改标签"，那就不需要关联的快照
-        List<Long> previousTags = tagIds == null ? null : selectTagIds(articleId);
         Instant now = Instant.now().truncatedTo(ChronoUnit.MILLIS);
         writeBody(articleId, markdown, html, wordCount, previous, now);
 
-        int affected;
         try {
-            // 关联先改，article 的 UPDATE 作为唯一提交点：任一步失败时元数据都还没动，
-            // 还原关联 + 正文就能回到一致。反过来先 UPDATE 的话，失败就再也回不去了
-            if (tagIds != null) {
-                replaceArticleTags(articleId, tagIds);
-            }
-            affected = articleMapper.update(null, new LambdaUpdateWrapper<Article>()
-                    .set(Article::getTitle, title)
-                    .set(Article::getSummary, summaryOf(summary, html))
-                    .set(Article::getState, ArticleConstants.PUBLISH.byteValue())
-                    // 首次发布才写发布时间
-                    .set(Article::getPublishTime, existing.getPublishTime() == null
-                            ? LocalDateTime.now(ZoneOffset.UTC) : existing.getPublishTime())
-                    // update(null, wrapper) 不会触发自动填充，内容编辑要自己补 update_time
-                    .set(Article::getUpdateTime, LocalDateTime.now(ZoneOffset.UTC))
-                    .eq(Article::getId, articleId)
-                    .eq(Article::getDeleted, ArticleConstants.NOT_DELETED));
+            // 关联与元数据放同一事务：CAS 失败时一起回滚，不用再手工还原关联
+            transactionTemplate.executeWithoutResult(status -> {
+                if (tagIds != null) {
+                    replaceArticleTags(articleId, tagIds);
+                }
+                int affected = articleMapper.update(null, new LambdaUpdateWrapper<Article>()
+                        .set(Article::getTitle, title)
+                        .set(Article::getSummary, summaryOf(summary, html))
+                        .set(Article::getState, ArticleConstants.PUBLISH.byteValue())
+                        // 首次发布才写发布时间
+                        .set(Article::getPublishTime, existing.getPublishTime() == null
+                                ? LocalDateTime.now(ZoneOffset.UTC) : existing.getPublishTime())
+                        // update(null, wrapper) 不会触发自动填充，内容编辑要自己补 update_time
+                        .set(Article::getUpdateTime, LocalDateTime.now(ZoneOffset.UTC))
+                        .setSql("version = version + 1")
+                        .eq(Article::getId, articleId)
+                        // 乐观锁：检测窗口含上面那次 Mongo 正文写，期间版本被推高过就不认
+                        .eq(Article::getVersion, existing.getVersion())
+                        .eq(Article::getDeleted, ArticleConstants.NOT_DELETED));
+                if (affected == 0) {
+                    // 抛异常让事务回滚（关联一并还原），正文由外层统一补偿
+                    throw new BusinessException(CommonErrorCode.CONFLICT, "文章已被修改，发布未生效");
+                }
+            });
         } catch (RuntimeException e) {
-            restoreTagsAndBody(articleId, previousTags, previous, now);
+            restoreBody(articleId, previous, now);
             throw e;
-        }
-        if (affected == 0) {
-            restoreTagsAndBody(articleId, previousTags, previous, now);
-            throw new BusinessException(CommonErrorCode.CONFLICT, "文章状态已变化，发布未生效");
         }
         tagService.evictHotTags();
         return articleId;
@@ -428,7 +435,9 @@ public class ArticleServiceImpl implements ArticleService {
                 .build();
     }
 
-    /** 阅读量：Redis 为读源，登录用户按 RedisTtl.VIEW_ONCE 窗口去重，游客只读不计数 */
+    /**
+     * 阅读量：Redis 为读源，登录用户按 RedisTtl.VIEW_ONCE 窗口去重，游客只读不计数
+     */
     private int resolveViewCount(Article article) {
         String countKey = ArticleRedisKeyConstants.VIEW_COUNT_KEY + article.getId();
         try {
@@ -459,7 +468,9 @@ public class ArticleServiceImpl implements ArticleService {
         return article.getViewCount() == null ? 0 : article.getViewCount();
     }
 
-    /** 确保计数 key 存在，miss 则用快照重建。SETNX 回填，避免覆盖并发 INCR */
+    /**
+     * 确保计数 key 存在，miss 则用快照重建。SETNX 回填，避免覆盖并发 INCR
+     */
     private int ensureCount(String key, Supplier<Long> dbCount) {
         String cached = stringRedisTemplate.opsForValue().get(key);
         if (cached != null) {
@@ -472,7 +483,9 @@ public class ArticleServiceImpl implements ArticleService {
 
     // ==================== 标签关联辅助 ====================
 
-    /** 全量替换某文章的标签关联（先删后插）。调用方保证 tagIds 已去重且已校验存在 */
+    /**
+     * 全量替换某文章的标签关联（先删后插）。调用方保证 tagIds 已去重且已校验存在
+     */
     private void replaceArticleTags(Long articleId, List<Long> tagIds) {
         articleTagMapper.delete(new LambdaQueryWrapper<ArticleTag>().eq(ArticleTag::getArticleId, articleId));
         saveArticleTags(articleId, tagIds);
@@ -482,9 +495,11 @@ public class ArticleServiceImpl implements ArticleService {
         if (tagIds == null || tagIds.isEmpty()) {
             return;
         }
-        for (Long tagId : tagIds) {
-            articleTagMapper.insert(ArticleTag.builder().articleId(articleId).tagId(tagId).build());
-        }
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
+        List<ArticleTag> articleTags = tagIds.stream()
+                .map(tagId -> ArticleTag.builder().articleId(articleId).tagId(tagId).createTime(now).id(IdWorker.getId()).build())
+                .toList();
+        articleTagMapper.insertBatch(articleTags);
     }
 
     private List<Long> selectTagIds(Long articleId) {
@@ -498,17 +513,11 @@ public class ArticleServiceImpl implements ArticleService {
         return tagIds;
     }
 
-    /** 覆盖发布失败时还原：previousTags 非空才说明本次确实改过关联 */
-    private void restoreTagsAndBody(Long articleId, List<Long> previousTags, ArticleContent previous, Instant now) {
-        if (previousTags != null) {
-            replaceArticleTags(articleId, previousTags);
-        }
-        restoreBody(articleId, previous, now);
-    }
-
     // ==================== 双写与补偿（四条路径共用） ====================
 
-    /** 写正文（MongoDB）。previous 非空表示是覆盖，保留原本的首次创建时间 */
+    /**
+     * 写正文（MongoDB）。previous 非空表示是覆盖，保留原本的首次创建时间
+     */
     private void writeBody(long articleId, String markdown, String html, int wordCount,
                            ArticleContent previous, Instant now) {
         articleContentRepository.save(ArticleContent.builder()
@@ -521,7 +530,9 @@ public class ArticleServiceImpl implements ArticleService {
                 .build());
     }
 
-    /** 回滚正文，但只在它还停留在本次写入的那一版时（被并发保存覆盖了就不能拿旧数据倒退） */
+    /**
+     * 回滚正文，但只在它还停留在本次写入的那一版时（被并发保存覆盖了就不能拿旧数据倒退）
+     */
     private void restoreBody(long articleId, ArticleContent previous, Instant writtenAt) {
         ArticleContent current = articleContentRepository.findById(articleId).orElse(null);
         if (current == null || !writtenAt.equals(current.getUpdateTime())) {
