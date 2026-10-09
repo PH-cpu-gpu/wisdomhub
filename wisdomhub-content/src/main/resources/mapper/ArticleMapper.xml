@@ -45,4 +45,27 @@
         ORDER BY f.create_time DESC, f.id DESC
     </select>
 
+    <!-- 专栏内文章：排序键（归入顺序）在关系表、可见性在 article 表，只能 join。
+         列名必须带 a. 前缀：column_article 也有 id / create_time，不限定就 ambiguous -->
+    <select id="selectColumnArticlePage" resultMap="BaseResultMap">
+        SELECT a.id,
+               a.author_id,
+               a.title,
+               a.summary,
+               a.state,
+               a.view_count,
+               a.like_count,
+               a.comment_count,
+               a.favorite_count,
+               a.publish_time,
+               a.create_time,
+               a.update_time
+        FROM column_article ca
+                 JOIN article a ON a.id = ca.article_id
+        WHERE ca.column_id = #{columnId}
+          AND a.state = #{state}
+          AND a.deleted = #{deleted}
+        ORDER BY ca.create_time ASC, ca.id ASC
+    </select>
+
 </mapper>

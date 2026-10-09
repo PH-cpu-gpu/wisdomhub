@@ -1,0 +1,206 @@
+package com.wisdomhub.content.service.impl;
+
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.wisdomhub.common.core.exception.BusinessException;
+import com.wisdomhub.common.core.result.CommonErrorCode;
+import com.wisdomhub.common.core.result.PageResponse;
+import com.wisdomhub.common.web.util.CurrentUserUtil;
+import com.wisdomhub.common.web.util.OwnerUtil;
+import com.wisdomhub.common.web.util.PageUtil;
+import com.wisdomhub.content.constants.ArticleConstants;
+import com.wisdomhub.content.constants.ColumnConstants;
+import com.wisdomhub.content.domain.dto.ColumnCreateDTO;
+import com.wisdomhub.content.domain.entity.Article;
+import com.wisdomhub.content.domain.entity.Column;
+import com.wisdomhub.content.domain.entity.ColumnArticle;
+import com.wisdomhub.content.domain.vo.ArticleListItemVO;
+import com.wisdomhub.content.domain.vo.ColumnVO;
+import com.wisdomhub.content.mapper.ArticleMapper;
+import com.wisdomhub.content.mapper.ColumnArticleMapper;
+import com.wisdomhub.content.mapper.ColumnMapper;
+import com.wisdomhub.content.service.ColumnService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DuplicateKeyException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class ColumnServiceImpl implements ColumnService {
+
+    private static final String ARTICLE_COUNT_COLUMN = "article_count";
+
+    private final ColumnMapper columnMapper;
+    private final ColumnArticleMapper columnArticleMapper;
+    private final ArticleMapper articleMapper;
+
+    // ==================== 读 ====================
+
+    @Override
+    public PageResponse<ColumnVO> listMyColumns(Integer page, Integer pageSize) {
+        Page<Column> result = columnMapper.selectPage(PageUtil.of(page, pageSize),
+                new LambdaQueryWrapper<Column>()
+                        .eq(Column::getUserId, CurrentUserUtil.id())
+                        .eq(Column::getDeleted, ColumnConstants.NOT_DELETED)
+                        // 同一秒建的专栏会撞 create_time，用 id 兜底否则翻页会漂移
+                        .orderByDesc(Column::getCreateTime)
+                        .orderByDesc(Column::getId));
+        return PageUtil.toResponse(result, result.getRecords().stream().map(this::toVO).toList());
+    }
+
+    @Override
+    public ColumnVO getColumnDetail(Long columnId) {
+        return toVO(requireVisibleColumn(columnId));
+    }
+
+    @Override
+    public PageResponse<ArticleListItemVO> listColumnArticles(Long columnId, Integer page, Integer pageSize) {
+        requireVisibleColumn(columnId);
+        IPage<Article> result = articleMapper.selectColumnArticlePage(PageUtil.of(page, pageSize),
+                columnId, ArticleConstants.PUBLISH, ArticleConstants.NOT_DELETED);
+        List<ArticleListItemVO> items = result.getRecords().stream().map(this::toListItem).toList();
+        return PageUtil.toResponse(result, items);
+    }
+
+    // ==================== 写 ====================
+
+    @Override
+    public Long createColumn(ColumnCreateDTO dto) {
+        Column column = Column.builder()
+                .userId(CurrentUserUtil.id())
+                .title(dto.getTitle())
+                // DDL 是 NOT NULL DEFAULT ''，显式给空串，不依赖 MP 的 null 字段跳过策略
+                .description(dto.getDescription() == null ? "" : dto.getDescription())
+                .cover(dto.getCover())
+                .price(dto.getPrice() == null ? 0 : dto.getPrice())
+                .articleCount(0)
+                .state(ColumnConstants.NORMAL.byteValue())
+                .deleted(ColumnConstants.NOT_DELETED.byteValue())
+                .build();
+        columnMapper.insert(column);
+        return column.getId();
+    }
+
+    @Override
+    @Transactional
+    public int addArticle(Long columnId, Long articleId) {
+        Column column = requireVisibleColumn(columnId);
+        OwnerUtil.assertOwner(column.getUserId());
+        Article article = requirePublishedArticle(articleId);
+        OwnerUtil.assertOwner(article.getAuthorId());
+
+        try {
+            columnArticleMapper.insert(ColumnArticle.builder()
+                    .columnId(columnId)
+                    .articleId(articleId)
+                    .build());
+        } catch (DuplicateKeyException e) {
+            // 已经归入过：设置状态类操作，幂等返回 200
+            return column.getArticleCount();
+        }
+        if (bumpArticleCount(columnId, 1) == 0) {
+            // 校验之后专栏被并发下架/删除：抛出去回滚这次插入
+            throw new BusinessException(CommonErrorCode.NOT_FOUND, "专栏不存在");
+        }
+        return readArticleCount(columnId);
+    }
+
+    @Override
+    @Transactional
+    public int removeArticle(Long columnId, Long articleId) {
+        Column column = requireVisibleColumn(columnId);
+        OwnerUtil.assertOwner(column.getUserId());
+        int deleted = columnArticleMapper.delete(new LambdaQueryWrapper<ColumnArticle>()
+                .eq(ColumnArticle::getColumnId, columnId)
+                .eq(ColumnArticle::getArticleId, articleId));
+        if (deleted == 0) {
+            // 本来就没归入过：幂等，不是错误
+            return column.getArticleCount();
+        }
+        bumpArticleCount(columnId, -1);
+        return readArticleCount(columnId);
+    }
+
+    // ==================== 共用 ====================
+
+    private Column requireVisibleColumn(Long columnId) {
+        Column column = columnMapper.selectById(columnId);
+        if (column == null
+                || column.getDeleted() == ColumnConstants.DELETED.byteValue()
+                || column.getState() != ColumnConstants.NORMAL.byteValue()) {
+            throw new BusinessException(CommonErrorCode.NOT_FOUND, "专栏不存在");
+        }
+        return column;
+    }
+
+    /** 只有已发布且未删除的文章能归入专栏，同 B1.26 的 requireVisibleArticle */
+    private Article requirePublishedArticle(Long articleId) {
+        Article article = articleMapper.selectById(articleId);
+        if (article == null
+                || article.getDeleted() == ArticleConstants.DELETED.byteValue()
+                || article.getState() != ArticleConstants.PUBLISH.byteValue()) {
+            throw new BusinessException(CommonErrorCode.NOT_FOUND, "文章不存在");
+        }
+        return article;
+    }
+
+    /**
+     * 收录数原子增减，绝不读改写。不 bump update_time（同 B1.26：归入/移出不该把整行写一遍）。
+     * delta 为负时带非负安全网：历史漂移时不要把计数减成负数
+     */
+    private int bumpArticleCount(Long columnId, int delta) {
+        LambdaUpdateWrapper<Column> wrapper = new LambdaUpdateWrapper<Column>()
+                .setSql(ARTICLE_COUNT_COLUMN + " = " + ARTICLE_COUNT_COLUMN + " + " + delta)
+                .eq(Column::getId, columnId)
+                .eq(Column::getDeleted, ColumnConstants.NOT_DELETED)
+                .eq(Column::getState, ColumnConstants.NORMAL);
+        if (delta < 0) {
+            wrapper.ge(Column::getArticleCount, 1);
+        }
+        return columnMapper.update(null, wrapper);
+    }
+
+    /** 成功路径读回最新收录数。 */
+    private int readArticleCount(Long columnId) {
+        Column latest = columnMapper.selectById(columnId);
+        if (latest == null || latest.getArticleCount() == null) {
+            return 0;
+        }
+        return latest.getArticleCount();
+    }
+
+    private ColumnVO toVO(Column column) {
+        return ColumnVO.builder()
+                .columnId(column.getId())
+                .userId(column.getUserId())
+                .title(column.getTitle())
+                .description(column.getDescription())
+                .cover(column.getCover())
+                .price(column.getPrice())
+                .articleCount(column.getArticleCount())
+                .createTime(column.getCreateTime())
+                .build();
+    }
+
+    /** 与 ArticleServiceImpl.toListItem 同形。第三次出现再抽公共转换器 */
+    private ArticleListItemVO toListItem(Article article) {
+        return ArticleListItemVO.builder()
+                .articleId(article.getId())
+                .authorId(article.getAuthorId())
+                .title(article.getTitle())
+                .summary(article.getSummary())
+                .publishTime(article.getPublishTime())
+                .viewCount(article.getViewCount())
+                .likeCount(article.getLikeCount())
+                .commentCount(article.getCommentCount())
+                .favoriteCount(article.getFavoriteCount())
+                .build();
+    }
+}

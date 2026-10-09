@@ -24,4 +24,12 @@ public interface ArticleMapper extends BaseMapper<Article> {
                                       @Param("userId") Long userId,
                                       @Param("state") Integer state,
                                       @Param("deleted") Integer deleted);
+
+    /**
+     * 专栏内文章分页，按归入时间升序（章节顺序，不是文章发布时间）。
+     */
+    IPage<Article> selectColumnArticlePage(IPage<Article> page,
+                                           @Param("columnId") Long columnId,
+                                           @Param("state") Integer state,
+                                           @Param("deleted") Integer deleted);
 }
