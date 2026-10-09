@@ -45,4 +45,9 @@ public interface ArticleService {
      */
     PageResponse<ArticleListItemVO> listArticles(Integer page, Integer pageSize, String sort,
                                                  Long tagId, Long authorId);
+
+    /**
+     * 我的收藏分页，按收藏时间倒序（不是文章发布时间）。join 过滤掉草稿 / 下架 / 已删的文章，
+     */
+    PageResponse<ArticleListItemVO> listMyFavorites(Integer page, Integer pageSize);
 }

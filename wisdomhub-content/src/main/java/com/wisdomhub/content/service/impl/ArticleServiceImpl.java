@@ -3,6 +3,7 @@ package com.wisdomhub.content.service.impl;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.wisdomhub.common.core.exception.BusinessException;
@@ -19,12 +20,16 @@ import com.wisdomhub.content.domain.document.ArticleContent;
 import com.wisdomhub.content.domain.dto.ArticleDraftDTO;
 import com.wisdomhub.content.domain.dto.ArticlePublishDTO;
 import com.wisdomhub.content.domain.entity.Article;
+import com.wisdomhub.content.domain.entity.ArticleFavorite;
+import com.wisdomhub.content.domain.entity.ArticleLike;
 import com.wisdomhub.content.domain.entity.ArticleTag;
 import com.wisdomhub.content.domain.vo.ArticleBriefVO;
 import com.wisdomhub.content.domain.vo.ArticleDetailVO;
 import com.wisdomhub.content.domain.vo.ArticleListItemVO;
 import com.wisdomhub.content.domain.vo.ArticleSourceVO;
 import com.wisdomhub.content.domain.vo.DraftBriefVO;
+import com.wisdomhub.content.mapper.ArticleFavoriteMapper;
+import com.wisdomhub.content.mapper.ArticleLikeMapper;
 import com.wisdomhub.content.mapper.ArticleMapper;
 import com.wisdomhub.content.mapper.ArticleTagMapper;
 import com.wisdomhub.content.repository.ArticleContentRepository;
@@ -65,6 +70,8 @@ public class ArticleServiceImpl implements ArticleService {
 
     private final ArticleMapper articleMapper;
     private final ArticleTagMapper articleTagMapper;
+    private final ArticleLikeMapper articleLikeMapper;
+    private final ArticleFavoriteMapper articleFavoriteMapper;
     private final ArticleContentRepository articleContentRepository;
     private final MarkdownRenderer markdownRenderer;
     private final StringRedisTemplate stringRedisTemplate;
@@ -140,6 +147,16 @@ public class ArticleServiceImpl implements ArticleService {
             // 白名单外一律 400：枚举没有「最接近的合法值」，静默回退会掩盖前端拼错
             default -> throw new BusinessException(CommonErrorCode.BAD_REQUEST, "排序方式不合法");
         }
+    }
+
+    @Override
+    public PageResponse<ArticleListItemVO> listMyFavorites(Integer page, Integer pageSize) {
+        IPage<Article> result = articleMapper.selectFavoritePage(PageUtil.of(page, pageSize),
+                CurrentUserUtil.id(), ArticleConstants.PUBLISH, ArticleConstants.NOT_DELETED);
+        List<ArticleListItemVO> items = result.getRecords().stream()
+                .map(this::toListItem)
+                .toList();
+        return PageUtil.toResponse(result, items);
     }
 
     private ArticleListItemVO toListItem(Article article) {
@@ -427,12 +444,31 @@ public class ArticleServiceImpl implements ArticleService {
                 .summary(article.getSummary())
                 .html(content.getHtml())
                 .publishTime(article.getPublishTime())
-                // 计数放最后：前面的 404 / 500 都不该污染阅读量
+                .liked(resolveLiked(article.getId()))
+                .collected(resolveCollected(article.getId()))
                 .viewCount(resolveViewCount(article))
                 .likeCount(article.getLikeCount())
                 .commentCount(article.getCommentCount())
                 .favoriteCount(article.getFavoriteCount())
                 .build();
+    }
+
+    /**
+     * 当前用户是否已点赞 / 已收藏。详情是可选登录路径，游客没有 userId → 恒 false。
+     * 走 uk(user_id, article_id) 的索引命中，两次 exists 都很便宜，不值得为它加缓存
+     */
+    private boolean resolveLiked(Long articleId) {
+        Long userId = UserContext.getUserId();
+        return userId != null && articleLikeMapper.exists(new LambdaQueryWrapper<ArticleLike>()
+                .eq(ArticleLike::getUserId, userId)
+                .eq(ArticleLike::getArticleId, articleId));
+    }
+
+    private boolean resolveCollected(Long articleId) {
+        Long userId = UserContext.getUserId();
+        return userId != null && articleFavoriteMapper.exists(new LambdaQueryWrapper<ArticleFavorite>()
+                .eq(ArticleFavorite::getUserId, userId)
+                .eq(ArticleFavorite::getArticleId, articleId));
     }
 
     /**
