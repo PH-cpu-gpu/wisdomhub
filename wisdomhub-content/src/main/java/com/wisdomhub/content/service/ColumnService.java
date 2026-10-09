@@ -1,0 +1,33 @@
+package com.wisdomhub.content.service;
+
+import com.wisdomhub.common.core.result.PageResponse;
+import com.wisdomhub.content.domain.dto.ColumnCreateDTO;
+import com.wisdomhub.content.domain.vo.ArticleListItemVO;
+import com.wisdomhub.content.domain.vo.ColumnVO;
+
+public interface ColumnService {
+
+    /** 创建专栏。创建类不幂等（17.3），重复提交真的会建两条。返回专栏 ID */
+    Long createColumn(ColumnCreateDTO dto);
+
+    /** 我的专栏分页，按创建时间倒序 */
+    PageResponse<ColumnVO> listMyColumns(Integer page, Integer pageSize);
+
+    /** 专栏详情。仅 state=1 且未删除可见，游客可读 */
+    ColumnVO getColumnDetail(Long columnId);
+
+    /**
+     * 专栏内文章分页，按归入时间升序。只返回 state=2 且未删除的文章，
+     * 所以 article_count 可能比 total 大（下架/删除的文章仍占着关系行）
+     */
+    PageResponse<ArticleListItemVO> listColumnArticles(Long columnId, Integer page, Integer pageSize);
+
+    /**
+     * 归入文章。设置状态类操作（17.3），幂等：重复归入返回 200。
+     * 要求「专栏是自己的」且「文章是自己已发布的」，返回专栏最新收录数
+     */
+    int addArticle(Long columnId, Long articleId);
+
+    /** 移出文章。幂等：没归入过也返回 200。只校验专栏属主，不校验文章状态（下架/删除的文章也要能清出去） */
+    int removeArticle(Long columnId, Long articleId);
+}
