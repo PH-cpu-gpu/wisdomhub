@@ -24,4 +24,25 @@
         id, author_id, title, summary, state, view_count, like_count, comment_count, favorite_count, publish_time, deleted, create_time, update_time
     </sql>
 
+    <select id="selectFavoritePage" resultMap="BaseResultMap">
+        SELECT a.id,
+               a.author_id,
+               a.title,
+               a.summary,
+               a.state,
+               a.view_count,
+               a.like_count,
+               a.comment_count,
+               a.favorite_count,
+               a.publish_time,
+               a.create_time,
+               a.update_time
+        FROM article_favorite f
+                 JOIN article a ON a.id = f.article_id
+        WHERE f.user_id = #{userId}
+          AND a.state = #{state}
+          AND a.deleted = #{deleted}
+        ORDER BY f.create_time DESC, f.id DESC
+    </select>
+
 </mapper>

@@ -35,7 +35,7 @@ public class ArticleController {
         return R.success(articleService.publish(articlePublishDTO));
     }
 
-    @Operation(summary = "文章列表（分页 / 标签过滤 / 排序）")
+    @Operation(summary = "文章列表")
     @GetMapping("/article")
     public R<PageResponse<ArticleListItemVO>> list(
             @RequestParam(defaultValue = "1") Integer page,
@@ -50,6 +50,13 @@ public class ArticleController {
     @GetMapping("/article/{articleId}")
     public R<ArticleDetailVO> detail(@PathVariable Long articleId) {
         return R.success(articleService.getDetail(articleId));
+    }
+
+    @Operation(summary = "我的收藏")
+    @GetMapping("/article/collect")
+    public R<PageResponse<ArticleListItemVO>> myFavorites(@RequestParam(defaultValue = "1") Integer page,
+                                                          @RequestParam(defaultValue = "10") Integer pageSize) {
+        return R.success(articleService.listMyFavorites(page, pageSize));
     }
 
     @Operation(summary = "读取编辑器源数据（草稿恢复 / 编辑已发布）")

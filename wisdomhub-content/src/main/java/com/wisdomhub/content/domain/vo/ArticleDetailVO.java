@@ -35,4 +35,10 @@ public class ArticleDetailVO {
     private Integer commentCount;
 
     private Integer favoriteCount;
+
+    /** 当前登录用户是否已点赞；详情是可选登录路径，游客恒 false（按钮给他点了也是 401） */
+    private Boolean liked;
+
+    /** 当前登录用户是否已收藏，同上 */
+    private Boolean collected;
 }
