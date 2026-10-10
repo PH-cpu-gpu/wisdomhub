@@ -11,10 +11,13 @@ import com.wisdomhub.common.web.util.OwnerUtil;
 import com.wisdomhub.common.web.util.PageUtil;
 import com.wisdomhub.content.constants.ArticleConstants;
 import com.wisdomhub.content.constants.CommentConstants;
+import com.wisdomhub.content.constants.QuestionConstants;
 import com.wisdomhub.content.domain.dto.CommentCreateDTO;
+import com.wisdomhub.content.domain.entity.Answer;
 import com.wisdomhub.content.domain.entity.Article;
 import com.wisdomhub.content.domain.entity.Comment;
 import com.wisdomhub.content.domain.vo.CommentVO;
+import com.wisdomhub.content.mapper.AnswerMapper;
 import com.wisdomhub.content.mapper.ArticleMapper;
 import com.wisdomhub.content.mapper.CommentMapper;
 import com.wisdomhub.content.service.CommentService;
@@ -31,8 +34,9 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 评论。comment 与 article.comment_count 都在 MySQL，写路径包一个本地事务就原子 ——
- * 提交点即事务提交、补偿即回滚，不需要 B1.18/B1.20 那套跨存储补偿（那套的前提是 Mongo 写无法回滚）。
+ * 评论。comment 与目标的 comment_count（文章 / 回答各一列）都在 MySQL，
+ * 写路径包一个本地事务就原子 —— 提交点即事务提交、补偿即回滚，
+ * 不需要 B1.18/B1.20 那套跨存储补偿（那套的前提是 Mongo 写无法回滚）。
  */
 @Slf4j
 @Service
@@ -41,6 +45,7 @@ public class CommentServiceImpl implements CommentService {
 
     private final CommentMapper commentMapper;
     private final ArticleMapper articleMapper;
+    private final AnswerMapper answerMapper;
 
     // ==================== 发表 ====================
 
@@ -50,8 +55,8 @@ public class CommentServiceImpl implements CommentService {
         Long userId = CurrentUserUtil.id();
         int targetType = resolveTargetType(dto.getTargetType());
         Long targetId = dto.getTargetId();
-        // 写时要校验文章
-        assertCommentable(targetId);
+        // 写时要校验目标（文章 / 回答）
+        assertCommentable(targetType, targetId);
         Long parentId = normalizeParentId(dto.getParentId(), targetType, targetId);
 
         Comment comment = Comment.builder()
@@ -64,15 +69,9 @@ public class CommentServiceImpl implements CommentService {
                 .build();
         commentMapper.insert(comment);
 
-        int affected = articleMapper.update(null, new LambdaUpdateWrapper<Article>()
-                // 原子自增，绝不读改写
-                .setSql("comment_count = comment_count + 1")
-                .eq(Article::getId, targetId)
-                .eq(Article::getDeleted, ArticleConstants.NOT_DELETED)
-                .eq(Article::getState, ArticleConstants.PUBLISH));
-        if (affected == 0) {
-            // 上面校验过之后被并发删除/下架：抛出去回滚评论插入，不让评论挂在不可见文章上
-            throw new BusinessException(CommonErrorCode.NOT_FOUND, "文章不存在");
+        if (bumpTargetCommentCount((byte) targetType, targetId, 1) == 0) {
+            // 上面校验过之后被并发删除/下架：抛出去回滚评论插入，不让评论挂在不可见目标上
+            throw new BusinessException(CommonErrorCode.NOT_FOUND, targetNotFoundMessage(targetType));
         }
         return comment.getId();
     }
@@ -100,11 +99,8 @@ public class CommentServiceImpl implements CommentService {
             // 只有一种可能：selectById 之后被并发删掉了
             throw new BusinessException(CommonErrorCode.NOT_FOUND, "评论不存在");
         }
-        articleMapper.update(null, new LambdaUpdateWrapper<Article>()
-                .setSql("comment_count = comment_count - " + affected)
-                .eq(Article::getId, comment.getTargetId())
-                // 非负安全网：历史漂移时不要把计数减成负数
-                .ge(Article::getCommentCount, affected));
+        // 减到评论自己的 target 上：评论回答就减 answer.comment_count（非负安全网在 helper 里）
+        bumpTargetCommentCount(comment.getTargetType(), comment.getTargetId(), -affected);
     }
 
     // ==================== 分页 ====================
@@ -118,7 +114,6 @@ public class CommentServiceImpl implements CommentService {
                         .eq(Comment::getTargetId, targetId)
                         .isNull(Comment::getParentId)
                         .eq(Comment::getDeleted, CommentConstants.NOT_DELETED)
-                        // create_time 是秒精度会重复，用 id 兜底否则翻页会漂移
                         .orderByAsc(Comment::getCreateTime)
                         .orderByAsc(Comment::getId));
 
@@ -149,7 +144,7 @@ public class CommentServiceImpl implements CommentService {
             vo.setReplies(repliesByParent.getOrDefault(root.getId(), new ArrayList<>()));
             items.add(vo);
         }
-        // total 是「一级评论数」，与 article.comment_count（含二级回复）刻意不等 —— 分页单位 ≠ 计数单位
+        // total 是「一级评论数」，与目标的 comment_count（含二级回复）刻意不等 —— 分页单位 ≠ 计数单位
         return PageUtil.toResponse(rootPage, items);
     }
 
@@ -168,20 +163,60 @@ public class CommentServiceImpl implements CommentService {
         if (targetType == null) {
             return CommentConstants.TARGET_TYPE_ARTICLE;
         }
-        if (!CommentConstants.TARGET_TYPE_ARTICLE.equals(targetType)) {
+        if (!CommentConstants.TARGET_TYPE_ARTICLE.equals(targetType)
+                && !CommentConstants.TARGET_TYPE_ANSWER.equals(targetType)) {
             throw new BusinessException(CommonErrorCode.BAD_REQUEST, "评论目标类型不合法");
         }
         return targetType;
     }
 
-    /** 文章必须存在、未删除、已发布。同库单表查，不是跨服务调用 */
-    private void assertCommentable(Long targetId) {
+    /**
+     * 评论目标必须存在且可见：文章要已发布未删，回答要未删。
+     */
+    private void assertCommentable(int targetType, Long targetId) {
+        if (targetType == CommentConstants.TARGET_TYPE_ANSWER) {
+            Answer answer = answerMapper.selectById(targetId);
+            if (answer == null || answer.getDeleted() == QuestionConstants.DELETED.byteValue()) {
+                throw new BusinessException(CommonErrorCode.NOT_FOUND, "回答不存在");
+            }
+            return;
+        }
         Article article = articleMapper.selectById(targetId);
         if (article == null
                 || article.getDeleted() == ArticleConstants.DELETED.byteValue()
                 || article.getState() != ArticleConstants.PUBLISH.byteValue()) {
             throw new BusinessException(CommonErrorCode.NOT_FOUND, "文章不存在");
         }
+    }
+
+    /**
+     * 目标评论数原子增减，绝不读改写。文章多一层「已发布」条件 —— 下架文章不该被评论计数。
+     * delta 为负时带非负安全网：历史漂移时不要把计数减成负数
+     */
+    private int bumpTargetCommentCount(byte targetType, Long targetId, int delta) {
+        if (targetType == CommentConstants.TARGET_TYPE_ANSWER.byteValue()) {
+            LambdaUpdateWrapper<Answer> wrapper = new LambdaUpdateWrapper<Answer>()
+                    .setSql("comment_count = comment_count + " + delta)
+                    .eq(Answer::getId, targetId)
+                    .eq(Answer::getDeleted, QuestionConstants.NOT_DELETED);
+            if (delta < 0) {
+                wrapper.ge(Answer::getCommentCount, -delta);
+            }
+            return answerMapper.update(null, wrapper);
+        }
+        LambdaUpdateWrapper<Article> wrapper = new LambdaUpdateWrapper<Article>()
+                    .setSql("comment_count = comment_count + " + delta)
+                    .eq(Article::getId, targetId)
+                    .eq(Article::getDeleted, ArticleConstants.NOT_DELETED)
+                    .eq(Article::getState, ArticleConstants.PUBLISH);
+        if (delta < 0) {
+            wrapper.ge(Article::getCommentCount, -delta);
+        }
+        return articleMapper.update(null, wrapper);
+    }
+
+    private String targetNotFoundMessage(int targetType) {
+        return targetType == CommentConstants.TARGET_TYPE_ANSWER ? "回答不存在" : "文章不存在";
     }
 
     /**
