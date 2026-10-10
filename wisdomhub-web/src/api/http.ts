@@ -4,6 +4,7 @@ import { ElMessage } from 'element-plus'
 // 不引的话 ElMessage 会渲染成没有样式的裸文本。
 import 'element-plus/es/components/message/style/css'
 
+import { beginRequest, endRequest } from '@/composables/useLoading'
 import { env } from '@/config/env'
 import { router } from '@/router'
 import { clearSession, getAccessToken } from '@/utils/auth-storage'
@@ -74,6 +75,15 @@ export class ApiError extends Error {
  */
 let handlingUnauthorized = false
 
+/**
+ * 认证接口自己的 401 是「账号或密码不对」，不是「会话失效」——
+ * 不能走清 token + 跳登录那一套，否则在登录页输错一次密码就会被弹「登录已过期」并跳一次路由。
+ * 技术文档 17.3 明写了这条（「前端的 401 拦截器要放行登录接口本身」）。
+ */
+function isAuthEndpoint(url: string | undefined): boolean {
+  return typeof url === 'string' && url.startsWith('/auth/')
+}
+
 function handleUnauthorized(message?: string): void {
   clearSession()
 
@@ -140,12 +150,15 @@ http.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }
+  // 顶栏 loading 的计数：进一个请求加一，两个响应分支各减一（无论成败都恰好减一次）
+  beginRequest()
   return config
 })
 
 http.interceptors.response.use(
   // ---- HTTP 200：可能是业务成功，也可能是业务失败（由 code 决定） ----
   (response) => {
+    endRequest()
     const { config } = response
 
     // 绕过拆包的接口（SSE / 文件下载）原样返回，它们的 body 不套 R<T>
@@ -173,7 +186,7 @@ http.interceptors.response.use(
     }
 
     if (r.code === ApiCode.UNAUTHORIZED) {
-      handleUnauthorized(r.message)
+      if (!isAuthEndpoint(config.url)) handleUnauthorized(r.message)
       return Promise.reject(new ApiError(r.code, r.message))
     }
 
@@ -184,9 +197,11 @@ http.interceptors.response.use(
 
   // ---- HTTP 非 200，或请求根本没发出去 ----
   (error: AxiosError) => {
-    // 真实的 401（网关也可能返回）——同样走失效流程
+    endRequest()
+
+    // 真实的 401（网关也可能返回）——同样走失效流程，但认证接口除外
     if (error.response?.status === ApiCode.UNAUTHORIZED) {
-      handleUnauthorized()
+      if (!isAuthEndpoint(error.config?.url)) handleUnauthorized()
       return Promise.reject(new ApiError(ApiCode.UNAUTHORIZED, '登录已过期'))
     }
 

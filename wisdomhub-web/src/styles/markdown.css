@@ -1,0 +1,222 @@
+/* ==========================================================================
+   正文排版与代码高亮
+   --------------------------------------------------------------------------
+   两个消费者共用一份：文章详情页（F1.4，用后端渲染好的 html）与
+   编辑器预览（F1.3，用前端 markdown-it 渲染）—— 两边用同一个类名 `.wh-prose`，
+   排版就不会一个页面对一个样。
+
+   ⚠️ 代码高亮**不引 highlight.js 自带的主题 CSS**：那是固定色的，亮/暗主题必有一套难看。
+   这里把 `.hljs-*` 映射到 tokens.css 的 `--wh-code-*`，与类别色同一套色相，
+   切主题时颜色的含义不变。highlight.js 只负责给 token 打类名，颜色全归本项目。
+   ========================================================================== */
+
+.wh-prose {
+  font-size: var(--wh-text-base);
+  line-height: var(--wh-leading-relaxed);
+  color: var(--wh-text-1);
+
+  /* 长单词/URL 不撑破容器（中文文章里常见的 BUG） */
+  overflow-wrap: break-word;
+}
+
+/* 垂直节奏用「相邻兄弟」而不是 margin-bottom：
+   后者会在最后一个元素后面留一段空隙，容器 padding 就难对齐了 */
+.wh-prose > * + * {
+  margin-top: var(--wh-space-4);
+}
+
+.wh-prose h1,
+.wh-prose h2,
+.wh-prose h3,
+.wh-prose h4,
+.wh-prose h5,
+.wh-prose h6 {
+  margin-top: var(--wh-space-6);
+  font-weight: var(--wh-weight-semibold);
+  line-height: var(--wh-leading-snug);
+  letter-spacing: var(--wh-tracking-tight);
+}
+
+.wh-prose h1 {
+  font-size: var(--wh-text-2xl);
+}
+
+.wh-prose h2 {
+  padding-bottom: var(--wh-space-2);
+  border-bottom: var(--wh-border-width) solid var(--wh-border);
+  font-size: var(--wh-text-xl);
+}
+
+.wh-prose h3 {
+  font-size: var(--wh-text-lg);
+}
+
+.wh-prose h4,
+.wh-prose h5,
+.wh-prose h6 {
+  font-size: var(--wh-text-base);
+}
+
+.wh-prose a {
+  color: var(--wh-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.wh-prose a:hover {
+  color: var(--wh-accent-hover);
+}
+
+.wh-prose ul,
+.wh-prose ol {
+  padding-left: var(--wh-space-5);
+}
+
+.wh-prose li + li {
+  margin-top: var(--wh-space-1);
+}
+
+.wh-prose blockquote {
+  padding-left: var(--wh-space-4);
+
+  color: var(--wh-text-2);
+  border-left: 2px solid var(--wh-border-strong);
+}
+
+.wh-prose hr {
+  border: none;
+  border-top: var(--wh-border-width) solid var(--wh-border);
+}
+
+/* ---- 行内代码 ---- */
+.wh-prose code {
+  padding: 0.1em 0.35em;
+
+  font-family: var(--wh-font-mono);
+  font-size: 0.9em;
+  background-color: var(--wh-bg-raised);
+  border-radius: var(--wh-radius-xs);
+}
+
+/* ---- 代码块 ---- */
+.wh-prose pre {
+  overflow-x: auto;
+
+  padding: var(--wh-space-4);
+
+  background-color: var(--wh-bg-raised);
+  border: var(--wh-border-width) solid var(--wh-border);
+  border-radius: var(--wh-radius-md);
+}
+
+/* 块里的 code 不要再套一层背景和内边距 */
+.wh-prose pre code {
+  padding: 0;
+
+  font-size: var(--wh-text-sm);
+  line-height: var(--wh-leading-normal);
+  background: none;
+  border-radius: 0;
+}
+
+.wh-prose table {
+  width: 100%;
+
+  font-size: var(--wh-text-sm);
+  border-collapse: collapse;
+}
+
+.wh-prose th,
+.wh-prose td {
+  padding: var(--wh-space-2) var(--wh-space-3);
+  text-align: left;
+  border: var(--wh-border-width) solid var(--wh-border);
+}
+
+.wh-prose th {
+  font-weight: var(--wh-weight-medium);
+  background-color: var(--wh-bg-raised);
+}
+
+.wh-prose img {
+  max-width: 100%;
+  border-radius: var(--wh-radius-md);
+}
+
+.wh-prose kbd {
+  padding: 0.1em 0.4em;
+
+  font-family: var(--wh-font-mono);
+  font-size: 0.85em;
+  background-color: var(--wh-bg-raised);
+  border: var(--wh-border-width) solid var(--wh-border-strong);
+  border-radius: var(--wh-radius-xs);
+}
+
+/* ==========================================================================
+   highlight.js 的 token 类名 → 本项目令牌
+   （类名取自 highlight.js 11.x 的默认映射，只覆盖技术文章里真会出现的那些）
+   ========================================================================== */
+.hljs-comment,
+.hljs-quote {
+  font-style: italic;
+  color: var(--wh-code-comment);
+}
+
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-literal,
+.hljs-doctag {
+  color: var(--wh-code-keyword);
+}
+
+.hljs-string,
+.hljs-attr,
+.hljs-template-tag,
+.hljs-regexp {
+  color: var(--wh-code-string);
+}
+
+.hljs-number,
+.hljs-symbol,
+.hljs-bullet,
+.hljs-built_in {
+  color: var(--wh-code-number);
+}
+
+.hljs-title,
+.hljs-title.function_,
+.hljs-title.class_,
+.hljs-section {
+  color: var(--wh-code-function);
+}
+
+.hljs-type,
+.hljs-tag,
+.hljs-name,
+.hljs-variable,
+.hljs-params,
+.hljs-property {
+  color: var(--wh-code-type);
+}
+
+.hljs-meta,
+.hljs-meta .hljs-keyword {
+  color: var(--wh-code-comment);
+}
+
+.hljs-deletion {
+  color: var(--wh-danger);
+}
+
+.hljs-addition {
+  color: var(--wh-accent);
+}
+
+.hljs-emphasis {
+  font-style: italic;
+}
+
+.hljs-strong {
+  font-weight: var(--wh-weight-semibold);
+}

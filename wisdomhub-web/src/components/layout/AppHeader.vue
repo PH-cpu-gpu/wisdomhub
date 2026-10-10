@@ -1,10 +1,14 @@
 <script setup lang="ts">
 import { Bell, Close, Menu, Search } from '@element-plus/icons-vue'
-import { computed, ref } from 'vue'
+import { ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 
 import { primaryNav } from '@/config/navigation'
+import { useAuth } from '@/composables/useAuth'
+import { useProfile } from '@/composables/useProfile'
 import { useUserStore } from '@/stores/user'
+
+import UserAvatar from '@/components/UserAvatar.vue'
 
 import ThemeToggle from './ThemeToggle.vue'
 
@@ -20,6 +24,9 @@ const emit = defineEmits<{
 const route = useRoute()
 const router = useRouter()
 const user = useUserStore()
+const auth = useAuth()
+// 资料是共享缓存（App.vue 启动时拉过一次，登录后 useAuth 会再拉一次）
+const { profile } = useProfile()
 
 const keyword = ref('')
 
@@ -39,18 +46,16 @@ function onSearch() {
   void router.push({ path: '/search', query: { kw } })
 }
 
-function onUserCommand(command: string) {
+async function onUserCommand(command: string) {
   if (command === 'logout') {
-    // ⚠️ 这里只清本地会话，**没有调后端注销**（B1.9 的 token 黑名单）。
-    // 也就是说服务端那份 token 要等自然过期才失效。F1.1 接上 B1.9 后补这一刀。
-    user.clearSession()
+    // 真正注销：调后端把两个 token 拉黑（B1.9），后端失败也会清本地（见 useAuth）
+    await auth.logout()
     void router.push('/')
     return
   }
   void router.push(command)
 }
 
-const userInitial = computed(() => (user.isLoggedIn ? 'U' : ''))
 </script>
 
 <template>
@@ -106,13 +111,21 @@ const userInitial = computed(() => (user.isLoggedIn ? 'U' : ''))
         <!-- 用户区 -->
         <el-dropdown v-if="user.isLoggedIn" trigger="click" @command="onUserCommand">
           <button class="hdr__avatar" type="button" aria-label="用户菜单">
-            {{ userInitial }}
+            <UserAvatar :src="profile?.avatar" :name="profile?.username" :size="30" />
           </button>
           <template #dropdown>
             <el-dropdown-menu>
-              <el-dropdown-item command="/me/articles">个人中心</el-dropdown-item>
+              <el-dropdown-item command="/me/profile">个人资料</el-dropdown-item>
+              <el-dropdown-item command="/me/articles">我的文章</el-dropdown-item>
               <el-dropdown-item command="/me/favorites">我的收藏</el-dropdown-item>
-              <el-dropdown-item command="logout" divided>退出登录</el-dropdown-item>
+              <el-dropdown-item
+                v-if="user.userId"
+                :command="`/user/${user.userId}`"
+                divided
+              >
+                我的公开主页
+              </el-dropdown-item>
+              <el-dropdown-item command="logout">退出登录</el-dropdown-item>
             </el-dropdown-menu>
           </template>
         </el-dropdown>
@@ -256,17 +269,12 @@ const userInitial = computed(() => (user.isLoggedIn ? 'U' : ''))
 }
 
 .hdr__avatar {
-  display: grid;
-  place-items: center;
+  display: block;
 
-  width: 30px;
-  height: 30px;
   margin-left: var(--wh-space-1);
+  padding: 0;
 
-  font-size: var(--wh-text-xs);
-  font-weight: var(--wh-weight-semibold);
-  color: var(--wh-text-on-fill);
-  background-color: var(--wh-accent);
+  background: none;
   border: none;
   border-radius: var(--wh-radius-full);
   cursor: pointer;

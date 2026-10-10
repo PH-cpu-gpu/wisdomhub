@@ -24,6 +24,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.List;
+
 @Tag(name = "用户controller")
 @Validated
 @RestController
@@ -37,6 +39,18 @@ public class UserController {
     @GetMapping("/profile/{userId}")
     public R<UserProfileVO> getUserProfile(@NotNull @PathVariable Long userId) {
         return R.success(userService.getUserProfile(userId));
+    }
+
+    /**
+     * 批量取用户摘要（列表页显示作者名用）。
+     * ⚠️ 路径落在 `/profile/brief` 而不是 `/brief`：网关的免登录名单里是 `/api/user/profile/`
+     * 前缀，这样游客也能取（文章列表对游客可见）。字面量 `brief` 优先于 `/profile/{userId}`，
+     * 不会撞车。
+     */
+    @Operation(summary = "批量取用户摘要")
+    @GetMapping("/profile/brief")
+    public R<List<UserBriefVO>> listBrief(@RequestParam("userIds") List<Long> userIds) {
+        return R.success(userService.listBrief(userIds));
     }
 
     @Operation(summary = "更新用户资料")

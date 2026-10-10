@@ -1,6 +1,7 @@
 package com.wisdomhub.user.service;
 
 import com.wisdomhub.common.core.result.PageResponse;
+import java.util.List;
 import com.wisdomhub.user.domain.dto.BindEmailDTO;
 import com.wisdomhub.user.domain.dto.LoginDTO;
 import com.wisdomhub.user.domain.dto.LogoutDTO;
@@ -44,4 +45,11 @@ public interface UserService {
     PageResponse<UserBriefVO> listFollowing(Long userId, Integer page, Integer pageSize);
 
     PageResponse<UserBriefVO> listFans(Long userId, Integer page, Integer pageSize);
+
+    /**
+     * 按 ID 批量取用户摘要（用户名/头像/简介）。列表页要显示作者名，而文章接口只给 authorId
+     * —— 跨服务 JOIN 被禁止（原则六），所以由这里批量补。
+     * 查不到的 ID 直接不返回（用户被删），调用方自己兜底。
+     */
+    List<UserBriefVO> listBrief(List<Long> userIds);
 }

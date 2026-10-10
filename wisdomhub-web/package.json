@@ -14,11 +14,14 @@
     "@fontsource/ibm-plex-sans": "^5.3.0",
     "axios": "^1.20.0",
     "element-plus": "^2.14.6",
+    "highlight.js": "^11.10.0",
+    "markdown-it": "^14.1.0",
     "pinia": "^4.0.3",
     "vue": "^3.5.42",
     "vue-router": "^5.3.1"
   },
   "devDependencies": {
+    "@types/markdown-it": "^14.1.2",
     "@types/node": "^24.13.3",
     "@vitejs/plugin-vue": "^6.0.8",
     "@vue/tsconfig": "^0.9.1",

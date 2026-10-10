@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 
 import { env } from '@/config/env'
+import { getSession } from '@/utils/auth-storage'
 
 /**
  * 路由表。
@@ -25,6 +26,11 @@ declare module 'vue-router' {
     note?: string
     /** 是否显示侧边栏。默认显示，显式写 false 关闭。 */
     sidebar?: boolean
+    /**
+     * 需要登录才能进（F1.9 的「未登录拦截」）。
+     * 由下面的 beforeEach 统一处理：未登录 → 跳登录页并带上 redirect。
+     */
+    requiresAuth?: boolean
   }
 }
 
@@ -41,7 +47,7 @@ const PlaceholderView = () => import('@/views/PlaceholderView.vue')
 function placeholder(
   path: string,
   name: string,
-  meta: { title: string; task: string; note: string; sidebar?: boolean },
+  meta: { title: string; task: string; note: string; sidebar?: boolean; requiresAuth?: boolean },
 ): RouteRecordRaw {
   return { path, name, component: PlaceholderView, meta }
 }
@@ -57,89 +63,103 @@ export const routes: RouteRecordRaw[] = [
       {
         path: '',
         name: 'home',
-        component: PlaceholderView,
-        meta: {
-          title: '首页',
-          task: 'F1.2',
-          note: '文章列表：分页、按最新/最热排序、骨架屏。数据来自 B1.23 的文章列表接口。',
-        },
+        component: () => import('@/views/HomeView.vue'),
+        meta: { title: '首页' },
       },
 
       // ---- 内容 ----
-      placeholder('article/:id', 'article-detail', {
-        title: '文章详情',
-        task: 'F1.4',
-        note: 'Markdown 正文渲染、代码高亮、二级评论、点赞收藏。对应 B1.21 与 B1.25。',
-        sidebar: false,
-      }),
-      placeholder('editor', 'article-editor', {
-        title: '写文章',
-        task: 'F1.3',
-        note: 'Markdown 编辑 + 实时预览 + 自动存草稿 + 发布。对应 B1.18 与 B1.20。',
-        sidebar: false,
-      }),
-      placeholder('editor/:id', 'article-editor-edit', {
-        title: '编辑文章',
-        task: 'F1.3',
-        note: '在已有文章上继续编辑，每次发布生成一个版本（B1.19）。',
-        sidebar: false,
-      }),
+      {
+        path: 'article/:id',
+        name: 'article-detail',
+        component: () => import('@/views/ArticleDetailView.vue'),
+        meta: { title: '文章详情', sidebar: false },
+      },
+      {
+        path: 'editor',
+        name: 'article-editor',
+        component: () => import('@/views/EditorView.vue'),
+        // 写作要登录：草稿与发布接口都会 401
+        meta: { title: '写文章', sidebar: false, requiresAuth: true },
+      },
+      {
+        path: 'editor/:id',
+        name: 'article-editor-edit',
+        component: () => import('@/views/EditorView.vue'),
+        meta: { title: '编辑文章', sidebar: false, requiresAuth: true },
+      },
 
       // ---- 标签 ----
-      placeholder('tags', 'tag-list', {
-        title: '标签',
-        task: 'F1.5',
-        note: '标签云与热门标签。热门标签走 B1.4 的多级缓存。',
-      }),
-      placeholder('tag/:name', 'tag-detail', {
-        title: '标签详情',
-        task: 'F1.5',
-        note: '某个标签下的文章列表，按标签筛文章。',
-      }),
+      {
+        path: 'tags',
+        name: 'tag-list',
+        component: () => import('@/views/TagListView.vue'),
+        meta: { title: '标签' },
+      },
+      {
+        // 用标签名而不是 id：可读、可分享。name → id 的转换在页面里用全量标签做
+        path: 'tag/:name',
+        name: 'tag-detail',
+        component: () => import('@/views/TagDetailView.vue'),
+        meta: { title: '标签' },
+      },
 
       // ---- 问答 ----
-      placeholder('questions', 'question-list', {
-        title: '问答',
-        task: 'F1.7',
-        note: '问题列表与热门问题。对应 B1.28 的问答接口。',
-      }),
-      placeholder('question/ask', 'question-ask', {
-        title: '提问',
-        task: 'F1.7',
-        note: '提问表单：标题、正文、标签。',
-        sidebar: false,
-      }),
-      placeholder('question/:id', 'question-detail', {
-        title: '问题详情',
-        task: 'F1.7',
-        note: '回答列表、回答点赞、问题收藏。',
-        sidebar: false,
-      }),
+      {
+        path: 'questions',
+        name: 'question-list',
+        component: () => import('@/views/QuestionListView.vue'),
+        meta: { title: '问答' },
+      },
+      {
+        // 静态段优先于 `question/:id`，所以不用怕被模板段吃掉
+        path: 'question/ask',
+        name: 'question-ask',
+        component: () => import('@/views/QuestionAskView.vue'),
+        // 提问要登录：后端 createQuestion 首行就取当前用户，匿名必然 401
+        meta: { title: '提问', sidebar: false, requiresAuth: true },
+      },
+      {
+        path: 'question/:id',
+        name: 'question-detail',
+        component: () => import('@/views/QuestionDetailView.vue'),
+        meta: { title: '问题详情', sidebar: false },
+      },
 
       // ---- 用户 ----
-      placeholder('user/:id', 'user-profile', {
-        title: '个人主页',
-        task: 'F1.6',
-        note: '资料、文章列表、关注/粉丝、关注按钮。对应 B1.11 与 B1.12。',
-      }),
+      {
+        path: 'user/:id',
+        name: 'user-profile',
+        component: () => import('@/views/UserProfileView.vue'),
+        meta: { title: '个人主页' },
+      },
 
-      // ---- 个人中心。三个子页共用侧边栏作为子导航。----
-      { path: 'me', redirect: '/me/articles' },
-      placeholder('me/articles', 'me-articles', {
-        title: '我的文章',
-        task: 'F1.8',
-        note: '我发布的文章与草稿入口。',
-      }),
-      placeholder('me/drafts', 'me-drafts', {
-        title: '草稿箱',
-        task: 'F1.8',
-        note: '编辑中自动保存的草稿，可以继续编辑或丢弃（B1.20）。',
-      }),
-      placeholder('me/favorites', 'me-favorites', {
-        title: '我的收藏',
-        task: 'F1.8',
-        note: '收藏的文章，可以取消收藏。对应 B1.26。',
-      }),
+      // ---- 个人中心。四个子页共用侧边栏作为子导航，都要登录。----
+      // 默认落在「我的资料」：点个人中心的第一个期待是看到自己（头像/简介），不是内容列表
+      { path: 'me', redirect: '/me/profile' },
+      {
+        path: 'me/profile',
+        name: 'me-profile',
+        component: () => import('@/views/MeProfileView.vue'),
+        meta: { title: '我的资料', requiresAuth: true },
+      },
+      {
+        path: 'me/articles',
+        name: 'me-articles',
+        component: () => import('@/views/MeArticlesView.vue'),
+        meta: { title: '我的文章', requiresAuth: true },
+      },
+      {
+        path: 'me/drafts',
+        name: 'me-drafts',
+        component: () => import('@/views/MeDraftsView.vue'),
+        meta: { title: '草稿箱', requiresAuth: true },
+      },
+      {
+        path: 'me/favorites',
+        name: 'me-favorites',
+        component: () => import('@/views/MeFavoritesView.vue'),
+        meta: { title: '我的收藏', requiresAuth: true },
+      },
 
       // ---- 搜索 ----
       placeholder('search', 'search', {
@@ -167,6 +187,7 @@ export const routes: RouteRecordRaw[] = [
         task: 'F2.5',
         note: '未读红点、实时弹出、标记已读。对应 B2.16 与 B2.17。',
         sidebar: false,
+        requiresAuth: true,
       }),
 
       // ---- 付费专栏 ----
@@ -206,11 +227,12 @@ export const routes: RouteRecordRaw[] = [
     path: '/',
     component: BlankLayout,
     children: [
-      placeholder('login', 'login', {
-        title: '登录 / 注册',
-        task: 'F1.1',
-        note: '只收手机号或邮箱（没有用户名登录入口），首次登录引导设置用户名与密码。对应 B1.7 与 B1.8。',
-      }),
+      {
+        path: 'login',
+        name: 'login',
+        component: () => import('@/views/LoginView.vue'),
+        meta: { title: '登录' },
+      },
       {
         path: 'design',
         name: 'design',
@@ -236,6 +258,23 @@ export const router = createRouter({
   scrollBehavior(_to, _from, savedPosition) {
     return savedPosition ?? { top: 0 }
   },
+})
+
+/**
+ * F1.9 未登录拦截：`meta.requiresAuth` 的页面，未登录一律送去登录页并带上回跳地址。
+ *
+ * 这里直接读 `utils/auth-storage` 而不是用 Pinia store：会话本来就存在那儿，
+ * 而且 store 里的 `userId` 是从 token 解出来的 —— 但 token 有没有、失没失效，
+ * 权威只有 auth-storage 这一份。少一层依赖也少一个「谁先初始化」的问题。
+ *
+ * ⚠️ 这只是**体验层**的拦截：真正的鉴权在网关（验签 + 黑名单）与各服务的属主校验。
+ * 前端能拦住导航，拦不住任何人直接调接口。
+ */
+router.beforeEach((to) => {
+  if (!to.meta.requiresAuth) return true
+  if (getSession() !== null) return true
+
+  return { path: '/login', query: { redirect: to.fullPath } }
 })
 
 // 页面标题：路由 meta.title + 应用名。放在 afterEach 而不是 beforeEach，
