@@ -43,7 +43,7 @@ public class CommentController {
         return R.success(commentService.pageComments(targetType, targetId, page, pageSize));
     }
 
-    @Operation(summary = "删除评论（仅评论作者本人；删一级评论会级联删其回复）")
+    @Operation(summary = "删除评论")
     @DeleteMapping("/{commentId}")
     public R<Void> delete(@PathVariable Long commentId) {
         commentService.deleteComment(commentId);
