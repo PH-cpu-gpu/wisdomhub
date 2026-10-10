@@ -1,6 +1,7 @@
 package com.wisdomhub.user.service;
 
 import com.wisdomhub.common.core.result.PageResponse;
+import com.wisdomhub.user.domain.dto.BindEmailDTO;
 import com.wisdomhub.user.domain.dto.LoginDTO;
 import com.wisdomhub.user.domain.dto.LogoutDTO;
 import com.wisdomhub.user.domain.dto.ProfileDTO;
@@ -26,6 +27,9 @@ public interface UserService {
     void logout(LogoutDTO logoutDTO);
 
     void updateProfile(ProfileDTO profileDTO);
+
+    /** 绑定 / 改绑邮箱：要验证码、落库前转小写、被占用返回 409 */
+    void bindEmail(BindEmailDTO bindEmailDTO);
 
     String updateAvatar(MultipartFile avatar);
 

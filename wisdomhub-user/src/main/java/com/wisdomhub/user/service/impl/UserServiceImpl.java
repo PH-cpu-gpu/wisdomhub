@@ -236,6 +236,35 @@ public class UserServiceImpl implements UserService {
     }
 
     /**
+     * 绑定 / 改绑邮箱。先校验证码再查占用 —— 反过来会让「邮箱是否已被注册」变成一个
+     * 不需要验证码就能探测的接口（用户枚举）
+     */
+    @Override
+    public void bindEmail(BindEmailDTO bindEmailDTO) {
+        Long userId = UserContext.getUserId();
+        String email = bindEmailDTO.getEmail().toLowerCase(Locale.ROOT);
+
+        String key = RedisKeyConstants.CODE_BY_EMAIL_KEY + email;
+        String value = stringRedisTemplate.opsForValue().get(key);
+        if (value == null) {
+            throw new BusinessException(CommonErrorCode.BAD_REQUEST, "验证码不存在或已过期");
+        }
+        if (!value.equals(bindEmailDTO.getCode())) {
+            throw new BusinessException(CommonErrorCode.BAD_REQUEST, "验证码错误");
+        }
+
+        // 预检只为说清是谁占用了; 并发下最终仍由 uk_email 兜底
+        if (userMapper.exists(new LambdaQueryWrapper<User>()
+                .eq(User::getEmail, email)
+                .ne(User::getId, userId))) {
+            throw new BusinessException(CommonErrorCode.CONFLICT, "邮箱已被占用");
+        }
+
+        userMapper.updateById(User.builder().id(userId).email(email).build());
+        stringRedisTemplate.delete(key);
+    }
+
+    /**
      * 更新用户头像
      */
     @Override

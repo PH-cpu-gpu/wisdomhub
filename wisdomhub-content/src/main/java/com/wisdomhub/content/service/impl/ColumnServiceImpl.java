@@ -28,6 +28,8 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 
 @Slf4j
@@ -126,6 +128,27 @@ public class ColumnServiceImpl implements ColumnService {
         }
         bumpArticleCount(columnId, -1);
         return readArticleCount(columnId);
+    }
+
+    @Override
+    @Transactional
+    public void deleteColumn(Long columnId) {
+        Column column = requireVisibleColumn(columnId);
+        OwnerUtil.assertOwner(column.getUserId());
+
+        int affected = columnMapper.update(null, new LambdaUpdateWrapper<Column>()
+                .set(Column::getDeleted, ColumnConstants.DELETED.byteValue())
+                // update(null, wrapper) 不触发自动填充，逻辑删除要自己补 update_time
+                .set(Column::getUpdateTime, LocalDateTime.now(ZoneOffset.UTC))
+                .eq(Column::getId, columnId)
+                .eq(Column::getDeleted, ColumnConstants.NOT_DELETED));
+        if (affected == 0) {
+            throw new BusinessException(CommonErrorCode.CONFLICT, "专栏状态已变化，删除未生效");
+        }
+        // 关系行没有软删语义，留着就是永久孤儿 → 物理删（同 B1.32 删文章的口径）。
+        // ⚠️ 不动 column_purchase：那是付款凭证，专栏下架/删除不该抹掉用户的购买记录
+        columnArticleMapper.delete(new LambdaQueryWrapper<ColumnArticle>()
+                .eq(ColumnArticle::getColumnId, columnId));
     }
 
     // ==================== 共用 ====================
