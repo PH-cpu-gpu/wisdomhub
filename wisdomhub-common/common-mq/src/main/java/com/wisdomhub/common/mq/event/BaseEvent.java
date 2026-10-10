@@ -11,7 +11,6 @@ public abstract class BaseEvent<T> {
     private String eventId = UUID.randomUUID().toString();
     private String eventType;
     private LocalDateTime occurredAt = LocalDateTime.now(ZoneOffset.UTC);
-    private int version = 1;
     private T payload;
 
     protected BaseEvent(String eventType, T payload) {
