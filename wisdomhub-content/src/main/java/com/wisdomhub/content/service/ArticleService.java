@@ -50,4 +50,7 @@ public interface ArticleService {
      * 我的收藏分页，按收藏时间倒序（不是文章发布时间）。join 过滤掉草稿 / 下架 / 已删的文章，
      */
     PageResponse<ArticleListItemVO> listMyFavorites(Integer page, Integer pageSize);
+
+    /** 删除已发布文章（仅作者本人；草稿走 deleteDraft）。级联清关联行，再删正文与阅读量 key */
+    void deleteArticle(Long articleId);
 }
