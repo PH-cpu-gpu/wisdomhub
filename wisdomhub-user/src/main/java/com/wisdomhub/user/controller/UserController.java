@@ -2,6 +2,7 @@ package com.wisdomhub.user.controller;
 
 import com.wisdomhub.common.core.result.PageResponse;
 import com.wisdomhub.common.core.result.R;
+import com.wisdomhub.user.domain.dto.BindEmailDTO;
 import com.wisdomhub.user.domain.dto.ProfileDTO;
 import com.wisdomhub.user.domain.vo.UserBriefVO;
 import com.wisdomhub.user.domain.vo.UserProfileVO;
@@ -42,6 +43,13 @@ public class UserController {
     @PutMapping("/profile")
     public R<Void> updateProfile(@Valid @RequestBody ProfileDTO profileDTO) {
         userService.updateProfile(profileDTO);
+        return R.success();
+    }
+
+    @Operation(summary = "绑定 / 改绑邮箱")
+    @PutMapping("/email")
+    public R<Void> bindEmail(@Valid @RequestBody BindEmailDTO bindEmailDTO) {
+        userService.bindEmail(bindEmailDTO);
         return R.success();
     }
 

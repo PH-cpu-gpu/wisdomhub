@@ -63,6 +63,13 @@ public class ColumnController {
         return R.success(columnService.addArticle(columnId, articleId));
     }
 
+    @Operation(summary = "删除专栏（仅创建者本人）")
+    @DeleteMapping("/{columnId}")
+    public R<Void> delete(@PathVariable Long columnId) {
+        columnService.deleteColumn(columnId);
+        return R.success();
+    }
+
     @Operation(summary = "移出文章")
     @DeleteMapping("/{columnId}/article/{articleId}")
     public R<Integer> removeArticle(@PathVariable Long columnId, @PathVariable Long articleId) {

@@ -23,6 +23,7 @@ import com.wisdomhub.common.web.util.OwnerUtil;
 import com.wisdomhub.common.web.util.PageUtil;
 import com.wisdomhub.content.constants.ArticleConstants;
 import com.wisdomhub.content.constants.ArticleRedisKeyConstants;
+import com.wisdomhub.content.constants.ColumnConstants;
 import com.wisdomhub.content.constants.CommentConstants;
 import com.wisdomhub.content.domain.document.ArticleContent;
 import com.wisdomhub.content.domain.dto.ArticleDraftDTO;
@@ -675,6 +676,8 @@ public class ArticleServiceImpl implements ArticleService {
         columnMapper.update(null, new LambdaUpdateWrapper<Column>()
                 .setSql("article_count = article_count - 1")
                 .inSql(Column::getId, "SELECT column_id FROM column_article WHERE article_id = " + articleId)
+                .eq(Column::getDeleted, ColumnConstants.NOT_DELETED)
+                .eq(Column::getState, ColumnConstants.NORMAL)
                 .ge(Column::getArticleCount, 1));
         columnArticleMapper.delete(new LambdaQueryWrapper<ColumnArticle>()
                 .eq(ColumnArticle::getArticleId, articleId));

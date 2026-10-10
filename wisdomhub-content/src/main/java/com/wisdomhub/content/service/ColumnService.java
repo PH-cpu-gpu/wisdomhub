@@ -30,4 +30,7 @@ public interface ColumnService {
 
     /** 移出文章。幂等：没归入过也返回 200。只校验专栏属主，不校验文章状态（下架/删除的文章也要能清出去） */
     int removeArticle(Long columnId, Long articleId);
+
+    /** 删除专栏：仅创建者本人。软删专栏行，并物理删掉它的归入关系行（文章本身不受影响） */
+    void deleteColumn(Long columnId);
 }

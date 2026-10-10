@@ -3,6 +3,7 @@ package com.wisdomhub.user.controller;
 import com.wisdomhub.common.core.result.R;
 import com.wisdomhub.user.domain.dto.LoginDTO;
 import com.wisdomhub.user.domain.dto.LogoutDTO;
+import com.wisdomhub.user.domain.dto.RefreshDTO;
 import com.wisdomhub.user.domain.dto.RegisterDTO;
 import com.wisdomhub.user.service.UserService;
 import com.wisdomhub.user.domain.vo.LoginVO;
@@ -38,8 +39,8 @@ public class AuthController {
 
     @Operation(summary = "刷新accessToken")
     @PostMapping("/refresh")
-    public R<LoginVO> refresh(@NotBlank @RequestParam String refreshToken) {
-        return R.success(userService.refresh(refreshToken));
+    public R<LoginVO> refresh(@Valid @RequestBody RefreshDTO refreshDTO) {
+        return R.success(userService.refresh(refreshDTO.getRefreshToken()));
     }
 
     @Operation(summary = "登出")
