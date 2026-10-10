@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.wisdomhub.content.mapper.QuestionMapper">
+
+    <resultMap id="BaseResultMap" type="com.wisdomhub.content.domain.entity.Question">
+        <id column="id" property="id" />
+        <result column="user_id" property="userId" />
+        <result column="title" property="title" />
+        <result column="content" property="content" />
+        <result column="answer_count" property="answerCount" />
+        <result column="favorite_count" property="favoriteCount" />
+        <result column="accepted_answer_id" property="acceptedAnswerId" />
+        <result column="create_time" property="createTime" />
+        <result column="update_time" property="updateTime" />
+        <result column="deleted" property="deleted" />
+    </resultMap>
+
+    <!-- 故意不查 content：列表只显示标题，TEXT 正文不该跟着列表一起回传。
+         service 侧不接受 article 那张宽表的做法，这里只取列表要用的列 -->
+    <select id="selectFavoritePage" resultMap="BaseResultMap">
+        SELECT q.id,
+               q.user_id,
+               q.title,
+               q.answer_count,
+               q.favorite_count,
+               q.accepted_answer_id,
+               q.create_time
+        FROM question_favorite f
+                 JOIN question q ON q.id = f.question_id
+        WHERE f.user_id = #{userId}
+          AND q.deleted = #{deleted}
+        ORDER BY f.create_time DESC, f.id DESC
+    </select>
+
+</mapper>

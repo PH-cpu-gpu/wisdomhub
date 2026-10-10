@@ -19,15 +19,6 @@ CREATE TABLE question (
     INDEX idx_create_time (create_time)
 ) ENGINE=InnoDB COMMENT='问题';
 
-CREATE TABLE question_tag (
-    id BIGINT PRIMARY KEY COMMENT '雪花 ID',
-    question_id BIGINT NOT NULL COMMENT '问题 ID',
-    tag_id BIGINT NOT NULL COMMENT '标签 ID',
-    create_time DATETIME NOT NULL COMMENT '创建时间',
-    UNIQUE KEY uk_question_tag (question_id, tag_id),
-    INDEX idx_tag_id (tag_id)
-) ENGINE=InnoDB COMMENT='问题标签';
-
 CREATE TABLE answer (
     id BIGINT PRIMARY KEY COMMENT '雪花 ID',
     question_id BIGINT NOT NULL COMMENT '问题 ID',

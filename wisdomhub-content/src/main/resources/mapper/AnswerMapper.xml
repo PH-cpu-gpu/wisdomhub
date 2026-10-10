@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.wisdomhub.content.mapper.AnswerMapper">
+
+    <resultMap id="BaseResultMap" type="com.wisdomhub.content.domain.entity.Answer">
+        <id column="id" property="id" />
+        <result column="question_id" property="questionId" />
+        <result column="user_id" property="userId" />
+        <result column="content" property="content" />
+        <result column="like_count" property="likeCount" />
+        <result column="comment_count" property="commentCount" />
+        <result column="create_time" property="createTime" />
+        <result column="update_time" property="updateTime" />
+        <result column="deleted" property="deleted" />
+    </resultMap>
+
+    <!-- 采纳置顶 + 其余时间升序。用 null 安全的 <=> ：未采纳时参数为 null，
+         每一行都算出 0，排序退化成纯 create_time 升序（写成 = 的话整列都是 NULL，排序不可预期）。
+         create_time 是秒精度、会重复，必须用 id 兜底，否则翻页会漂移 -->
+    <select id="selectAnswerPage" resultMap="BaseResultMap">
+        SELECT a.id,
+               a.question_id,
+               a.user_id,
+               a.content,
+               a.like_count,
+               a.comment_count,
+               a.create_time,
+               a.update_time
+        FROM answer a
+        WHERE a.question_id = #{questionId}
+          AND a.deleted = #{deleted}
+        ORDER BY (a.id &lt;=&gt; #{acceptedAnswerId}) DESC, a.create_time ASC, a.id ASC
+    </select>
+
+</mapper>
