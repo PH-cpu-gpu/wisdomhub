@@ -9,6 +9,11 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.wisdomhub.common.core.exception.BusinessException;
 import com.wisdomhub.common.core.result.CommonErrorCode;
 import com.wisdomhub.common.core.result.PageResponse;
+import com.wisdomhub.common.mq.event.ArticleCreatedEvent;
+import com.wisdomhub.common.mq.event.ArticleUpdatedEvent;
+import com.wisdomhub.common.mq.event.BaseEvent;
+import com.wisdomhub.common.mq.event.payload.ArticleEventPayload;
+import com.wisdomhub.common.mq.util.EventPublisher;
 import com.wisdomhub.common.redis.constants.RedisTtl;
 import com.wisdomhub.common.security.context.UserContext;
 import com.wisdomhub.common.web.util.CurrentUserUtil;
@@ -77,6 +82,7 @@ public class ArticleServiceImpl implements ArticleService {
     private final StringRedisTemplate stringRedisTemplate;
     private final TagService tagService;
     private final TransactionTemplate transactionTemplate;
+    private final EventPublisher eventPublisher;
 
     /**
      * 根据用户Id查询其已发布未删除的文章数量
@@ -216,6 +222,8 @@ public class ArticleServiceImpl implements ArticleService {
             throw e;
         }
         tagService.evictHotTags();
+        // 事务提交之后再发
+        publishArticleCreated(articleId);
         return articleId;
     }
 
@@ -265,7 +273,50 @@ public class ArticleServiceImpl implements ArticleService {
             throw e;
         }
         tagService.evictHotTags();
+        publishArticleUpdated(articleId);
         return articleId;
+    }
+
+    /**
+     * 提交后回查一次再拼 payload
+     */
+    private ArticleEventPayload loadArticlePayload(Long articleId) {
+        Article article = articleMapper.selectById(articleId);
+        if (article == null) {
+            return null;
+        }
+        return ArticleEventPayload.builder()
+                .articleId(article.getId())
+                .authorId(article.getAuthorId())
+                .title(article.getTitle())
+                .summary(article.getSummary())
+                .state(article.getState().intValue())
+                .publishTime(article.getPublishTime())
+                .updateTime(article.getUpdateTime())
+                .build();
+    }
+
+    private void publishArticleCreated(Long articleId) {
+        ArticleEventPayload payload = loadArticlePayload(articleId);
+        if (payload != null) {
+            sendArticleEvent(new ArticleCreatedEvent(payload), articleId);
+        }
+    }
+
+    private void publishArticleUpdated(Long articleId) {
+        ArticleEventPayload payload = loadArticlePayload(articleId);
+        if (payload != null) {
+            sendArticleEvent(new ArticleUpdatedEvent(payload), articleId);
+        }
+    }
+
+    /** 发失败只记日志：事务已提交，抛出去会变成「接口 500 但文章其实发布成功了」 */
+    private void sendArticleEvent(BaseEvent<?> event, Long articleId) {
+        try {
+            eventPublisher.send(event);
+        } catch (Exception e) {
+            log.error("文章事件发送失败, eventType={}, articleId={}", event.getEventType(), articleId, e);
+        }
     }
 
     // ==================== 文章：草稿 ====================
