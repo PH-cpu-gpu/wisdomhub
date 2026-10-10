@@ -12,13 +12,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @Tag(name = "文章controller")
 @Validated
@@ -33,6 +27,13 @@ public class ArticleController {
     @PostMapping("/article")
     public R<Long> publish(@Valid @RequestBody ArticlePublishDTO articlePublishDTO) {
         return R.success(articleService.publish(articlePublishDTO));
+    }
+
+    @Operation(summary = "删除文章")
+    @DeleteMapping("/article/{articleId}")
+    public R<Void> delete(@PathVariable Long articleId) {
+        articleService.deleteArticle(articleId);
+        return R.success();
     }
 
     @Operation(summary = "文章列表")

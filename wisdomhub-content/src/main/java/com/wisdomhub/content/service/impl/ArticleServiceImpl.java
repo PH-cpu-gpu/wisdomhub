@@ -10,8 +10,10 @@ import com.wisdomhub.common.core.exception.BusinessException;
 import com.wisdomhub.common.core.result.CommonErrorCode;
 import com.wisdomhub.common.core.result.PageResponse;
 import com.wisdomhub.common.mq.event.ArticleCreatedEvent;
+import com.wisdomhub.common.mq.event.ArticleDeletedEvent;
 import com.wisdomhub.common.mq.event.ArticleUpdatedEvent;
 import com.wisdomhub.common.mq.event.BaseEvent;
+import com.wisdomhub.common.mq.event.payload.ArticleDeletedPayload;
 import com.wisdomhub.common.mq.event.payload.ArticleEventPayload;
 import com.wisdomhub.common.mq.util.EventPublisher;
 import com.wisdomhub.common.redis.constants.RedisTtl;
@@ -21,6 +23,7 @@ import com.wisdomhub.common.web.util.OwnerUtil;
 import com.wisdomhub.common.web.util.PageUtil;
 import com.wisdomhub.content.constants.ArticleConstants;
 import com.wisdomhub.content.constants.ArticleRedisKeyConstants;
+import com.wisdomhub.content.constants.CommentConstants;
 import com.wisdomhub.content.domain.document.ArticleContent;
 import com.wisdomhub.content.domain.dto.ArticleDraftDTO;
 import com.wisdomhub.content.domain.dto.ArticlePublishDTO;
@@ -28,6 +31,9 @@ import com.wisdomhub.content.domain.entity.Article;
 import com.wisdomhub.content.domain.entity.ArticleFavorite;
 import com.wisdomhub.content.domain.entity.ArticleLike;
 import com.wisdomhub.content.domain.entity.ArticleTag;
+import com.wisdomhub.content.domain.entity.Column;
+import com.wisdomhub.content.domain.entity.ColumnArticle;
+import com.wisdomhub.content.domain.entity.Comment;
 import com.wisdomhub.content.domain.vo.ArticleBriefVO;
 import com.wisdomhub.content.domain.vo.ArticleDetailVO;
 import com.wisdomhub.content.domain.vo.ArticleListItemVO;
@@ -37,6 +43,9 @@ import com.wisdomhub.content.mapper.ArticleFavoriteMapper;
 import com.wisdomhub.content.mapper.ArticleLikeMapper;
 import com.wisdomhub.content.mapper.ArticleMapper;
 import com.wisdomhub.content.mapper.ArticleTagMapper;
+import com.wisdomhub.content.mapper.ColumnArticleMapper;
+import com.wisdomhub.content.mapper.ColumnMapper;
+import com.wisdomhub.content.mapper.CommentMapper;
 import com.wisdomhub.content.repository.ArticleContentRepository;
 import com.wisdomhub.content.service.ArticleService;
 import com.wisdomhub.content.service.TagService;
@@ -77,6 +86,9 @@ public class ArticleServiceImpl implements ArticleService {
     private final ArticleTagMapper articleTagMapper;
     private final ArticleLikeMapper articleLikeMapper;
     private final ArticleFavoriteMapper articleFavoriteMapper;
+    private final ColumnArticleMapper columnArticleMapper;
+    private final ColumnMapper columnMapper;
+    private final CommentMapper commentMapper;
     private final ArticleContentRepository articleContentRepository;
     private final MarkdownRenderer markdownRenderer;
     private final StringRedisTemplate stringRedisTemplate;
@@ -164,6 +176,7 @@ public class ArticleServiceImpl implements ArticleService {
                 .toList();
         return PageUtil.toResponse(result, items);
     }
+
 
     private ArticleListItemVO toListItem(Article article) {
         return ArticleListItemVO.builder()
@@ -598,6 +611,82 @@ public class ArticleServiceImpl implements ArticleService {
             tagIds.add(row.getTagId());
         }
         return tagIds;
+    }
+
+    // ==================== 删除文章 ====================
+
+    @Override
+    public void deleteArticle(Long articleId) {
+        Article article = articleMapper.selectById(articleId);
+        if (article == null || article.getDeleted() == ArticleConstants.DELETED.byteValue()) {
+            throw new BusinessException(CommonErrorCode.NOT_FOUND, "文章不存在");
+        }
+        OwnerUtil.assertOwner(article.getAuthorId());
+        if (article.getState() != ArticleConstants.PUBLISH.byteValue()) {
+            throw new BusinessException(CommonErrorCode.CONFLICT, "只能删除已发布的文章");
+        }
+
+        // 一个事务：先让行不可见，再清它自己库里的关联行
+        transactionTemplate.executeWithoutResult(status -> {
+            int affected = articleMapper.update(null, new LambdaUpdateWrapper<Article>()
+                    .set(Article::getDeleted, ArticleConstants.DELETED.byteValue())
+                    .set(Article::getUpdateTime, LocalDateTime.now(ZoneOffset.UTC))
+                    .eq(Article::getId, articleId)
+                    .eq(Article::getDeleted, ArticleConstants.NOT_DELETED)
+                    .eq(Article::getState, ArticleConstants.PUBLISH));
+            if (affected == 0) {
+                // 只有一种可能：selectById 之后被并发删掉或改了状态
+                throw new BusinessException(CommonErrorCode.CONFLICT, "文章状态已变化，删除未生效");
+            }
+            cleanUpArticleRelations(articleId);
+        });
+
+        // 跨存储：正文删失败只记日志 —— 行已不可见，最坏是看不见的孤儿正文
+        try {
+            articleContentRepository.deleteById(articleId);
+        } catch (RuntimeException e) {
+            log.error("文章正文删除失败, 已成孤儿待清理, articleId={}", articleId, e);
+        }
+
+        deleteViewCountKey(articleId);
+        // article_tag 没了，热门标签缓存要跟着失效
+        tagService.evictHotTags();
+        sendArticleEvent(new ArticleDeletedEvent(ArticleDeletedPayload.builder()
+                .articleId(articleId)
+                .authorId(article.getAuthorId())
+                .build()), articleId);
+    }
+
+    /**
+     * 清文章自己库里的关联行。
+     */
+    private void cleanUpArticleRelations(Long articleId) {
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
+        articleTagMapper.delete(new LambdaQueryWrapper<ArticleTag>().eq(ArticleTag::getArticleId, articleId));
+        articleLikeMapper.delete(new LambdaQueryWrapper<ArticleLike>().eq(ArticleLike::getArticleId, articleId));
+        articleFavoriteMapper.delete(new LambdaQueryWrapper<ArticleFavorite>().eq(ArticleFavorite::getArticleId, articleId));
+        // 评论是实体表 → 软删。
+        commentMapper.update(null, new LambdaUpdateWrapper<Comment>()
+                .set(Comment::getDeleted, CommentConstants.DELETED.byteValue())
+                .set(Comment::getUpdateTime, now)
+                .eq(Comment::getTargetType, CommentConstants.TARGET_TYPE_ARTICLE.byteValue())
+                .eq(Comment::getTargetId, articleId)
+                .eq(Comment::getDeleted, CommentConstants.NOT_DELETED));
+        columnMapper.update(null, new LambdaUpdateWrapper<Column>()
+                .setSql("article_count = article_count - 1")
+                .inSql(Column::getId, "SELECT column_id FROM column_article WHERE article_id = " + articleId)
+                .ge(Column::getArticleCount, 1));
+        columnArticleMapper.delete(new LambdaQueryWrapper<ColumnArticle>()
+                .eq(ColumnArticle::getArticleId, articleId));
+    }
+
+    /** view:count 是永久 key（阅读量的读源），文章没了不清就是永久孤儿，落库任务每轮都白扫到它 */
+    private void deleteViewCountKey(Long articleId) {
+        try {
+            stringRedisTemplate.delete(ArticleRedisKeyConstants.VIEW_COUNT_KEY + articleId);
+        } catch (Exception e) {
+            log.warn("阅读量 key 清理失败, articleId={}", articleId, e);
+        }
     }
 
     // ==================== 双写与补偿（四条路径共用） ====================
