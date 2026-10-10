@@ -89,7 +89,7 @@
   --wh-z-toast: 300;
 
   /* ---- 布局 ------------------------------------------------------------- */
-  --wh-container: 1200px;
+  --wh-container: 1600px;
   /* 正文栏宽：约 44 个中文字 / 行。比拉丁排版常用的 60-80 字符窄，
      因为正文以中文为主，中文一行放太多字反而难读。 */
   --wh-reading: 42rem;
@@ -137,6 +137,17 @@
   --wh-cat-database: #be123c; /* DATABASE    数据库：MySQL / ES / Neo4j */
   --wh-cat-concept: #475569; /* CONCEPT     概念：AOP / MVCC / 分布式锁。故意最低饱和 ——
                                            概念是五类里最抽象的一类 */
+
+  /* 代码高亮（highlight.js 的 .hljs-* 类映射到这几个）。
+     刻意**不引入 highlight.js 自带的主题 CSS** —— 那些主题是固定色的，
+     在亮/暗两套主题下必有一套难看；这里的取值直接复用上面的色相，
+     亮度关系与类别色一致，切主题时「什么颜色代表什么」不会变。 */
+  --wh-code-keyword: #6d28d9; /* 关键字：复用 FRAMEWORK 的紫 */
+  --wh-code-string: #047857; /* 字符串：复用主色绿 */
+  --wh-code-number: #be123c; /* 数字/字面量：复用 DATABASE 的绯 */
+  --wh-code-function: #0369a1; /* 函数名/属性：复用 MIDDLEWARE 的蓝 */
+  --wh-code-type: #9a6700; /* 类名/类型/标签：复用 LANGUAGE 的琥珀 */
+  --wh-code-comment: #8b95a9; /* 注释：用最弱的文本色，注释本来就该退到背景里 */
 }
 
 /* ==========================================================================
@@ -176,6 +187,14 @@ html.dark {
   --wh-cat-middleware: #38bdf8;
   --wh-cat-database: #fb7185;
   --wh-cat-concept: #8fa0bc;
+
+  /* 代码高亮：暗底上按同一色相提亮，与类别色的处理方式一致 */
+  --wh-code-keyword: #a78bfa;
+  --wh-code-string: #6ee7b7;
+  --wh-code-number: #fb7185;
+  --wh-code-function: #38bdf8;
+  --wh-code-type: #f0b429;
+  --wh-code-comment: #5d6b84;
 }
 
 /* ==========================================================================

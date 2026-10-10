@@ -33,6 +33,7 @@ public class InternalApiGuardFilter implements WebFilter {
         if (!"/internal".equals(path) && !path.startsWith("/internal/")) {
             return chain.filter(exchange);
         }
+
         log.warn("拦截公网 /internal 访问: {} {}", exchange.getRequest().getMethod(), path);
         exchange.getResponse().setStatusCode(HttpStatus.FORBIDDEN);
         exchange.getResponse().getHeaders().setContentType(MediaType.APPLICATION_JSON);

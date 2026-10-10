@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { EditPen, Star } from '@element-plus/icons-vue'
+import { EditPen } from '@element-plus/icons-vue'
 import { RouterLink, useRoute } from 'vue-router'
 
-import { accountNav, placeholderHotTech } from '@/config/navigation'
+import { accountNav } from '@/config/navigation'
 import { useUserStore } from '@/stores/user'
 
 /**
@@ -42,30 +42,6 @@ function isActive(to: string): boolean {
           >
             <el-icon><component :is="item.icon" /></el-icon>
             {{ item.label }}
-          </RouterLink>
-        </li>
-        <li>
-          <RouterLink
-            class="side__link"
-            :class="{ 'is-active': isActive('/me/favorites') }"
-            to="/me/favorites"
-          >
-            <el-icon><Star /></el-icon>
-            我的收藏
-          </RouterLink>
-        </li>
-      </ul>
-    </section>
-
-    <section class="side__group">
-      <h2 class="side__title">热门技术</h2>
-      <ul class="side__list">
-        <li v-for="tech in placeholderHotTech" :key="tech.name">
-          <!-- 颜色点：与徽章、图谱节点共用同一套类别配色（见 styles/base.css）。
-               色点旁边始终有技术名，不靠颜色单独表意。 -->
-          <RouterLink class="side__link" :to="`/tech/${tech.name}`">
-            <span class="side__dot" :data-cat="tech.category" />
-            {{ tech.name }}
           </RouterLink>
         </li>
       </ul>
@@ -156,14 +132,5 @@ function isActive(to: string): boolean {
 .side__link.is-active {
   color: var(--wh-accent);
   background-color: var(--wh-accent-soft);
-}
-
-/* 类别色点。颜色由 data-cat 下发（见 styles/base.css），这里只管形状。 */
-.side__dot {
-  flex: none;
-  width: 6px;
-  height: 6px;
-  border-radius: var(--wh-radius-full);
-  background-color: var(--wh-cat, var(--wh-text-3));
 }
 </style>

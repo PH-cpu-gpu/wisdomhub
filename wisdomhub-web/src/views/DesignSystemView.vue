@@ -152,7 +152,7 @@ const roles = [
 <template>
   <main class="ds wh-container">
     <header class="ds__head">
-      <p class="ds__eyebrow wh-mono">F0.2 · 设计系统与技术选型</p>
+      <p class="ds__eyebrow wh-mono">设计系统</p>
       <h1 class="ds__title">WisdomHub 设计系统</h1>
       <p class="ds__lede">
         本页既是规范文档，也是规范的实例 —— 页面上每一个颜色、字号、间距都是从下面这些令牌取的。
@@ -472,7 +472,7 @@ const roles = [
         接口契约见技术文档 17.1。
       </p>
 
-      <h3 class="ds__sub-title">联调冒烟（F0.5）</h3>
+      <h3 class="ds__sub-title">连通性检查</h3>
       <p class="ds__note ds__note--sub">
         打一次 <code>GET /api/knowledge/ping</code>。这个请求会走完
         dev server 代理 → 网关路由 → knowledge-service 整条链路，

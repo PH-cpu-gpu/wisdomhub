@@ -2,6 +2,7 @@ package com.wisdomhub.user.util;
 
 import cn.hutool.core.lang.UUID;
 import com.qcloud.cos.COSClient;
+import com.qcloud.cos.model.CannedAccessControlList;
 import com.qcloud.cos.model.ObjectMetadata;
 import com.qcloud.cos.model.PutObjectRequest;
 import com.wisdomhub.common.core.exception.BusinessException;
@@ -59,6 +60,9 @@ public class CosUtil {
                     file.getInputStream(),
                     metadata
             );
+
+            // 设置头像公共读
+            request.setCannedAcl(CannedAccessControlList.PublicRead);
 
             cosClient.putObject(request);
 

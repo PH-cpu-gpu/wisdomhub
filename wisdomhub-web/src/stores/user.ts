@@ -7,6 +7,7 @@ import {
   setSession as setStoredSession,
   type AuthSession,
 } from '@/utils/auth-storage'
+import { readUserId } from '@/utils/jwt'
 
 /**
  * 会话状态。
@@ -30,6 +31,12 @@ export const useUserStore = defineStore('user', () => {
   /** 当前 token 的持有者 id。没有就返回 null。 */
   const accessToken = computed(() => session.value?.accessToken ?? null)
 
+  /**
+   * 当前登录用户 id（从 accessToken 的 payload 里读，**不验签**）。
+   * 只用来判断「这条评论是不是我写的」「这篇文章是不是我的」，不能当权限依据 —— 见 utils/jwt。
+   */
+  const userId = computed(() => readUserId(session.value?.accessToken))
+
   function setSession(next: AuthSession): void {
     setStoredSession(next)
   }
@@ -42,5 +49,5 @@ export const useUserStore = defineStore('user', () => {
     clearStoredSession()
   }
 
-  return { session, isLoggedIn, accessToken, setSession, clearSession }
+  return { session, isLoggedIn, accessToken, userId, setSession, clearSession }
 })

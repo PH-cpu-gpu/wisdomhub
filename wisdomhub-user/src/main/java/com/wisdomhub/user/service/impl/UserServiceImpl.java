@@ -1,5 +1,6 @@
 package com.wisdomhub.user.service.impl;
 
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -132,6 +133,7 @@ public class UserServiceImpl implements UserService {
         return LoginVO.builder()
                 .accessToken(tokenDTO.getAccessToken())
                 .refreshToken(tokenDTO.getRefreshToken())
+                .hasEmail(user.getEmail() != null)
                 .build();
     }
 
@@ -166,6 +168,7 @@ public class UserServiceImpl implements UserService {
         return LoginVO.builder()
                 .accessToken(tokenDTO.getAccessToken())
                 .refreshToken(tokenDTO.getRefreshToken())
+                .hasEmail(user.getEmail() != null)
                 .build();
     }
 
@@ -262,6 +265,25 @@ public class UserServiceImpl implements UserService {
 
         userMapper.updateById(User.builder().id(userId).email(email).build());
         stringRedisTemplate.delete(key);
+    }
+
+    /** 一次最多问 100 个 ID —— 只是防滥用，列表页去重后远小于这个数 */
+    private static final int MAX_BRIEF_IDS = 100;
+
+    @Override
+    public List<UserBriefVO> listBrief(List<Long> userIds) {
+        if (userIds == null || userIds.isEmpty()) {
+            return List.of();
+        }
+        List<Long> ids = userIds.stream().distinct().limit(MAX_BRIEF_IDS).toList();
+        return userMapper.selectByIds(ids).stream()
+                .map(user -> UserBriefVO.builder()
+                        .userId(user.getId())
+                        .username(user.getUsername())
+                        .avatar(user.getAvatar())
+                        .bio(user.getBio())
+                        .build())
+                .toList();
     }
 
     /**
