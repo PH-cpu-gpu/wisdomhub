@@ -278,7 +278,7 @@ public class UserServiceImpl implements UserService {
                     () -> userFollowMapper.selectCount(new LambdaQueryWrapper<UserFollow>()
                             .eq(UserFollow::getFolloweeId, userId))));
         } catch (Exception e) {
-            // Redis 不可用: 退回 user 表快照列(由 XXL-JOB 定期回写, 可能略旧)
+            // Redis 不可用: 退回 user 表快照列
             log.warn("计数读取失败, 退回 user 表快照: userId={}", userId, e);
             userProfile.setFollowCount(user.getFollowCount());
             userProfile.setFansCount(user.getFansCount());

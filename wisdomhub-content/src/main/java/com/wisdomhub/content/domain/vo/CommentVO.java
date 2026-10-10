@@ -22,13 +22,17 @@ public class CommentVO {
 
     private Long userId;
 
-    /** 一级评论为 null；二级回复为它的一级父评论 id（发布时已归一化） */
+    /**
+     * 一级评论为 null；二级回复为它的一级父评论 id（发布时已归一化）
+     */
     private Long parentId;
 
     private String content;
 
     private LocalDateTime createTime;
 
-    /** 空集合给 [] 不给 null（17.3） */
+    /**
+     * 空集合给 [] 不给 null
+     */
     private List<CommentVO> replies;
 }
