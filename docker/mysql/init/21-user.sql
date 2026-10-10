@@ -37,7 +37,9 @@ CREATE TABLE user_browse_history (
     create_time DATETIME NOT NULL COMMENT '首次浏览时间',
     update_time DATETIME NOT NULL COMMENT '最近浏览时间',
     UNIQUE KEY uk_user_article (user_id, article_id),
-    INDEX idx_user_update (user_id, update_time)
+    INDEX idx_user_update (user_id, update_time),
+    -- B2.31 清理已删文章的浏览历史按它删；没有以 article_id 打头的索引会全表扫
+    INDEX idx_article_id (article_id)
 ) ENGINE=InnoDB COMMENT='浏览历史';
 
 CREATE TABLE user_learning_record (
