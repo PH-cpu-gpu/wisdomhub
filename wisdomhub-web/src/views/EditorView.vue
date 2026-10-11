@@ -8,6 +8,7 @@ import { getArticleSource, publishArticle } from '@/api/article'
 import { createDraft, updateDraft } from '@/api/draft'
 import { ApiError } from '@/api/http'
 import { listTags, type Tag } from '@/api/tag'
+import { groupTags } from '@/config/tag-categories'
 import { renderMarkdown } from '@/composables/useMarkdown'
 import { useUserStore } from '@/stores/user'
 import { formatDateTime } from '@/utils/format'
@@ -41,6 +42,8 @@ const tagIds = ref<string[]>([])
 const articleState = ref<number>(STATE_DRAFT)
 
 const tags = ref<Tag[]>([])
+/** 130 个标签平铺在一个下拉里没法翻，按分组渲染 option-group */
+const tagGroups = computed(() => groupTags(tags.value))
 const loading = ref(Boolean(articleId.value))
 const saving = ref(false)
 const publishing = ref(false)
@@ -239,7 +242,9 @@ onBeforeRouteLeave(async () => {
           placeholder="选标签（最多 10 个）"
           filterable
         >
-          <el-option v-for="tag in tags" :key="tag.tagId" :label="tag.name" :value="tag.tagId" />
+          <el-option-group v-for="group in tagGroups" :key="group.category" :label="group.category">
+            <el-option v-for="tag in group.tags" :key="tag.tagId" :label="tag.name" :value="tag.tagId" />
+          </el-option-group>
         </el-select>
 
         <el-button :loading="saving" :disabled="isPublished" @click="saveDraft()">

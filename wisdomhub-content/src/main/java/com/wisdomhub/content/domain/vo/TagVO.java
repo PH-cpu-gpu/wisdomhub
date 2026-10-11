@@ -16,5 +16,8 @@ public class TagVO {
 
     private String name;
 
+    /** 展示分组，前端按它给标签云分组 */
+    private String category;
+
     private String description;
 }

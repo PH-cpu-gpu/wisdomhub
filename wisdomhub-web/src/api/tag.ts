@@ -9,6 +9,8 @@ import { get } from './http'
 export interface Tag {
   tagId: string
   name: string
+  /** 展示分组，中文。顺序见 config/tag-categories.ts */
+  category: string
   description: string
 }
 

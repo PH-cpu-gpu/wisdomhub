@@ -47,6 +47,7 @@ public class TagServiceImpl implements TagService {
             result.add(TagVO.builder()
                     .tagId(tag.getId())
                     .name(tag.getName())
+                    .category(tag.getCategory())
                     .description(tag.getDescription())
                     .build());
         }
@@ -76,6 +77,7 @@ public class TagServiceImpl implements TagService {
         // 并发下预检可能同时通过，最终由 uk_name 抛 DuplicateKeyException → 全局 409
         Tag tag = Tag.builder()
                 .name(name)
+                .category(StrUtil.blankToDefault(dto.getCategory(), TagConstants.CATEGORY_DEFAULT).trim())
                 .description(StrUtil.nullToEmpty(dto.getDescription()).trim())
                 .build();
         tagMapper.insert(tag);
@@ -100,6 +102,7 @@ public class TagServiceImpl implements TagService {
         }
         tagMapper.update(null, new LambdaUpdateWrapper<Tag>()
                 .set(Tag::getName, name)
+                .set(Tag::getCategory, StrUtil.blankToDefault(dto.getCategory(), TagConstants.CATEGORY_DEFAULT).trim())
                 .set(Tag::getDescription, StrUtil.nullToEmpty(dto.getDescription()).trim())
                 .set(Tag::getUpdateTime, LocalDateTime.now(ZoneOffset.UTC))
                 .eq(Tag::getId, tagId));

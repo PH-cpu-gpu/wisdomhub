@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import 'element-plus/es/components/message/style/css'
 
 import { listHotTags, listTags, type HotTag, type Tag } from '@/api/tag'
 import { ApiError } from '@/api/http'
+import { groupTags } from '@/config/tag-categories'
 
 /**
  * F1.5 标签页。
@@ -20,6 +21,9 @@ import { ApiError } from '@/api/http'
 const tags = ref<Tag[]>([])
 const hotTags = ref<HotTag[]>([])
 const loading = ref(true)
+
+/** 130 条平铺没人看得下去，按 tag.category 切组，组顺序见 config/tag-categories.ts */
+const groups = computed(() => groupTags(tags.value))
 
 async function load() {
   loading.value = true
@@ -63,10 +67,13 @@ onMounted(() => void load())
         </ul>
       </section>
 
-      <section class="tags__section">
-        <h2 class="tags__section-title">全部</h2>
+      <section v-for="group in groups" :key="group.category" class="tags__section">
+        <h2 class="tags__section-title">
+          {{ group.category }}
+          <span class="tags__count wh-mono">{{ group.tags.length }}</span>
+        </h2>
         <ul class="tags__cloud">
-          <li v-for="tag in tags" :key="tag.tagId">
+          <li v-for="tag in group.tags" :key="tag.tagId">
             <RouterLink
               class="tags__chip"
               :to="{ name: 'tag-detail', params: { name: tag.name } }"
@@ -113,10 +120,20 @@ onMounted(() => void load())
 }
 
 .tags__section-title {
+  display: flex;
+  gap: var(--wh-space-2);
+  align-items: baseline;
+
   padding-bottom: var(--wh-space-2);
 
   font-size: var(--wh-text-lg);
   border-bottom: var(--wh-border-width) solid var(--wh-border);
+}
+
+/* 分组标题右侧的条数，压到与「热门」那栏的数字同一档 */
+.tags__count {
+  font-size: var(--wh-text-xs);
+  color: var(--wh-text-3);
 }
 
 .tags__hot {
