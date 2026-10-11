@@ -15,6 +15,9 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.wisdomhub.common.core.exception.BusinessException;
 import com.wisdomhub.common.core.result.CommonErrorCode;
 import com.wisdomhub.common.core.result.PageResponse;
+import com.wisdomhub.common.mq.event.UserUpdatedEvent;
+import com.wisdomhub.common.mq.event.payload.UserEventPayload;
+import com.wisdomhub.common.mq.util.EventPublisher;
 import com.wisdomhub.common.web.util.PageUtil;
 import com.wisdomhub.common.redis.constants.RedisSharedConstants;
 import com.wisdomhub.common.redis.constants.RedisTtl;
@@ -59,6 +62,7 @@ public class UserServiceImpl implements UserService {
     private final PasswordEncoder passwordEncoder;
     private final JwtPropertyConfiguration jwtPropertyConfiguration;
     private final CosUtil cosUtil;
+    private final EventPublisher eventPublisher;
 
     /**
      * 根据手机号获取验证码
@@ -236,6 +240,7 @@ public class UserServiceImpl implements UserService {
                 .bio(profileDTO.getBio())
                 .build();
         userMapper.updateById(user);
+        publishUserUpdated(userId);
     }
 
     /**
@@ -301,12 +306,41 @@ public class UserServiceImpl implements UserService {
 
         String newUrl = cosUtil.uploadAvatar(avatar);
         userMapper.updateById(User.builder().id(userId).avatar(newUrl).build());
+        publishUserUpdated(userId);
 
         // 先落库再删旧文件
         if (StrUtil.isNotBlank(oldUrl)) {
             cosUtil.deleteByUrl(oldUrl);
         }
         return newUrl;
+    }
+
+    // ==================== 事件 ====================
+
+    /**
+     * 用户资料变了就发一条。上面的 updateById 都是「新建一个只带目标字段的对象」的部分更新，
+     * 所以必须回查一次才能拿到完整的对外字段。改绑邮箱 / 手机号不发：它们不在任何索引里，
+     * 没理由让联系方式离开 user-service。
+     */
+    private void publishUserUpdated(Long userId) {
+        User user = userMapper.selectById(userId);
+        if (user == null) {
+            return;
+        }
+        UserEventPayload payload = UserEventPayload.builder()
+                .userId(user.getId())
+                .username(user.getUsername())
+                .avatar(user.getAvatar())
+                .bio(user.getBio())
+                .createTime(user.getCreateTime())
+                .updateTime(user.getUpdateTime())
+                .build();
+        try {
+            eventPublisher.send(new UserUpdatedEvent(payload));
+        } catch (Exception e) {
+            // 写已经生效，抛出去会变成「接口 500 但资料其实改好了」
+            log.error("用户事件发送失败, userId={}", userId, e);
+        }
     }
 
     /**

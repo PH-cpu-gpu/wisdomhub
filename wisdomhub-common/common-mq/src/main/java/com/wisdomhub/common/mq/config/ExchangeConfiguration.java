@@ -1,6 +1,7 @@
 package com.wisdomhub.common.mq.config;
 
 import com.wisdomhub.common.mq.constants.MqTopologyConstants;
+import org.springframework.amqp.core.DirectExchange;
 import org.springframework.amqp.core.ExchangeBuilder;
 import org.springframework.amqp.core.TopicExchange;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -13,6 +14,14 @@ public class ExchangeConfiguration {
     public TopicExchange eventExchange() {
         return ExchangeBuilder
                 .topicExchange(MqTopologyConstants.EVENT_EXCHANGE)
+                .durable(true)
+                .build();
+    }
+
+    @Bean
+    public DirectExchange deadLetterExchange() {
+        return ExchangeBuilder
+                .directExchange(MqTopologyConstants.DLX_EXCHANGE)
                 .durable(true)
                 .build();
     }
