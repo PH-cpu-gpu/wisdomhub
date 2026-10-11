@@ -72,7 +72,7 @@ async function onSubmit() {
           :rows="10"
           maxlength="10000"
           show-word-limit
-          placeholder="复现步骤、报错信息、你已经排除的可能……&#10;&#10;（纯文本，不上 Markdown）"
+          placeholder="复现步骤、报错信息、你已经排除的可能……"
         />
       </el-form-item>
 

@@ -22,6 +22,7 @@ import {
   type AnswerItem,
   type QuestionDetail,
 } from '@/api/question'
+import { loadUserNames, userName } from '@/composables/useUserNames'
 import { useUserStore } from '@/stores/user'
 import { formatDateTime, formatRelativeTime } from '@/utils/format'
 
@@ -75,6 +76,7 @@ async function loadQuestion() {
 
   try {
     question.value = await getQuestion(questionId.value)
+    void loadUserNames([question.value.userId])
   } catch (e) {
     if (e instanceof ApiError && e.code === ApiCode.NOT_FOUND) {
       notFound.value = true
@@ -92,6 +94,8 @@ async function loadAnswers() {
     const result = await listAnswers(questionId.value, answerPage.value, answerPageSize.value)
     answers.value = result.items
     answerTotal.value = result.total
+    // 回答只给 userId，用户名走共享缓存批量取（见 useUserNames）
+    void loadUserNames(result.items.map((item) => item.userId))
   } catch (e) {
     answers.value = []
     answerTotal.value = 0
@@ -105,6 +109,7 @@ async function loadAnswers() {
 async function refreshQuestion() {
   try {
     question.value = await getQuestion(questionId.value)
+    void loadUserNames([question.value.userId])
   } catch {
     /* 计数刷新失败不影响阅读 */
   }
@@ -270,7 +275,7 @@ onMounted(() => {
 
         <div class="qd__meta wh-mono">
           <RouterLink class="qd__author" :to="`/user/${question.userId}`">
-            用户 {{ String(question.userId).slice(-4) }}
+            {{ userName(question.userId) }}
           </RouterLink>
           <span :title="formatDateTime(question.createTime)">
             {{ formatRelativeTime(question.createTime) }}
@@ -342,7 +347,7 @@ onMounted(() => {
                 已采纳
               </span>
               <RouterLink class="qd__author" :to="`/user/${answer.userId}`">
-                用户 {{ String(answer.userId).slice(-4) }}
+                {{ userName(answer.userId) }}
               </RouterLink>
               <span :title="formatDateTime(answer.createTime)">
                 {{ formatRelativeTime(answer.createTime) }}
