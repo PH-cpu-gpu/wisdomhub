@@ -4,8 +4,8 @@ import { computed, ref, watch } from 'vue'
 /**
  * 全局外观状态。目前只有主题。
  *
- * 主题是**暗色优先**：用户没表过态时一律暗色，不跟随系统；
- * 只有用户主动选了「跟随系统」才去读 prefers-color-scheme。
+ * 主题**默认跟随系统**：用户没表过态时读 prefers-color-scheme，
+ * 系统切深浅色时页面实时跟着切；用户手动选过 dark / light 则以他的为准。
  *
  * ⚠️ 存储键 `wisdomhub:theme` 与取值口径（dark | light | system）
  * 同时写在 index.html 的内联脚本里 —— 那份要在首屏绘制前就把 class 定下来，
@@ -23,7 +23,7 @@ function readStoredMode(): ThemeMode {
   } catch {
     /* localStorage 不可用（隐私模式 / 被策略禁用）时退回默认值 */
   }
-  return 'dark'
+  return 'system'
 }
 
 export const useAppStore = defineStore('app', () => {
