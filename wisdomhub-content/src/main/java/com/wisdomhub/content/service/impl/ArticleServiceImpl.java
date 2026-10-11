@@ -37,9 +37,12 @@ import com.wisdomhub.content.domain.entity.ColumnArticle;
 import com.wisdomhub.content.domain.entity.Comment;
 import com.wisdomhub.content.domain.vo.ArticleBriefVO;
 import com.wisdomhub.content.domain.vo.ArticleDetailVO;
+import com.wisdomhub.content.domain.vo.ArticleInternalVO;
 import com.wisdomhub.content.domain.vo.ArticleListItemVO;
 import com.wisdomhub.content.domain.vo.ArticleSourceVO;
+import com.wisdomhub.content.domain.vo.ArticleTagVO;
 import com.wisdomhub.content.domain.vo.DraftBriefVO;
+import com.wisdomhub.content.domain.vo.TagVO;
 import com.wisdomhub.content.mapper.ArticleFavoriteMapper;
 import com.wisdomhub.content.mapper.ArticleLikeMapper;
 import com.wisdomhub.content.mapper.ArticleMapper;
@@ -63,8 +66,10 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.function.Supplier;
 
 @Slf4j
@@ -76,6 +81,12 @@ public class ArticleServiceImpl implements ArticleService {
      * 摘要留空时从正文纯文本截取的长度
      */
     private static final int SUMMARY_MAX = 100;
+
+    /**
+     * 内部同步分页：缺省 200，上限 500（护栏在这里，调用方不必自己钳）
+     */
+    private static final int SYNC_DEFAULT_SIZE = 200;
+    private static final int SYNC_MAX_SIZE = 500;
 
     /**
      * sort 白名单枚举
@@ -324,7 +335,9 @@ public class ArticleServiceImpl implements ArticleService {
         }
     }
 
-    /** 发失败只记日志：事务已提交，抛出去会变成「接口 500 但文章其实发布成功了」 */
+    /**
+     * 发失败只记日志：事务已提交，抛出去会变成「接口 500 但文章其实发布成功了」
+     */
     private void sendArticleEvent(BaseEvent<?> event, Long articleId) {
         try {
             eventPublisher.send(event);
@@ -683,7 +696,9 @@ public class ArticleServiceImpl implements ArticleService {
                 .eq(ColumnArticle::getArticleId, articleId));
     }
 
-    /** view:count 是永久 key（阅读量的读源），文章没了不清就是永久孤儿，落库任务每轮都白扫到它 */
+    /**
+     * view:count 是永久 key（阅读量的读源），文章没了不清就是永久孤儿，落库任务每轮都白扫到它
+     */
     private void deleteViewCountKey(Long articleId) {
         try {
             stringRedisTemplate.delete(ArticleRedisKeyConstants.VIEW_COUNT_KEY + articleId);
@@ -730,5 +745,116 @@ public class ArticleServiceImpl implements ArticleService {
         }
         String text = markdownRenderer.toPlainText(html);
         return text.length() <= SUMMARY_MAX ? text : text.substring(0, SUMMARY_MAX);
+    }
+
+    // ==================== 服务间读契约（消费方 search-service）====================
+
+    @Override
+    public ArticleInternalVO getInternalArticle(Long articleId) {
+        Article article = articleMapper.selectById(articleId);
+        if (article == null || article.getDeleted() == ArticleConstants.DELETED.byteValue()) {
+            throw new BusinessException(CommonErrorCode.NOT_FOUND, "文章不存在");
+        }
+        ArticleContent content = articleContentRepository.findById(articleId).orElse(null);
+        if (content == null) {
+            // 同 getDetail：行还在却没有正文属服务端数据问题，不能当空文章返回
+            log.error("文章正文缺失, articleId={}", articleId);
+            throw new BusinessException(CommonErrorCode.INTERNAL_ERROR, "文章正文缺失");
+        }
+        List<ArticleTagVO> tags = loadTagsByArticleIds(List.of(articleId)).getOrDefault(articleId, List.of());
+        return toInternalVO(article, content.getMarkdown(), tags);
+    }
+
+    @Override
+    public List<ArticleInternalVO> syncArticles(LocalDateTime since, Long lastId, Integer size) {
+        int limit = (size == null || size <= 0) ? SYNC_DEFAULT_SIZE : Math.min(size, SYNC_MAX_SIZE);
+        long cursor = lastId == null ? 0L : lastId;
+        LambdaQueryWrapper<Article> wrapper = new LambdaQueryWrapper<Article>()
+                .eq(Article::getDeleted, ArticleConstants.NOT_DELETED);
+        if (since == null) {
+            // 全表扫：按雪花 ID 升序走，游标单调、无并列
+            wrapper.gt(Article::getId, cursor).orderByAsc(Article::getId);
+        } else {
+            // 水位线扫：(update_time, id) 复合游标。只按 update_time 推进会在「同一秒多行」处静默漏行
+            wrapper.and(q -> q.gt(Article::getUpdateTime, since)
+                            .or(o -> o.eq(Article::getUpdateTime, since).gt(Article::getId, cursor)))
+                    .orderByAsc(Article::getUpdateTime)
+                    .orderByAsc(Article::getId);
+        }
+        List<Article> articles = articleMapper.selectPage(new Page<>(1, limit, false), wrapper).getRecords();
+        if (articles.isEmpty()) {
+            return List.of();
+        }
+        List<Long> articleIds = articles.stream().map(Article::getId).toList();
+        // 一次取全部正文与标签，避免逐行 N+1
+        Map<Long, String> markdownById = new HashMap<>();
+        for (ArticleContent content : articleContentRepository.findAllById(articleIds)) {
+            markdownById.put(content.getArticleId(), content.getMarkdown());
+        }
+        Map<Long, List<ArticleTagVO>> tagsById = loadTagsByArticleIds(articleIds);
+        List<ArticleInternalVO> result = new ArrayList<>(articles.size());
+        for (Article article : articles) {
+            String markdown = markdownById.get(article.getId());
+            if (markdown == null) {
+                // 丢一行不拖垮整页，但要让日志看得见：这是「行可见却无正文」的不变式被破坏
+                log.error("正文缺失，跳过同步, articleId={}", article.getId());
+                continue;
+            }
+            result.add(toInternalVO(article, markdown, tagsById.getOrDefault(article.getId(), List.of())));
+        }
+        return result;
+    }
+
+    private ArticleInternalVO toInternalVO(Article article, String markdown, List<ArticleTagVO> tags) {
+        return ArticleInternalVO.builder()
+                .articleId(article.getId())
+                .authorId(article.getAuthorId())
+                .title(article.getTitle())
+                .summary(article.getSummary())
+                .state(article.getState().intValue())
+                .createTime(article.getCreateTime())
+                .publishTime(article.getPublishTime())
+                .updateTime(article.getUpdateTime())
+                .viewCount(article.getViewCount())
+                .likeCount(article.getLikeCount())
+                .commentCount(article.getCommentCount())
+                .favoriteCount(article.getFavoriteCount())
+                .tags(tags)
+                .markdown(markdown)
+                .build();
+    }
+
+    /**
+     * 批量取标签名
+     */
+    private Map<Long, List<ArticleTagVO>> loadTagsByArticleIds(List<Long> articleIds) {
+        if (articleIds.isEmpty()) {
+            return Map.of();
+        }
+        List<ArticleTag> rows = articleTagMapper.selectList(new LambdaQueryWrapper<ArticleTag>()
+                .select(ArticleTag::getArticleId, ArticleTag::getTagId)
+                .in(ArticleTag::getArticleId, articleIds));
+        if (rows.isEmpty()) {
+            return Map.of();
+        }
+        Map<Long, TagVO> dictionary = new HashMap<>();
+        for (TagVO tag : tagService.listAllTags()) {
+            dictionary.put(tag.getTagId(), tag);
+        }
+        Map<Long, List<ArticleTagVO>> result = new HashMap<>();
+        for (ArticleTag row : rows) {
+            TagVO tag = dictionary.get(row.getTagId());
+            if (tag == null) {
+                // 标签被删、关联行还没清干净的窗口期，跳过比抛异常合适
+                continue;
+            }
+            result.computeIfAbsent(row.getArticleId(), k -> new ArrayList<>())
+                    .add(ArticleTagVO.builder()
+                            .tagId(tag.getTagId())
+                            .name(tag.getName())
+                            .category(tag.getCategory())
+                            .build());
+        }
+        return result;
     }
 }
