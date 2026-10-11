@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue'
-import { RouterLink, useRoute, useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 import { ApiError } from '@/api/http'
 import { listQuestions, type QuestionListItem, type QuestionSort } from '@/api/question'
-import { formatCount, formatDateTime, formatRelativeTime } from '@/utils/format'
+import QuestionRow from '@/components/question/QuestionListItem.vue'
+import { loadUserNames } from '@/composables/useUserNames'
 
 /**
  * F1.7 问答列表。
@@ -39,6 +40,8 @@ async function load(retryOnOutOfRange = true) {
     const result = await listQuestions({ page: page.value, pageSize: pageSize.value, sort: sort.value })
     items.value = result.items
     total.value = result.total
+    // 列表只给 userId，用户名走共享缓存批量取（见 useUserNames）
+    void loadUserNames(result.items.map((item) => item.userId))
 
     if (retryOnOutOfRange && result.items.length === 0 && result.pages > 0 && page.value > result.pages) {
       page.value = result.pages
@@ -101,25 +104,7 @@ onMounted(() => void load())
 
     <template v-else>
       <ul class="qa__list" :class="{ 'is-loading': loading }">
-        <li v-for="question in items" :key="question.questionId" class="qa__item">
-          <h2 class="qa__item-title">
-            <RouterLink :to="`/question/${question.questionId}`">{{ question.title }}</RouterLink>
-            <span v-if="question.solved" class="qa__solved wh-mono">已解决</span>
-          </h2>
-
-          <div class="qa__item-meta wh-mono">
-            <RouterLink class="qa__author" :to="`/user/${question.userId}`">
-              用户 {{ String(question.userId).slice(-4) }}
-            </RouterLink>
-            <span :title="formatDateTime(question.createTime)">
-              {{ formatRelativeTime(question.createTime) }}
-            </span>
-            <span class="qa__stats">
-              <span>回答 {{ formatCount(question.answerCount) }}</span>
-              <span>收藏 {{ formatCount(question.favoriteCount) }}</span>
-            </span>
-          </div>
-        </li>
+        <QuestionRow v-for="question in items" :key="question.questionId" :question="question" />
       </ul>
 
       <div class="qa__pager">
@@ -191,68 +176,6 @@ onMounted(() => void load())
 .qa__list.is-loading {
   opacity: 0.55;
   transition: opacity var(--wh-duration-base) var(--wh-ease);
-}
-
-.qa__item {
-  padding: var(--wh-space-5) 0;
-  border-bottom: var(--wh-border-width) solid var(--wh-border);
-}
-
-.qa__item-title {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--wh-space-2);
-  align-items: center;
-
-  font-size: var(--wh-text-lg);
-  font-weight: var(--wh-weight-semibold);
-  line-height: var(--wh-leading-snug);
-}
-
-.qa__item-title a {
-  color: var(--wh-text-1);
-  text-decoration: none;
-}
-
-.qa__item-title a:hover {
-  color: var(--wh-accent);
-}
-
-.qa__solved {
-  flex: none;
-  padding: 0 var(--wh-space-2);
-
-  font-size: var(--wh-text-xs);
-  color: var(--wh-accent);
-  background-color: var(--wh-accent-soft);
-  border-radius: var(--wh-radius-full);
-}
-
-.qa__item-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--wh-space-3);
-  align-items: center;
-
-  margin-top: var(--wh-space-3);
-
-  font-size: var(--wh-text-xs);
-  color: var(--wh-text-3);
-}
-
-.qa__author {
-  color: var(--wh-text-2);
-  text-decoration: none;
-}
-
-.qa__author:hover {
-  color: var(--wh-accent);
-}
-
-.qa__stats {
-  display: flex;
-  gap: var(--wh-space-3);
-  margin-left: auto;
 }
 
 .qa__pager {
