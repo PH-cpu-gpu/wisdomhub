@@ -8,9 +8,10 @@
      :root       亮色（基础值）
      html.dark   暗色覆盖
 
-   「暗色优先」不是靠 CSS 顺序实现的，而是靠 index.html 上预设的 class="dark"
-   —— 首屏直接就是暗色，不需要等 JS 加载完再切。同一份口径写在 index.html 的
-   内联脚本与 src/stores/app.ts 里，三处取值必须一致（dark | light | system）。
+   「跟随系统」不是靠 CSS 的 prefers-color-scheme 实现的，而是靠 index.html 的内联脚本
+   在首屏绘制前就把 dark 类挂好 —— 否则会先渲染一帧再切。同一份口径写在 index.html 的内联
+   脚本与 src/stores/app.ts 里，三处取值必须一致（dark | light | system）。
+   没表过态时默认走 system；脚本跑不了（JS 被禁）时落在 :root 的亮色上。
 
    为什么用 CSS 变量而不是 SCSS 变量：变量要在运行时随主题切换，SCSS 变量在
    编译期就被替换成固定值了，做不了运行时换肤。
@@ -100,21 +101,22 @@
    2. 亮色主题
    ========================================================================== */
 :root {
-  /* 底色 */
-  --wh-bg-base: #f7f8fa; /* 页面底 */
+  /* 底色。2026-10-11 换掉原来那套 flat 冷白（#f7f8fa）：白卡片压上去只有 1.06:1、
+     描边 1.19:1，整页发飘没骨架。亮色的层次全靠描边，这套把描边收到 1.35:1。 */
+  --wh-bg-base: #fafafa; /* 页面底 */
   --wh-bg-surface: #ffffff; /* 卡片、面板 */
-  --wh-bg-raised: #f1f3f7; /* 悬浮、输入框、代码块 */
-  --wh-bg-hover: #e8ecf3; /* 行悬停 */
+  --wh-bg-raised: #f0f0f1; /* 悬浮、输入框、代码块 */
+  --wh-bg-hover: #e8e8ea; /* 行悬停 */
 
   /* 描边 */
-  --wh-border: #e0e5ee;
-  --wh-border-strong: #c8d0de;
+  --wh-border: #d9d9dc;
+  --wh-border-strong: #b8b8bd;
 
   /* 文本。只有三级：主要 / 次要 / 弱化。
      再细分会出现「区别看不出来但维护成本翻倍」的中间态。 */
-  --wh-text-1: #0f1723; /* 正文、标题 */
-  --wh-text-2: #526079; /* 次要说明 */
-  --wh-text-3: #8b95a9; /* 时间、计数、占位符 */
+  --wh-text-1: #1c1c20; /* 正文、标题 */
+  --wh-text-2: #4f5058; /* 次要说明 */
+  --wh-text-3: #6f7079; /* 时间、计数、占位符。原 #8b95a9 只有 2.84:1，压到 4.71:1 */
   --wh-text-inverse: #ffffff;
 
   /* 主色。只用于「动作」与「焦点」：按钮、链接、激活态、focus ring。
@@ -147,7 +149,7 @@
   --wh-code-number: #be123c; /* 数字/字面量：复用 DATABASE 的绯 */
   --wh-code-function: #0369a1; /* 函数名/属性：复用 MIDDLEWARE 的蓝 */
   --wh-code-type: #9a6700; /* 类名/类型/标签：复用 LANGUAGE 的琥珀 */
-  --wh-code-comment: #8b95a9; /* 注释：用最弱的文本色，注释本来就该退到背景里 */
+  --wh-code-comment: #6f7079; /* 注释：用最弱的文本色，注释本来就该退到背景里 */
 }
 
 /* ==========================================================================
@@ -156,19 +158,22 @@
    ========================================================================== */
 html.dark {
   /* 底色。用带蓝调的深色而不是纯黑 #000：
-     纯黑上放卡片只能靠加亮，层级会挤成一团；略高的底色留出加亮空间。 */
-  --wh-bg-base: #0a0e17;
-  --wh-bg-surface: #121826;
-  --wh-bg-raised: #1a2233;
-  --wh-bg-hover: #202a3d;
+     纯黑上放卡片只能靠加亮，层级会挤成一团；略高的底色留出加亮空间。
+     2026-10-11 整体抬亮一档（原 #0a0e17 比 GitHub Dark 还黑），色相走 Tokyo Night 的蓝紫。 */
+  --wh-bg-base: #1a1b26;
+  --wh-bg-surface: #1f2335;
+  --wh-bg-raised: #292e42;
+  --wh-bg-hover: #323852;
 
-  --wh-border: #232d42;
-  --wh-border-strong: #33405a;
+  /* 比 Tokyo Night 原版略强：底色抬亮后原版 #2f334d 只有 1.38:1，
+     比抬亮前的 1.40:1 还弱，会把「用 1px 框线分区」这条原则削掉 */
+  --wh-border: #353a54;
+  --wh-border-strong: #444b6e;
 
-  --wh-text-1: #e4e9f2; /* 不用纯白：大面积纯白文字在暗底上会发光刺眼 */
-  --wh-text-2: #97a3b8;
-  --wh-text-3: #5d6b84;
-  --wh-text-inverse: #0a0e17;
+  --wh-text-1: #c0caf5; /* 不用纯白：大面积纯白文字在暗底上会发光刺眼 */
+  --wh-text-2: #9aa5ce;
+  --wh-text-3: #7c86ad; /* 原版 muted #565f89 只有 2.76:1，比抬亮前还糊，提到 4.78:1 */
+  --wh-text-inverse: #1a1b26;
 
   --wh-accent: #6ee7b7;
   --wh-accent-hover: #8df0c9;
@@ -194,7 +199,7 @@ html.dark {
   --wh-code-number: #fb7185;
   --wh-code-function: #38bdf8;
   --wh-code-type: #f0b429;
-  --wh-code-comment: #5d6b84;
+  --wh-code-comment: #7c86ad; /* 跟随 text-3 一起提亮，它俩是同一个「最弱文本」角色 */
 }
 
 /* ==========================================================================

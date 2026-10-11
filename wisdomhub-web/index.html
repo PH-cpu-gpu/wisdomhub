@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-CN" class="dark">
+<html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
@@ -13,15 +13,15 @@
       ;(function () {
         try {
           var saved = localStorage.getItem('wisdomhub:theme')
-          // 用户没表过态 → 暗色优先；表过态就照他选的来。
+          // 用户没表过态 → 跟随系统；表过态就照他选的来。
+          var mode = saved === 'dark' || saved === 'light' || saved === 'system' ? saved : 'system'
           var isDark =
-            saved === null
-              ? true
-              : saved === 'dark' ||
-                (saved === 'system' && matchMedia('(prefers-color-scheme: dark)').matches)
+            mode === 'system'
+              ? matchMedia('(prefers-color-scheme: dark)').matches
+              : mode === 'dark'
           document.documentElement.classList.toggle('dark', isDark)
         } catch (e) {
-          /* localStorage 被禁用时保持 <html> 上预设的 dark */
+          /* localStorage 不可用：不挂 class，落在 :root 的亮色上 */
         }
       })()
     </script>

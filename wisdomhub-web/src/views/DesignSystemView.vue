@@ -145,7 +145,7 @@ const roles = [
   { key: '状态', value: 'Pinia' },
   { key: '组件库', value: 'Element Plus（按需引入）' },
   { key: '字体', value: 'IBM Plex Sans + IBM Plex Mono（自托管 latin 子集）' },
-  { key: '主题', value: 'CSS 变量 + html.dark，暗色优先' },
+  { key: '主题', value: 'CSS 变量 + html.dark，默认跟随系统' },
 ]
 </script>
 
@@ -161,10 +161,10 @@ const roles = [
 
     <!-- ================= 主题切换 ================= -->
     <section class="ds__section">
-      <h2 class="ds__section-title">暗色模式</h2>
+      <h2 class="ds__section-title">主题</h2>
       <p class="ds__note">
-        暗色优先：用户没表过态时一律暗色。<code>html</code> 上的 <code>dark</code> 类由
-        index.html 的内联脚本在首屏绘制前定好（否则会亮色一闪再切暗色），
+        默认跟随系统：用户没表过态时读 <code>prefers-color-scheme</code>。<code>html</code> 上的
+        <code>dark</code> 类由 index.html 的内联脚本在首屏绘制前定好（否则会先渲染一帧再切），
         之后由 Pinia 的 app store 接管。Element Plus 的暗色变量集也挂在同一个类上，两套主题因此同步切换。
       </p>
 
@@ -222,7 +222,7 @@ const roles = [
       <h3 class="ds__sub-title">文字</h3>
       <p class="ds__note ds__note--sub">
         只有三级。再细分会出现「区别看不出来、维护成本却翻倍」的中间态。
-        暗色下正文用 <code>#e4e9f2</code> 而不是纯白 —— 大面积纯白文字在暗底上会发光刺眼。
+        暗色下正文用 <code>#c0caf5</code> 而不是纯白 —— 大面积纯白文字在暗底上会发光刺眼。
       </p>
       <ul class="ds__swatches">
         <li v-for="s in textTokens" :key="s.token" class="ds__swatch">
