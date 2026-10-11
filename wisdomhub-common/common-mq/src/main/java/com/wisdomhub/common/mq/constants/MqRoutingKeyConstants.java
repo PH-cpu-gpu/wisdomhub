@@ -15,9 +15,15 @@ public final class MqRoutingKeyConstants {
     public static final String COMMENT_CREATED = "comment.created";
 
     public static final String QUESTION_CREATED = "question.created";
+    public static final String QUESTION_DELETED = "question.deleted";
     public static final String ANSWER_CREATED = "answer.created";
 
+    public static final String TAG_CREATED = "tag.created";
+    public static final String TAG_UPDATED = "tag.updated";
+    public static final String TAG_DELETED = "tag.deleted";
+
     public static final String USER_REGISTERED = "user.registered";
+    public static final String USER_UPDATED = "user.updated";
     public static final String USER_FOLLOWED = "user.followed";
 
     public static final String ORDER_CREATED = "order.created";

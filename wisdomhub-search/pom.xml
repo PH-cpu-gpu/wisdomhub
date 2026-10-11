@@ -43,6 +43,12 @@
             <artifactId>common-mq</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <!-- 事件里没有正文与标签，索引前要回查 content-service 的内部接口 -->
+        <dependency>
+            <groupId>com.wisdomhub</groupId>
+            <artifactId>common-feign</artifactId>
+            <version>${project.version}</version>
+        </dependency>
 
         <dependency>
             <groupId>org.springframework.boot</groupId>

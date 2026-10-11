@@ -5,6 +5,13 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.wisdomhub.common.core.exception.BusinessException;
 import com.wisdomhub.common.core.result.CommonErrorCode;
+import com.wisdomhub.common.mq.event.BaseEvent;
+import com.wisdomhub.common.mq.event.TagCreatedEvent;
+import com.wisdomhub.common.mq.event.TagDeletedEvent;
+import com.wisdomhub.common.mq.event.TagUpdatedEvent;
+import com.wisdomhub.common.mq.event.payload.TagDeletedPayload;
+import com.wisdomhub.common.mq.event.payload.TagEventPayload;
+import com.wisdomhub.common.mq.util.EventPublisher;
 import com.wisdomhub.common.web.util.CurrentUserUtil;
 import com.wisdomhub.content.constants.ArticleConstants;
 import com.wisdomhub.content.constants.TagConstants;
@@ -35,6 +42,7 @@ public class TagServiceImpl implements TagService {
 
     private final TagMapper tagMapper;
     private final ArticleTagMapper articleTagMapper;
+    private final EventPublisher eventPublisher;
 
     // ==================== 读：走两级缓存 ====================
 
@@ -81,6 +89,7 @@ public class TagServiceImpl implements TagService {
                 .description(StrUtil.nullToEmpty(dto.getDescription()).trim())
                 .build();
         tagMapper.insert(tag);
+        sendEvent(new TagCreatedEvent(loadTagPayload(tag.getId())));
         return tag.getId();
     }
 
@@ -106,6 +115,7 @@ public class TagServiceImpl implements TagService {
                 .set(Tag::getDescription, StrUtil.nullToEmpty(dto.getDescription()).trim())
                 .set(Tag::getUpdateTime, LocalDateTime.now(ZoneOffset.UTC))
                 .eq(Tag::getId, tagId));
+        sendEvent(new TagUpdatedEvent(loadTagPayload(tagId)));
     }
 
     @Override
@@ -121,6 +131,38 @@ public class TagServiceImpl implements TagService {
         // 顺序：先删关系行，再删标签本体。
         articleTagMapper.delete(new LambdaQueryWrapper<ArticleTag>().eq(ArticleTag::getTagId, tagId));
         tagMapper.deleteById(tagId);
+        // 标签是物理删，行没了就再也查不到 —— 这条事件是下游清 ES 里残留标签的唯一线索
+        sendEvent(new TagDeletedEvent(TagDeletedPayload.builder().tagId(tagId).build()));
+    }
+
+    // ==================== 事件 ====================
+
+    /** 写完回查一次再拼 payload，保证发出去的就是已提交的那一行 */
+    private TagEventPayload loadTagPayload(Long tagId) {
+        Tag tag = tagMapper.selectById(tagId);
+        if (tag == null) {
+            return null;
+        }
+        return TagEventPayload.builder()
+                .tagId(tag.getId())
+                .name(tag.getName())
+                .category(tag.getCategory())
+                .description(tag.getDescription())
+                .createTime(tag.getCreateTime())
+                .updateTime(tag.getUpdateTime())
+                .build();
+    }
+
+    /** 发失败只记日志：写已经生效，抛出去会变成「接口 500 但标签其实改好了」 */
+    private void sendEvent(BaseEvent<?> event) {
+        if (event.getPayload() == null) {
+            return;
+        }
+        try {
+            eventPublisher.send(event);
+        } catch (Exception e) {
+            log.error("标签事件发送失败, eventType={}", event.getEventType(), e);
+        }
     }
 
     // ==================== 供发布流程调用 ====================

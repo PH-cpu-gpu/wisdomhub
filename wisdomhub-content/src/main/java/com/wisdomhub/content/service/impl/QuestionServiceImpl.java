@@ -8,6 +8,12 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.wisdomhub.common.core.exception.BusinessException;
 import com.wisdomhub.common.core.result.CommonErrorCode;
 import com.wisdomhub.common.core.result.PageResponse;
+import com.wisdomhub.common.mq.event.BaseEvent;
+import com.wisdomhub.common.mq.event.QuestionCreatedEvent;
+import com.wisdomhub.common.mq.event.QuestionDeletedEvent;
+import com.wisdomhub.common.mq.event.payload.QuestionDeletedPayload;
+import com.wisdomhub.common.mq.event.payload.QuestionEventPayload;
+import com.wisdomhub.common.mq.util.EventPublisher;
 import com.wisdomhub.common.redis.constants.RedisTtl;
 import com.wisdomhub.common.security.context.UserContext;
 import com.wisdomhub.common.web.util.CurrentUserUtil;
@@ -37,6 +43,8 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -55,6 +63,7 @@ public class QuestionServiceImpl implements QuestionService {
     private final AnswerLikeMapper answerLikeMapper;
     private final CommentMapper commentMapper;
     private final StringRedisTemplate stringRedisTemplate;
+    private final EventPublisher eventPublisher;
 
     // ==================== 读 ====================
 
@@ -129,6 +138,7 @@ public class QuestionServiceImpl implements QuestionService {
                 .deleted(QuestionConstants.NOT_DELETED.byteValue())
                 .build();
         questionMapper.insert(question);
+        publishQuestionCreated(question.getId());
         return question.getId();
     }
 
@@ -226,6 +236,46 @@ public class QuestionServiceImpl implements QuestionService {
                 .inSql(AnswerLike::getAnswerId, "SELECT id FROM answer WHERE question_id = " + questionId));
         questionFavoriteMapper.delete(new LambdaQueryWrapper<QuestionFavorite>()
                 .eq(QuestionFavorite::getQuestionId, questionId));
+
+        // 本方法是 @Transactional，直接发会在回滚时留下「消息发了但问题还在」
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                sendEvent(new QuestionDeletedEvent(QuestionDeletedPayload.builder()
+                        .questionId(questionId)
+                        .userId(question.getUserId())
+                        .build()));
+            }
+        });
+    }
+
+    // ==================== 事件 ====================
+
+    private void publishQuestionCreated(Long questionId) {
+        Question question = questionMapper.selectById(questionId);
+        if (question == null) {
+            return;
+        }
+        sendEvent(new QuestionCreatedEvent(QuestionEventPayload.builder()
+                .questionId(question.getId())
+                .userId(question.getUserId())
+                .title(question.getTitle())
+                .content(question.getContent())
+                .answerCount(question.getAnswerCount())
+                .favoriteCount(question.getFavoriteCount())
+                .acceptedAnswerId(question.getAcceptedAnswerId())
+                .createTime(question.getCreateTime())
+                .updateTime(question.getUpdateTime())
+                .build()));
+    }
+
+    /** 发失败只记日志：事务已提交，抛出去会变成「接口 500 但问题其实提问成功了」 */
+    private void sendEvent(BaseEvent<?> event) {
+        try {
+            eventPublisher.send(event);
+        } catch (Exception e) {
+            log.error("问题事件发送失败, eventType={}", event.getEventType(), e);
+        }
     }
 
     // ==================== 共用 ====================
