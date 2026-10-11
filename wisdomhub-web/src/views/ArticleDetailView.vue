@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import 'element-plus/es/components/message/style/css'
@@ -16,6 +16,7 @@ import { ApiError } from '@/api/http'
 import { ApiCode } from '@/api/types'
 import CommentSection from '@/components/comment/CommentSection.vue'
 import { highlightIn } from '@/composables/useMarkdown'
+import { loadUserNames, userName } from '@/composables/useUserNames'
 import { useUserStore } from '@/stores/user'
 import { formatCount, formatDateTime, formatRelativeTime } from '@/utils/format'
 
@@ -39,6 +40,69 @@ const notFound = ref(false)
 const acting = ref(false)
 const articleEl = ref<HTMLElement | null>(null)
 
+/** 目录项，level 是标题层级 1~3 */
+interface TocItem {
+  id: string
+  text: string
+  level: number
+}
+
+const toc = ref<TocItem[]>([])
+const activeId = ref('')
+let tocObserver: IntersectionObserver | null = null
+
+const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)')
+
+/** 吸顶导航的高度，锚点跳转要留出来（与 CSS 的 scroll-margin-top 同源） */
+const HEADING_OFFSET = 72
+
+function scrollToHeading(id: string) {
+  document.getElementById(id)?.scrollIntoView({
+    behavior: prefersReducedMotion.matches ? 'auto' : 'smooth',
+    block: 'start',
+  })
+}
+
+/** 扫正文标题生成目录。必须在 v-html 进 DOM 后调（同 highlightIn），标题的 id 就地补上 */
+function buildToc(root: HTMLElement | null) {
+  tocObserver?.disconnect()
+  tocObserver = null
+  activeId.value = ''
+
+  const headings = root ? Array.from(root.querySelectorAll<HTMLElement>('h1, h2, h3')) : []
+  const items: TocItem[] = []
+  headings.forEach((el, i) => {
+    const text = (el.textContent ?? '').trim()
+    if (!text) return
+    const id = el.id || `wh-heading-${i + 1}`
+    el.id = id
+    items.push({ id, text, level: Number(el.tagName.slice(1)) })
+  })
+  toc.value = items
+
+  if (items.length === 0) return
+
+  // 只把落在视口上方那条带里的标题当作「当前位置」，下面的 70% 不算
+  const visible = new Set<string>()
+  tocObserver = new IntersectionObserver(
+    (entries) => {
+      for (const entry of entries) {
+        if (entry.isIntersecting) visible.add(entry.target.id)
+        else visible.delete(entry.target.id)
+      }
+      const next = toc.value.find((item) => visible.has(item.id))
+      if (next) activeId.value = next.id
+    },
+    { rootMargin: `-${HEADING_OFFSET}px 0px -70% 0px` },
+  )
+  for (const item of items) {
+    const el = document.getElementById(item.id)
+    if (el) tocObserver.observe(el)
+  }
+}
+
+onBeforeUnmount(() => tocObserver?.disconnect())
+
 const isOwner = computed(
   () =>
     detail.value !== null &&
@@ -51,21 +115,29 @@ async function load() {
   loading.value = true
   notFound.value = false
   detail.value = null
+  // 上一篇的标题马上就不在 DOM 里了，别让 observer 一直攥着它们
+  tocObserver?.disconnect()
+  toc.value = []
 
   try {
     detail.value = await getArticleDetail(articleId)
-    // 等 v-html 真正进 DOM 再高亮，否则 querySelector 什么也找不到
-    await nextTick()
-    highlightIn(articleEl.value)
+    void loadUserNames([detail.value.authorId])
   } catch (e) {
     if (e instanceof ApiError && e.code === ApiCode.NOT_FOUND) {
       notFound.value = true
-      return
+    } else {
+      ElMessage.error(e instanceof ApiError ? e.message : '加载失败')
     }
-    ElMessage.error(e instanceof ApiError ? e.message : '加载失败')
+    return
   } finally {
     loading.value = false
   }
+
+  // loading 必须先落回 false：正文挂在 v-else-if="detail" 上，loading 还是 true 时渲染的是
+  // 骨架屏、articleEl 是 null —— 高亮和目录都会什么都扫不到（这里踩过一次）
+  await nextTick()
+  highlightIn(articleEl.value)
+  buildToc(articleEl.value)
 }
 
 /** 未登录时把用户送到登录页，并记下回跳地址（登录成功后回到这一页） */
@@ -136,69 +208,176 @@ onMounted(() => void load())
     </el-empty>
 
     <template v-else-if="detail">
-      <header class="art__head">
-        <h1 class="art__title">{{ detail.title }}</h1>
+      <div class="art__layout" :class="{ 'is-single': toc.length === 0 }">
+        <aside v-if="toc.length" class="art__toc">
+          <h2 class="art__toc-title">目录</h2>
+          <ul class="art__toc-list">
+            <li v-for="item in toc" :key="item.id">
+              <a
+                class="art__toc-link"
+                :class="[`is-lv${item.level}`, { 'is-active': item.id === activeId }]"
+                :href="`#${item.id}`"
+                @click.prevent="scrollToHeading(item.id)"
+              >
+                {{ item.text }}
+              </a>
+            </li>
+          </ul>
+        </aside>
 
-        <div class="art__meta wh-mono">
-          <RouterLink class="art__author" :to="`/user/${detail.authorId}`">
-            用户 {{ String(detail.authorId).slice(-4) }}
-          </RouterLink>
-          <span :title="formatDateTime(detail.publishTime)">
-            {{ formatRelativeTime(detail.publishTime) }}
-          </span>
-          <span :title="`阅读 ${detail.viewCount}`">阅读 {{ formatCount(detail.viewCount) }}</span>
+        <div class="art__main">
+          <header class="art__head">
+            <h1 class="art__title">{{ detail.title }}</h1>
 
-          <!-- 只有作者本人能看到编辑入口；已发布文章的改动走「覆盖发布」 -->
-          <RouterLink v-if="isOwner" class="art__edit" :to="`/editor/${detail.articleId}`">
-            编辑
-          </RouterLink>
+            <div class="art__meta wh-mono">
+              <RouterLink class="art__author" :to="`/user/${detail.authorId}`">
+                {{ userName(detail.authorId) }}
+              </RouterLink>
+              <span :title="formatDateTime(detail.publishTime)">
+                {{ formatRelativeTime(detail.publishTime) }}
+              </span>
+              <span :title="`阅读 ${detail.viewCount}`">阅读 {{ formatCount(detail.viewCount) }}</span>
+
+              <!-- 只有作者本人能看到编辑入口；已发布文章的改动走「覆盖发布」 -->
+              <RouterLink v-if="isOwner" class="art__edit" :to="`/editor/${detail.articleId}`">
+                编辑
+              </RouterLink>
+            </div>
+          </header>
+
+          <!-- 正文：后端渲染 + 消毒过的 HTML -->
+          <article ref="articleEl" class="art__body wh-prose" v-html="detail.html" />
+
+          <div class="art__actions">
+            <button
+              class="art__action"
+              type="button"
+              :class="{ 'is-on': detail.liked }"
+              :disabled="acting"
+              @click="onToggleLike"
+            >
+              <span class="art__action-icon">{{ detail.liked ? '♥' : '♡' }}</span>
+              赞 <span class="wh-mono">{{ detail.likeCount }}</span>
+            </button>
+
+            <button
+              class="art__action"
+              type="button"
+              :class="{ 'is-on': detail.collected }"
+              :disabled="acting"
+              @click="onToggleCollect"
+            >
+              <span class="art__action-icon">{{ detail.collected ? '★' : '☆' }}</span>
+              收藏 <span class="wh-mono">{{ detail.favoriteCount }}</span>
+            </button>
+
+            <span class="art__action art__action--static">
+              评论 <span class="wh-mono">{{ detail.commentCount }}</span>
+            </span>
+          </div>
+
+          <CommentSection
+            :target-id="detail.articleId"
+            :comment-count="detail.commentCount"
+            @changed="refreshCounts"
+          />
         </div>
-      </header>
-
-      <!-- 正文：后端渲染 + 消毒过的 HTML -->
-      <article ref="articleEl" class="art__body wh-prose" v-html="detail.html" />
-
-      <div class="art__actions">
-        <button
-          class="art__action"
-          type="button"
-          :class="{ 'is-on': detail.liked }"
-          :disabled="acting"
-          @click="onToggleLike"
-        >
-          <span class="art__action-icon">{{ detail.liked ? '♥' : '♡' }}</span>
-          赞 <span class="wh-mono">{{ detail.likeCount }}</span>
-        </button>
-
-        <button
-          class="art__action"
-          type="button"
-          :class="{ 'is-on': detail.collected }"
-          :disabled="acting"
-          @click="onToggleCollect"
-        >
-          <span class="art__action-icon">{{ detail.collected ? '★' : '☆' }}</span>
-          收藏 <span class="wh-mono">{{ detail.favoriteCount }}</span>
-        </button>
-
-        <span class="art__action art__action--static">
-          评论 <span class="wh-mono">{{ detail.commentCount }}</span>
-        </span>
       </div>
-
-      <CommentSection
-        :target-id="detail.articleId"
-        :comment-count="detail.commentCount"
-        @changed="refreshCounts"
-      />
     </template>
   </div>
 </template>
 
 <style scoped>
 .art {
-  max-width: var(--wh-reading);
   padding-block: var(--wh-space-6);
+}
+
+/* 左目录 + 右正文。1fr : 5fr 就是「目录占 1/6，其余全给正文」 */
+.art__layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 5fr);
+  gap: var(--wh-space-6);
+  align-items: start;
+}
+
+/* 文章没有标题时，那一列直接不占，正文吃满 */
+.art__layout.is-single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* 同 DefaultLayout：允许收缩，否则宽表格/长代码块会把这一列撑破 */
+.art__main {
+  min-width: 0;
+}
+
+.art__toc {
+  position: sticky;
+  top: calc(var(--wh-nav-height) + var(--wh-space-4));
+
+  max-height: calc(100vh - var(--wh-nav-height) - var(--wh-space-6));
+  overflow-y: auto;
+}
+
+.art__toc-title {
+  padding-bottom: var(--wh-space-2);
+
+  font-size: var(--wh-text-xs);
+  font-weight: var(--wh-weight-medium);
+  letter-spacing: var(--wh-tracking-wide);
+  color: var(--wh-text-3);
+
+  border-bottom: var(--wh-border-width) solid var(--wh-border);
+}
+
+.art__toc-list {
+  margin-top: var(--wh-space-2);
+  list-style: none;
+}
+
+.art__toc-link {
+  display: block;
+  padding: var(--wh-space-1) 0;
+
+  font-size: var(--wh-text-sm);
+  line-height: var(--wh-leading-snug);
+  color: var(--wh-text-3);
+  text-decoration: none;
+
+  border-left: var(--wh-border-width) solid transparent;
+}
+
+/* 层级只靠缩进表达，不额外上色 */
+.art__toc-link.is-lv2 {
+  padding-left: var(--wh-space-3);
+}
+
+.art__toc-link.is-lv3 {
+  padding-left: var(--wh-space-5);
+}
+
+.art__toc-link:hover {
+  color: var(--wh-text-1);
+}
+
+.art__toc-link.is-active {
+  color: var(--wh-accent);
+  border-left-color: var(--wh-accent);
+}
+
+/* 吸顶导航会盖住锚点标题 */
+.art__body :deep(:is(h1, h2, h3)) {
+  scroll-margin-top: calc(var(--wh-nav-height) + var(--wh-space-4));
+}
+
+/* 窄屏放不下目录，退回单列 */
+@media (max-width: 1100px) {
+  .art__layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .art__toc {
+    display: none;
+  }
 }
 
 .art__head {

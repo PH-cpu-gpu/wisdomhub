@@ -13,6 +13,7 @@ import {
   type CommentItem,
 } from '@/api/comment'
 import { ApiError } from '@/api/http'
+import { loadUserNames, userName } from '@/composables/useUserNames'
 import { useUserStore } from '@/stores/user'
 import { formatDateTime, formatRelativeTime } from '@/utils/format'
 
@@ -61,6 +62,11 @@ async function load() {
     const result = await pageComments(props.targetId, props.targetType, page.value, pageSize.value)
     items.value = result.items
     total.value = result.total
+    // 评论只给 userId，用户名走共享缓存批量取，一级和二级一起（见 useUserNames）
+    void loadUserNames([
+      ...result.items.map((item) => item.userId),
+      ...result.items.flatMap((item) => (item.replies ?? []).map((reply) => reply.userId)),
+    ])
   } catch (e) {
     // 读路径不校验目标：目标不存在时后端返回空列表而不是 404，所以这里基本都是网络/服务问题
     ElMessage.error(e instanceof ApiError ? e.message : '评论加载失败')
@@ -189,7 +195,7 @@ onMounted(() => void load())
     <ul v-else class="cmt__list">
       <li v-for="root in items" :key="root.commentId" class="cmt__item">
         <div class="cmt__meta">
-          <RouterLink class="cmt__author" :to="`/user/${root.userId}`">用户 {{ String(root.userId).slice(-4) }}</RouterLink>
+          <RouterLink class="cmt__author" :to="`/user/${root.userId}`">{{ userName(root.userId) }}</RouterLink>
           <span :title="formatDateTime(root.createTime)">{{ formatRelativeTime(root.createTime) }}</span>
         </div>
         <p class="cmt__body">{{ root.content }}</p>
@@ -206,7 +212,7 @@ onMounted(() => void load())
           <li v-for="reply in root.replies" :key="reply.commentId" class="cmt__reply">
             <div class="cmt__meta">
               <RouterLink class="cmt__author" :to="`/user/${reply.userId}`">
-                用户 {{ String(reply.userId).slice(-4) }}
+                {{ userName(reply.userId) }}
               </RouterLink>
               <span :title="formatDateTime(reply.createTime)">{{ formatRelativeTime(reply.createTime) }}</span>
             </div>
