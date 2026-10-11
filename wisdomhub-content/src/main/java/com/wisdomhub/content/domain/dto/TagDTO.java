@@ -12,6 +12,9 @@ public class TagDTO {
     @Size(max = 50, message = "标签名长度不能超过50")
     private String name;
 
+    @Size(max = 20, message = "分组长度不能超过20")
+    private String category;
+
     @Size(max = 255, message = "标签描述长度不能超过255")
     private String description;
 }
