@@ -86,6 +86,16 @@ export function unfavoriteQuestion(questionId: string) {
   return del<number>(`/content/question/${questionId}/favorite`)
 }
 
+/**
+ * 我的问题收藏（B1.27）。按**收藏时间**倒序。
+ *
+ * ⚠️ 和文章收藏是两个接口、两条路径，别混：文章是 `/content/article/collect`，
+ * 问答是 `/content/question/favorite`（`GET /favorite`，注意它是 `/favorite` 而不是 `/{id}/favorite`）。
+ */
+export function listMyFavoriteQuestions(page = 1, pageSize = 10) {
+  return get<PageResponse<QuestionListItem>>('/content/question/favorite', { page, pageSize })
+}
+
 // ---------------------------------------------------------------------------
 // 回答
 // ---------------------------------------------------------------------------
