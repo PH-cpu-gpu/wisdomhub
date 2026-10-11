@@ -5,10 +5,12 @@ import com.wisdomhub.content.domain.dto.ArticleDraftDTO;
 import com.wisdomhub.content.domain.dto.ArticlePublishDTO;
 import com.wisdomhub.content.domain.vo.ArticleBriefVO;
 import com.wisdomhub.content.domain.vo.ArticleDetailVO;
+import com.wisdomhub.content.domain.vo.ArticleInternalVO;
 import com.wisdomhub.content.domain.vo.ArticleListItemVO;
 import com.wisdomhub.content.domain.vo.ArticleSourceVO;
 import com.wisdomhub.content.domain.vo.DraftBriefVO;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 public interface ArticleService {
@@ -53,4 +55,14 @@ public interface ArticleService {
 
     /** 删除已发布文章（仅作者本人；草稿走 deleteDraft）。级联清关联行，再删正文与阅读量 key */
     void deleteArticle(Long articleId);
+
+    // ==================== 服务间读契约（B2.1 定形，消费方 search-service）====================
+
+    /** 单篇完整快照：article 行 + 标签 + MongoDB 正文。已删除文章 404，正文缺失报 500（不变式被破坏） */
+    ArticleInternalVO getInternalArticle(Long articleId);
+
+    /**
+     * 增量分页，供 ES 全量对账。游标是 (since, lastId) 复合键，不是单纯的 since
+     */
+    List<ArticleInternalVO> syncArticles(LocalDateTime since, Long lastId, Integer size);
 }

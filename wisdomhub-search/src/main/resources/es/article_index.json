@@ -1,0 +1,66 @@
+{
+  "settings": {
+    "number_of_shards": 1,
+    "number_of_replicas": 0,
+    "analysis": {
+      "analyzer": {
+        "wh_ik_index": {
+          "type": "custom",
+          "tokenizer": "ik_max_word",
+          "filter": ["lowercase"]
+        },
+        "wh_ik_search": {
+          "type": "custom",
+          "tokenizer": "ik_smart",
+          "filter": ["lowercase"]
+        }
+      }
+    }
+  },
+  "mappings": {
+    "dynamic": "strict",
+    "properties": {
+      "articleId": { "type": "keyword" },
+      "title": {
+        "type": "text",
+        "analyzer": "wh_ik_index",
+        "search_analyzer": "wh_ik_search",
+        "fields": {
+          "keyword": { "type": "keyword", "ignore_above": 256 }
+        }
+      },
+      "suggest": {
+        "type": "completion",
+        "analyzer": "wh_ik_index",
+        "search_analyzer": "wh_ik_search",
+        "max_input_length": 100
+      },
+      "summary": {
+        "type": "text",
+        "analyzer": "wh_ik_index",
+        "search_analyzer": "wh_ik_search"
+      },
+      "content": {
+        "type": "text",
+        "analyzer": "wh_ik_index",
+        "search_analyzer": "wh_ik_search"
+      },
+      "authorId": { "type": "keyword" },
+      "tags": {
+        "properties": {
+          "tagId": { "type": "keyword" },
+          "name": { "type": "keyword" },
+          "category": { "type": "keyword" }
+        }
+      },
+      "state": { "type": "byte" },
+      "publishTime": { "type": "date", "format": "strict_date_optional_time||epoch_millis" },
+      "createTime": { "type": "date", "format": "strict_date_optional_time||epoch_millis" },
+      "updateTime": { "type": "date", "format": "strict_date_optional_time||epoch_millis" },
+      "viewCount": { "type": "integer" },
+      "likeCount": { "type": "integer" },
+      "commentCount": { "type": "integer" },
+      "favoriteCount": { "type": "integer" }
+    }
+  }
+}

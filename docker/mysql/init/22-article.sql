@@ -22,5 +22,7 @@ CREATE TABLE article (
     INDEX idx_author_state (author_id, state, create_time),
     INDEX idx_author_state_update (author_id, state, update_time),
     INDEX idx_state_publish (state, publish_time),
-    INDEX idx_state_view (state, view_count)
+    INDEX idx_state_view (state, view_count),
+    -- B2.1 内部增量同步按 (update_time, id) 复合游标扫；缺它这条查询要全表扫 + filesort
+    INDEX idx_update_time_id (update_time, id)
 ) ENGINE=InnoDB COMMENT='文章';
