@@ -3,6 +3,7 @@ package com.wisdomhub.search.controller;
 import com.wisdomhub.common.core.result.PageResponse;
 import com.wisdomhub.common.core.result.R;
 import com.wisdomhub.search.domain.vo.ArticleSearchVO;
+import com.wisdomhub.search.domain.vo.HotWordVO;
 import com.wisdomhub.search.domain.vo.QuestionSearchVO;
 import com.wisdomhub.search.domain.vo.TagSearchVO;
 import com.wisdomhub.search.domain.vo.UserSearchVO;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Tag(name = "搜索controller")
 @Validated
@@ -72,5 +74,22 @@ public class SearchController {
             @RequestParam(required = false) String sort,
             @RequestParam(required = false) String category) {
         return R.success(searchService.searchTags(keyword, page, pageSize, sort, category));
+    }
+
+    @Operation(summary = "输入建议，返回建议文本列表")
+    @GetMapping("/suggest")
+    public R<List<String>> suggest(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String type,
+            @RequestParam(required = false) Integer size) {
+        return R.success(searchService.suggest(keyword, type, size));
+    }
+
+    @Operation(summary = "热门搜索词：最近 N 天的搜索词榜")
+    @GetMapping("/hotword")
+    public R<List<HotWordVO>> hotWords(
+            @RequestParam(required = false) Integer days,
+            @RequestParam(required = false) Integer size) {
+        return R.success(searchService.hotWords(days, size));
     }
 }
