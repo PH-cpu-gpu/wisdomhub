@@ -29,6 +29,9 @@ public final class RedisTtl {
     /** 热门榜单刷新间隔 */
     public static final Duration HOT_RANK = Duration.ofMinutes(30);
 
+    /** 搜索热词的按日 zset：比最长查询窗口多留一天，7 天榜不会因为某天 key 先过期而缺角 */
+    public static final Duration SEARCH_HOT = Duration.ofDays(8);
+
     /** Spring Cache 的默认存活时间，单个 cacheName 可另行覆盖 */
     public static final Duration CACHE_DEFAULT = Duration.ofMinutes(30);
 

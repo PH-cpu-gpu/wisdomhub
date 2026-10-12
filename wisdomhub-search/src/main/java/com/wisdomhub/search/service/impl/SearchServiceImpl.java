@@ -11,9 +11,11 @@ import co.elastic.clients.elasticsearch._types.query_dsl.Query;
 import co.elastic.clients.elasticsearch._types.query_dsl.TextQueryType;
 import co.elastic.clients.elasticsearch.core.SearchRequest;
 import co.elastic.clients.elasticsearch.core.SearchResponse;
+import co.elastic.clients.elasticsearch.core.search.CompletionSuggestOption;
 import co.elastic.clients.elasticsearch.core.search.Highlight;
 import co.elastic.clients.elasticsearch.core.search.HighlighterEncoder;
 import co.elastic.clients.elasticsearch.core.search.Hit;
+import co.elastic.clients.elasticsearch.core.search.Suggestion;
 import co.elastic.clients.elasticsearch.core.search.TotalHits;
 import com.wisdomhub.common.core.exception.BusinessException;
 import com.wisdomhub.common.core.result.CommonErrorCode;
@@ -24,11 +26,13 @@ import com.wisdomhub.search.domain.document.QuestionIndexDoc;
 import com.wisdomhub.search.domain.document.TagIndexDoc;
 import com.wisdomhub.search.domain.document.UserIndexDoc;
 import com.wisdomhub.search.domain.vo.ArticleSearchVO;
+import com.wisdomhub.search.domain.vo.HotWordVO;
 import com.wisdomhub.search.domain.vo.QuestionSearchVO;
 import com.wisdomhub.search.domain.vo.TagBriefVO;
 import com.wisdomhub.search.domain.vo.TagSearchVO;
 import com.wisdomhub.search.domain.vo.UserSearchVO;
 import com.wisdomhub.search.service.EsIndexService;
+import com.wisdomhub.search.service.HotWordService;
 import com.wisdomhub.search.service.SearchService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -38,6 +42,7 @@ import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -54,13 +59,19 @@ public class SearchServiceImpl implements SearchService {
     private static final List<String> USER_FIELDS = List.of("username^3", "bio^1");
     private static final List<String> TAG_FIELDS = List.of("name^3", "description^1");
 
+    /** suggest 请求里给这个 suggester 起的名字，取回结果时按它索引 */
+    private static final String SUGGESTER_NAME = "wh_suggest";
+
     private final ElasticsearchClient elasticsearchClient;
+
+    private final HotWordService hotWordService;
 
     // ==================== 文章 ====================
 
     @Override
     public PageResponse<ArticleSearchVO> searchArticles(String keyword, Integer page, Integer pageSize, String sort,
                                                         Long tagId, LocalDateTime startTime, LocalDateTime endTime) {
+        hotWordService.record(keyword);
         int pageNo = SearchConstants.clampPage(page);
         int size = SearchConstants.clampPageSize(pageSize);
         Query query = buildQuery(keyword, ARTICLE_FIELDS, bool -> {
@@ -119,6 +130,7 @@ public class SearchServiceImpl implements SearchService {
     @Override
     public PageResponse<QuestionSearchVO> searchQuestions(String keyword, Integer page, Integer pageSize, String sort,
                                                           LocalDateTime startTime, LocalDateTime endTime) {
+        hotWordService.record(keyword);
         int pageNo = SearchConstants.clampPage(page);
         int size = SearchConstants.clampPageSize(pageSize);
         Query query = buildQuery(keyword, QUESTION_FIELDS, bool -> addPublishTimeRange(bool, startTime, endTime, "createTime"));
@@ -161,6 +173,7 @@ public class SearchServiceImpl implements SearchService {
 
     @Override
     public PageResponse<UserSearchVO> searchUsers(String keyword, Integer page, Integer pageSize, String sort) {
+        hotWordService.record(keyword);
         int pageNo = SearchConstants.clampPage(page);
         int size = SearchConstants.clampPageSize(pageSize);
         Query query = buildQuery(keyword, USER_FIELDS, bool -> { });
@@ -195,6 +208,7 @@ public class SearchServiceImpl implements SearchService {
 
     @Override
     public PageResponse<TagSearchVO> searchTags(String keyword, Integer page, Integer pageSize, String sort, String category) {
+        hotWordService.record(keyword);
         int pageNo = SearchConstants.clampPage(page);
         int size = SearchConstants.clampPageSize(pageSize);
         Query query = buildQuery(keyword, TAG_FIELDS, bool -> {
@@ -227,6 +241,66 @@ public class SearchServiceImpl implements SearchService {
                 .createTime(doc.getCreateTime())
                 .updateTime(doc.getUpdateTime())
                 .build();
+    }
+
+    // ==================== 输入建议 / 热搜词 ====================
+
+    @Override
+    public List<String> suggest(String keyword, String type, Integer size) {
+        // 输入框清空时不打 ES：空 prefix 会把整张索引的建议全捞回来
+        if (StrUtil.isBlank(keyword)) {
+            return List.of();
+        }
+        SearchRequest request = new SearchRequest.Builder()
+                .index(suggestIndex(type))
+                .suggest(s -> s.suggesters(SUGGESTER_NAME, f -> f
+                        .prefix(keyword.trim())
+                        .completion(c -> c.field("suggest")
+                                .size(SearchConstants.clampSuggestSize(size))
+                                .skipDuplicates(true))))
+                .source(s -> s.fetch(false))
+                .build();
+        try {
+            return extractSuggestions(elasticsearchClient.search(request, Void.class));
+        } catch (IOException | ElasticsearchException e) {
+            // 联想是输入框上的装饰，打挂它只是噪声，所以降级成空列表
+            log.error("输入建议查询失败, index={}", request.index(), e);
+            return List.of();
+        }
+    }
+
+    @Override
+    public List<HotWordVO> hotWords(Integer days, Integer size) {
+        return hotWordService.top(days, size);
+    }
+
+    private List<String> extractSuggestions(SearchResponse<Void> response) {
+        List<Suggestion<Void>> suggestions = response.suggest().get(SUGGESTER_NAME);
+        if (suggestions == null) {
+            return List.of();
+        }
+        LinkedHashSet<String> texts = new LinkedHashSet<>();
+        for (Suggestion<Void> suggestion : suggestions) {
+            if (!suggestion.isCompletion()) {
+                continue;
+            }
+            for (CompletionSuggestOption<Void> option : suggestion.completion().options()) {
+                if (StrUtil.isNotBlank(option.text())) {
+                    texts.add(option.text());
+                }
+            }
+        }
+        return List.copyOf(texts);
+    }
+
+    /** 白名单外的 type 落回 article */
+    private String suggestIndex(String type) {
+        return switch (type == null ? "" : type.trim().toLowerCase(Locale.ROOT)) {
+            case "question" -> EsIndexService.QUESTION_INDEX;
+            case "user" -> EsIndexService.USER_INDEX;
+            case "tag" -> EsIndexService.TAG_INDEX;
+            default -> EsIndexService.ARTICLE_INDEX;
+        };
     }
 
     // ==================== 共用 ====================
