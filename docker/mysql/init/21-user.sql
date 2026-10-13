@@ -41,14 +41,3 @@ CREATE TABLE user_browse_history (
     -- B2.31 清理已删文章的浏览历史按它删；没有以 article_id 打头的索引会全表扫
     INDEX idx_article_id (article_id)
 ) ENGINE=InnoDB COMMENT='浏览历史';
-
-CREATE TABLE user_learning_record (
-    id BIGINT PRIMARY KEY COMMENT '雪花 ID',
-    user_id BIGINT NOT NULL COMMENT '用户 ID',
-    technology_name VARCHAR(64) NOT NULL COMMENT '技术名，对应图谱 Technology.name',
-    mastered TINYINT NOT NULL DEFAULT 0 COMMENT '0-学习中 1-已掌握',
-    create_time DATETIME NOT NULL COMMENT '加入时间',
-    update_time DATETIME NOT NULL COMMENT '更新时间',
-    UNIQUE KEY uk_user_technology (user_id, technology_name),
-    INDEX idx_user_update (user_id, update_time)
-) ENGINE=InnoDB COMMENT='用户学习记录';
