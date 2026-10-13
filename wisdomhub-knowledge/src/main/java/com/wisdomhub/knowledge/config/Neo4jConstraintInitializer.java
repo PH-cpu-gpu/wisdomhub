@@ -17,7 +17,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 启动时执行 resources/neo4j/constraints.cypher 里的唯一约束。已存在即跳过（IF NOT EXISTS）。
+ * 启动时执行 resources/neo4j/constraints.cypher 里的唯一约束
  */
 @Slf4j
 @Component
@@ -56,7 +56,7 @@ public class Neo4jConstraintInitializer implements ApplicationRunner {
     }
 
     /**
-     * Neo4j 不可达时只记日志不抛：本服务当前没有别的功能，起不来会白卡一条链路。
+     * Neo4j 不可达时只记日志不抛。
      */
     private void createConstraint(String statement) {
         try (Session session = driver.session()) {
