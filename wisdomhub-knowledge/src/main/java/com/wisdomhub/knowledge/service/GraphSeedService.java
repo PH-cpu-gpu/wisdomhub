@@ -7,9 +7,8 @@ import com.wisdomhub.knowledge.api.dto.TagInternalDTO;
 import com.wisdomhub.knowledge.domain.vo.SeedResultVO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.neo4j.driver.Driver;
-import org.neo4j.driver.Session;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.data.neo4j.core.Neo4jClient;
 import org.springframework.stereotype.Service;
 
 import java.io.InputStream;
@@ -30,7 +29,7 @@ public class GraphSeedService {
             Set.of("BASED_ON", "USES", "PREREQUISITE", "SIMILAR_TO", "BELONGS_TO");
 
     private final ContentTagFeign contentTagFeign;
-    private final Driver driver;
+    private final Neo4jClient neo4jClient;
     private final ObjectMapper objectMapper;
 
     public SeedResultVO seed() {
@@ -77,9 +76,7 @@ public class GraphSeedService {
         }
         String cypher = "UNWIND $rows AS row MERGE (t:Tag {tagId: row.tagId}) "
                 + "SET t.name = row.name, t.category = row.category, t.description = row.description";
-        try (Session session = driver.session()) {
-            session.executeWrite(tx -> tx.run(cypher, Map.of("rows", rows)).consume());
-        }
+        neo4jClient.query(cypher).bindAll(Map.of("rows", rows)).run();
     }
 
     private void seedRelations(String type, List<List<String>> rows) {
@@ -88,9 +85,7 @@ public class GraphSeedService {
         }
         String cypher = "UNWIND $rows AS row MATCH (a:Tag {tagId: row[0]}) MATCH (b:Tag {tagId: row[1]}) "
                 + "MERGE (a)-[:" + type + "]->(b)";
-        try (Session session = driver.session()) {
-            session.executeWrite(tx -> tx.run(cypher, Map.of("rows", rows)).consume());
-        }
+        neo4jClient.query(cypher).bindAll(Map.of("rows", rows)).run();
     }
 
     private Map<String, String> indexByName(List<TagInternalDTO> tags) {
