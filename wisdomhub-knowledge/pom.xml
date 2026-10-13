@@ -43,6 +43,12 @@
             <artifactId>common-mq</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <!-- 拉 content-service 的 tag 字典建图谱种子 -->
+        <dependency>
+            <groupId>com.wisdomhub</groupId>
+            <artifactId>common-feign</artifactId>
+            <version>${project.version}</version>
+        </dependency>
 
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -57,7 +63,7 @@
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
 
-        <!-- Neo4j 唯一写入方（技术文档 7.13） -->
+        <!-- Neo4j 唯一写入方 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-neo4j</artifactId>
@@ -72,7 +78,7 @@
             <artifactId>spring-cloud-starter-alibaba-nacos-config</artifactId>
         </dependency>
 
-        <!-- Neo4j 定时全量对账（任务 B2.29） -->
+        <!-- Neo4j 定时全量对账 -->
         <dependency>
             <groupId>com.xuxueli</groupId>
             <artifactId>xxl-job-core</artifactId>
