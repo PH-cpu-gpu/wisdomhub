@@ -1,10 +1,12 @@
 package com.wisdomhub.knowledge.controller;
 
 import com.wisdomhub.common.core.result.R;
+import com.wisdomhub.knowledge.domain.vo.GraphVO;
 import com.wisdomhub.knowledge.domain.vo.PrerequisiteTreeVO;
 import com.wisdomhub.knowledge.domain.vo.TagDetailVO;
 import com.wisdomhub.knowledge.domain.vo.TagRelationsVO;
 import com.wisdomhub.knowledge.service.GraphQueryService;
+import com.wisdomhub.knowledge.service.GraphVisualizationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.NotNull;
@@ -24,6 +26,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class KnowledgeController {
 
     private final GraphQueryService graphQueryService;
+    private final GraphVisualizationService graphVisualizationService;
 
     @Operation(summary = "技术详情（节点属性 + 相关技术）")
     @GetMapping("/tag/{tagId}")
@@ -42,5 +45,19 @@ public class KnowledgeController {
     public R<PrerequisiteTreeVO> prerequisites(@NotNull @PathVariable String tagId,
                                                @RequestParam(defaultValue = "5") Integer maxDepth) {
         return R.success(graphQueryService.prerequisites(tagId, maxDepth));
+    }
+
+    @Operation(summary = "图谱可视化数据（总览：整张技术图，不含文章）")
+    @GetMapping("/graph")
+    public R<GraphVO> graph() {
+        return R.success(graphVisualizationService.overview());
+    }
+
+    @Operation(summary = "图谱可视化数据（邻域：中心 + N 跳技术 + 讲它的文章）")
+    @GetMapping("/graph/tag/{tagId}")
+    public R<GraphVO> graphNeighborhood(@NotNull @PathVariable String tagId,
+                                        @RequestParam(defaultValue = "1") Integer depth,
+                                        @RequestParam(defaultValue = "20") Integer articleLimit) {
+        return R.success(graphVisualizationService.neighborhood(tagId, depth, articleLimit));
     }
 }
