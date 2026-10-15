@@ -32,6 +32,10 @@ build/
 ### VS Code ###
 .vscode/
 
+### Python 字节码###
+__pycache__/
+*.pyc
+
 ### Other ###
 .claude/
 .env
