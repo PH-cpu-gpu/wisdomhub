@@ -6,6 +6,9 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.wisdomhub.common.core.exception.BusinessException;
 import com.wisdomhub.common.core.result.CommonErrorCode;
 import com.wisdomhub.common.core.result.PageResponse;
+import com.wisdomhub.common.mq.event.CommentCreatedEvent;
+import com.wisdomhub.common.mq.event.payload.CommentCreatedPayload;
+import com.wisdomhub.common.mq.util.EventPublisher;
 import com.wisdomhub.common.web.util.CurrentUserUtil;
 import com.wisdomhub.common.web.util.OwnerUtil;
 import com.wisdomhub.common.web.util.PageUtil;
@@ -46,6 +49,7 @@ public class CommentServiceImpl implements CommentService {
     private final CommentMapper commentMapper;
     private final ArticleMapper articleMapper;
     private final AnswerMapper answerMapper;
+    private final EventPublisher eventPublisher;
 
     // ==================== 发表 ====================
 
@@ -55,8 +59,8 @@ public class CommentServiceImpl implements CommentService {
         Long userId = CurrentUserUtil.id();
         int targetType = resolveTargetType(dto.getTargetType());
         Long targetId = dto.getTargetId();
-        // 写时要校验目标（文章 / 回答）
-        assertCommentable(targetType, targetId);
+        // 写时要校验目标（文章 / 回答），顺带取目标的作者作为通知接收者
+        Long receiverId = assertCommentable(targetType, targetId);
         Long parentId = normalizeParentId(dto.getParentId(), targetType, targetId);
 
         Comment comment = Comment.builder()
@@ -73,6 +77,7 @@ public class CommentServiceImpl implements CommentService {
             // 上面校验过之后被并发删除/下架：抛出去回滚评论插入，不让评论挂在不可见目标上
             throw new BusinessException(CommonErrorCode.NOT_FOUND, targetNotFoundMessage(targetType));
         }
+        sendCommentCreatedEvent(comment.getId(), targetType, targetId, userId, receiverId);
         return comment.getId();
     }
 
@@ -171,15 +176,15 @@ public class CommentServiceImpl implements CommentService {
     }
 
     /**
-     * 评论目标必须存在且可见：文章要已发布未删，回答要未删。
+     * 评论目标必须存在且可见：文章要已发布未删，回答要未删。返回目标作者 ID。
      */
-    private void assertCommentable(int targetType, Long targetId) {
+    private Long assertCommentable(int targetType, Long targetId) {
         if (targetType == CommentConstants.TARGET_TYPE_ANSWER) {
             Answer answer = answerMapper.selectById(targetId);
             if (answer == null || answer.getDeleted() == QuestionConstants.DELETED.byteValue()) {
                 throw new BusinessException(CommonErrorCode.NOT_FOUND, "回答不存在");
             }
-            return;
+            return answer.getUserId();
         }
         Article article = articleMapper.selectById(targetId);
         if (article == null
@@ -187,6 +192,7 @@ public class CommentServiceImpl implements CommentService {
                 || article.getState() != ArticleConstants.PUBLISH.byteValue()) {
             throw new BusinessException(CommonErrorCode.NOT_FOUND, "文章不存在");
         }
+        return article.getAuthorId();
     }
 
     /**
@@ -213,6 +219,21 @@ public class CommentServiceImpl implements CommentService {
             wrapper.ge(Article::getCommentCount, -delta);
         }
         return articleMapper.update(null, wrapper);
+    }
+
+    /** 发失败只记日志：写已生效，抛出去会变成「接口 500 但评论其实发成功了」 */
+    private void sendCommentCreatedEvent(Long commentId, int targetType, Long targetId, Long userId, Long receiverId) {
+        try {
+            eventPublisher.send(new CommentCreatedEvent(CommentCreatedPayload.builder()
+                    .commentId(commentId)
+                    .targetType(targetType)
+                    .targetId(targetId)
+                    .userId(userId)
+                    .receiverId(receiverId)
+                    .build()));
+        } catch (Exception e) {
+            log.error("评论发表事件发送失败, commentId={}, targetType={}, targetId={}", commentId, targetType, targetId, e);
+        }
     }
 
     private String targetNotFoundMessage(int targetType) {

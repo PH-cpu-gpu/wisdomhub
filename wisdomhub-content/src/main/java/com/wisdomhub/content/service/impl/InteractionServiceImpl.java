@@ -5,6 +5,9 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.toolkit.support.SFunction;
 import com.wisdomhub.common.core.exception.BusinessException;
 import com.wisdomhub.common.core.result.CommonErrorCode;
+import com.wisdomhub.common.mq.event.ArticleLikedEvent;
+import com.wisdomhub.common.mq.event.payload.ArticleLikedPayload;
+import com.wisdomhub.common.mq.util.EventPublisher;
 import com.wisdomhub.common.redis.constants.RedisTtl;
 import com.wisdomhub.common.web.util.CurrentUserUtil;
 import com.wisdomhub.content.constants.ArticleConstants;
@@ -35,6 +38,7 @@ public class InteractionServiceImpl implements InteractionService {
     private final ArticleLikeMapper articleLikeMapper;
     private final ArticleFavoriteMapper articleFavoriteMapper;
     private final StringRedisTemplate stringRedisTemplate;
+    private final EventPublisher eventPublisher;
 
     // ==================== 点赞 ====================
 
@@ -58,6 +62,7 @@ public class InteractionServiceImpl implements InteractionService {
             clearGate(gateKey);
             throw new BusinessException(CommonErrorCode.NOT_FOUND, "文章不存在");
         }
+        sendLikeEvent(articleId, userId, article.getAuthorId());
         return readCount(articleId, Article::getLikeCount);
     }
 
@@ -168,6 +173,19 @@ public class InteractionServiceImpl implements InteractionService {
             wrapper.ge(counter, 1);
         }
         return articleMapper.update(null, wrapper);
+    }
+
+    /** 发失败只记日志：写已生效，抛出去会变成「接口 500 但点赞其实成功了」 */
+    private void sendLikeEvent(Long articleId, Long userId, Long authorId) {
+        try {
+            eventPublisher.send(new ArticleLikedEvent(ArticleLikedPayload.builder()
+                    .articleId(articleId)
+                    .userId(userId)
+                    .authorId(authorId)
+                    .build()));
+        } catch (Exception e) {
+            log.error("文章点赞事件发送失败, articleId={}, userId={}", articleId, userId, e);
+        }
     }
 
     /** 成功路径读回最新计数。计数列都是 NOT NULL DEFAULT 0，判空只防「事务内被并发硬删」这种不该发生的情况 */

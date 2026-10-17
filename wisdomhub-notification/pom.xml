@@ -12,7 +12,7 @@
 
     <artifactId>wisdomhub-notification</artifactId>
     <name>wisdomhub-notification</name>
-    <description>站内通知：落库、未读数、实时推送（技术文档 5.7）</description>
+    <description>站内通知：落库、未读数、实时推送</description>
 
     <dependencies>
         <dependency>
@@ -60,6 +60,15 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-websocket</artifactId>
+        </dependency>
+        <!-- STOMP broker relay 的默认 TCP 客户端，servlet 栈不会自带 Reactor Netty -->
+        <dependency>
+            <groupId>io.projectreactor.netty</groupId>
+            <artifactId>reactor-netty-http</artifactId>
         </dependency>
 
         <!-- 通知需持久化与已读状态（技术文档 5.7） -->

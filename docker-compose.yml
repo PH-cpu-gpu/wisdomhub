@@ -151,6 +151,8 @@ services:
   rabbitmq:
     image: rabbitmq:4.1.8-management
     container_name: wisdomhub-rabbitmq
+    # 固定 hostname = 固定 RabbitMQ 节点名，否则容器一重建就换 mnesia 目录，持久化形同虚设
+    hostname: wisdomhub-rabbitmq
     restart: unless-stopped
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
@@ -159,8 +161,10 @@ services:
     ports:
       - "5672:5672"     # AMQP
       - "15672:15672"   # 管理台
+      - "61613:61613"   # STOMP，供 notification-service 的 broker relay 使用
     volumes:
       - rabbitmq-data:/var/lib/rabbitmq
+      - ./docker/rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 15s

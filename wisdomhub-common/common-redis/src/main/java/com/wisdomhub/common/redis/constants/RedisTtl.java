@@ -32,6 +32,9 @@ public final class RedisTtl {
     /** 搜索热词的按日 zset：比最长查询窗口多留一天，7 天榜不会因为某天 key 先过期而缺角 */
     public static final Duration SEARCH_HOT = Duration.ofDays(8);
 
+    /** 通知未读数：派生数据，短 TTL 兜住「重建 vs 写入」的竞态窗口 */
+    public static final Duration NOTIFICATION_UNREAD = Duration.ofMinutes(5);
+
     /** Spring Cache 的默认存活时间，单个 cacheName 可另行覆盖 */
     public static final Duration CACHE_DEFAULT = Duration.ofMinutes(30);
 
