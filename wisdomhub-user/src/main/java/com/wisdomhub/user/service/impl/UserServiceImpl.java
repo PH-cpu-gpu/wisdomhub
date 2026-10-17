@@ -15,8 +15,10 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.wisdomhub.common.core.exception.BusinessException;
 import com.wisdomhub.common.core.result.CommonErrorCode;
 import com.wisdomhub.common.core.result.PageResponse;
+import com.wisdomhub.common.mq.event.UserFollowedEvent;
 import com.wisdomhub.common.mq.event.UserUpdatedEvent;
 import com.wisdomhub.common.mq.event.payload.UserEventPayload;
+import com.wisdomhub.common.mq.event.payload.UserFollowedPayload;
 import com.wisdomhub.common.mq.util.EventPublisher;
 import com.wisdomhub.common.web.util.PageUtil;
 import com.wisdomhub.common.redis.constants.RedisSharedConstants;
@@ -397,6 +399,19 @@ public class UserServiceImpl implements UserService {
         }
         stringRedisTemplate.opsForValue().increment(followKey);
         stringRedisTemplate.opsForValue().increment(fansKey);
+        sendFollowedEvent(followerId, followeeId);
+    }
+
+    /** 发失败只记日志：写已生效，抛出去会变成「接口 500 但关注其实成功了」 */
+    private void sendFollowedEvent(Long followerId, Long followeeId) {
+        try {
+            eventPublisher.send(new UserFollowedEvent(UserFollowedPayload.builder()
+                    .followerId(followerId)
+                    .followeeId(followeeId)
+                    .build()));
+        } catch (Exception e) {
+            log.error("关注事件发送失败, followerId={}, followeeId={}", followerId, followeeId, e);
+        }
     }
 
     /**

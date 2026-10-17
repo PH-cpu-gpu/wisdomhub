@@ -6,6 +6,11 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.wisdomhub.common.core.exception.BusinessException;
 import com.wisdomhub.common.core.result.CommonErrorCode;
 import com.wisdomhub.common.core.result.PageResponse;
+import com.wisdomhub.common.mq.event.AnswerCreatedEvent;
+import com.wisdomhub.common.mq.event.AnswerLikedEvent;
+import com.wisdomhub.common.mq.event.payload.AnswerCreatedPayload;
+import com.wisdomhub.common.mq.event.payload.AnswerLikedPayload;
+import com.wisdomhub.common.mq.util.EventPublisher;
 import com.wisdomhub.common.redis.constants.RedisTtl;
 import com.wisdomhub.common.web.util.CurrentUserUtil;
 import com.wisdomhub.common.web.util.OwnerUtil;
@@ -48,6 +53,7 @@ public class AnswerServiceImpl implements AnswerService {
     private final CommentMapper commentMapper;
     private final QuestionMapper questionMapper;
     private final StringRedisTemplate stringRedisTemplate;
+    private final EventPublisher eventPublisher;
 
     // ==================== 读 ====================
 
@@ -68,7 +74,7 @@ public class AnswerServiceImpl implements AnswerService {
     @Transactional
     public Long createAnswer(Long questionId, AnswerCreateDTO dto) {
         Long userId = CurrentUserUtil.id();
-        requireVisibleQuestion(questionId);
+        Question question = requireVisibleQuestion(questionId);
         Answer answer = Answer.builder()
                 .questionId(questionId)
                 .userId(userId)
@@ -82,6 +88,7 @@ public class AnswerServiceImpl implements AnswerService {
             // 校验之后问题被并发删除：抛出去回滚这次插入
             throw new BusinessException(CommonErrorCode.NOT_FOUND, "问题不存在");
         }
+        sendAnswerCreatedEvent(answer.getId(), questionId, userId, question.getUserId());
         return answer.getId();
     }
 
@@ -109,6 +116,7 @@ public class AnswerServiceImpl implements AnswerService {
             clearGate(gateKey);
             throw new BusinessException(CommonErrorCode.NOT_FOUND, "回答不存在");
         }
+        sendAnswerLikedEvent(answerId, userId, answer.getUserId());
         return readLikeCount(answerId);
     }
 
@@ -168,6 +176,35 @@ public class AnswerServiceImpl implements AnswerService {
                 .eq(Comment::getTargetType, CommentConstants.TARGET_TYPE_ANSWER.byteValue())
                 .eq(Comment::getTargetId, answerId)
                 .eq(Comment::getDeleted, CommentConstants.NOT_DELETED));
+    }
+
+    // ==================== 事件 ====================
+
+    /** 发失败只记日志：写已生效，抛出去会变成「接口 500 但回答其实发成功了」 */
+    private void sendAnswerCreatedEvent(Long answerId, Long questionId, Long userId, Long questionAuthorId) {
+        try {
+            eventPublisher.send(new AnswerCreatedEvent(AnswerCreatedPayload.builder()
+                    .answerId(answerId)
+                    .questionId(questionId)
+                    .userId(userId)
+                    .questionAuthorId(questionAuthorId)
+                    .build()));
+        } catch (Exception e) {
+            log.error("回答发表事件发送失败, answerId={}, questionId={}", answerId, questionId, e);
+        }
+    }
+
+    /** 发失败只记日志：写已生效，抛出去会变成「接口 500 但点赞其实成功了」 */
+    private void sendAnswerLikedEvent(Long answerId, Long userId, Long authorId) {
+        try {
+            eventPublisher.send(new AnswerLikedEvent(AnswerLikedPayload.builder()
+                    .answerId(answerId)
+                    .userId(userId)
+                    .authorId(authorId)
+                    .build()));
+        } catch (Exception e) {
+            log.error("回答点赞事件发送失败, answerId={}, userId={}", answerId, userId, e);
+        }
     }
 
     // ==================== 共用 ====================
