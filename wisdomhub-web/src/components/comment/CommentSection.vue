@@ -13,7 +13,8 @@ import {
   type CommentItem,
 } from '@/api/comment'
 import { ApiError } from '@/api/http'
-import { loadUserNames, userName } from '@/composables/useUserNames'
+import UserAvatar from '@/components/UserAvatar.vue'
+import { loadUserNames, userAvatar, userName } from '@/composables/useUserNames'
 import { useUserStore } from '@/stores/user'
 import { formatDateTime, formatRelativeTime } from '@/utils/format'
 
@@ -178,6 +179,7 @@ onMounted(() => void load())
         class="cmt__input"
         rows="3"
         maxlength="1000"
+        aria-label="评论内容"
         placeholder="说点什么……（游客请先登录）"
       />
       <div class="cmt__composer-foot">
@@ -188,13 +190,18 @@ onMounted(() => void load())
       </div>
     </div>
 
-    <el-skeleton v-if="loading && items.length === 0" :rows="4" animated />
+    <div v-if="loading && items.length === 0" class="cmt__loading" role="status" aria-live="polite">
+      <el-skeleton :rows="4" animated />
+    </div>
 
-    <el-empty v-else-if="items.length === 0" description="还没有评论" />
+    <el-empty v-else-if="items.length === 0" description="还没有评论" :image-size="72" />
 
     <ul v-else class="cmt__list">
       <li v-for="root in items" :key="root.commentId" class="cmt__item">
         <div class="cmt__meta">
+          <span aria-hidden="true">
+            <UserAvatar :src="userAvatar(root.userId)" :name="userName(root.userId)" :size="20" />
+          </span>
           <RouterLink class="cmt__author" :to="`/user/${root.userId}`">{{ userName(root.userId) }}</RouterLink>
           <span :title="formatDateTime(root.createTime)">{{ formatRelativeTime(root.createTime) }}</span>
         </div>
@@ -211,6 +218,9 @@ onMounted(() => void load())
         <ul v-if="root.replies?.length" class="cmt__replies">
           <li v-for="reply in root.replies" :key="reply.commentId" class="cmt__reply">
             <div class="cmt__meta">
+              <span aria-hidden="true">
+                <UserAvatar :src="userAvatar(reply.userId)" :name="userName(reply.userId)" :size="20" />
+              </span>
               <RouterLink class="cmt__author" :to="`/user/${reply.userId}`">
                 {{ userName(reply.userId) }}
               </RouterLink>
@@ -233,7 +243,14 @@ onMounted(() => void load())
 
         <!-- 回复框：跟着被回复的那条走 -->
         <div v-if="replyTo === root.commentId" class="cmt__reply-box">
-          <textarea v-model="replyContent" class="cmt__input" rows="2" maxlength="1000" placeholder="回复……" />
+          <textarea
+            v-model="replyContent"
+            class="cmt__input"
+            rows="2"
+            maxlength="1000"
+            aria-label="回复内容"
+            placeholder="回复……"
+          />
           <div class="cmt__composer-foot">
             <el-button size="small" @click="cancelReply">取消</el-button>
             <el-button
@@ -286,7 +303,7 @@ onMounted(() => void load())
   display: flex;
   flex-direction: column;
   gap: var(--wh-space-2);
-  margin: var(--wh-space-4) 0 var(--wh-space-6);
+  margin: var(--wh-space-5) 0 var(--wh-space-7);
 }
 
 .cmt__input {
@@ -294,18 +311,28 @@ onMounted(() => void load())
   padding: var(--wh-space-3);
 
   font-family: inherit;
-  font-size: var(--wh-text-sm);
+  font-size: var(--wh-text-base);
   line-height: var(--wh-leading-normal);
   color: var(--wh-text-1);
+  caret-color: var(--wh-accent);
   background-color: var(--wh-bg-surface);
   border: var(--wh-border-width) solid var(--wh-border);
   border-radius: var(--wh-radius-md);
   outline: none;
   resize: vertical;
+
+  transition:
+    border-color var(--wh-duration-fast) var(--wh-ease),
+    box-shadow var(--wh-duration-fast) var(--wh-ease);
+}
+
+.cmt__input::placeholder {
+  color: var(--wh-text-2);
 }
 
 .cmt__input:focus {
   border-color: var(--wh-accent);
+  box-shadow: 0 0 0 3px var(--wh-accent-soft);
 }
 
 .cmt__composer-foot {
@@ -321,10 +348,14 @@ onMounted(() => void load())
   color: var(--wh-text-3);
 }
 
+.cmt__loading {
+  padding-block: var(--wh-space-2);
+}
+
 .cmt__list {
   display: flex;
   flex-direction: column;
-  gap: var(--wh-space-5);
+  gap: var(--wh-space-6);
   list-style: none;
 }
 
@@ -343,7 +374,7 @@ onMounted(() => void load())
   padding-left: var(--wh-space-4);
 
   list-style: none;
-  border-left: 2px solid var(--wh-border);
+  border-left: var(--wh-border-width) solid var(--wh-border);
 }
 
 .cmt__replies .cmt__reply:last-child {
@@ -353,15 +384,19 @@ onMounted(() => void load())
 
 .cmt__meta {
   display: flex;
-  gap: var(--wh-space-3);
+  gap: var(--wh-space-2);
   align-items: center;
 
-  font-size: var(--wh-text-xs);
+  font-size: var(--wh-text-sm);
   color: var(--wh-text-3);
+
+  --wh-avatar-bg: var(--wh-bg-raised);
+  --wh-avatar-text: var(--wh-text-2);
 }
 
 .cmt__author {
   color: var(--wh-text-2);
+  font-weight: var(--wh-weight-medium);
   text-decoration: none;
 }
 
@@ -372,10 +407,11 @@ onMounted(() => void load())
 .cmt__body {
   margin-top: var(--wh-space-2);
 
-  font-size: var(--wh-text-sm);
+  font-size: var(--wh-text-base);
   line-height: var(--wh-leading-relaxed);
   color: var(--wh-text-1);
   white-space: pre-wrap;
+  overflow-wrap: break-word;
 }
 
 .cmt__ops {
@@ -387,7 +423,7 @@ onMounted(() => void load())
 .cmt__op {
   padding: 0;
 
-  font-size: var(--wh-text-xs);
+  font-size: var(--wh-text-sm);
   color: var(--wh-text-3);
   background: none;
   border: none;

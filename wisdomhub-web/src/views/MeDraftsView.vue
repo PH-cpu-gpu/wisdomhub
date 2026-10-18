@@ -75,8 +75,10 @@ onMounted(() => void load())
 <template>
   <div class="drafts">
     <header class="drafts__head">
-      <h1 class="drafts__title">草稿箱</h1>
-      <span class="drafts__sub">编辑时自动保存的草稿，点标题继续编辑</span>
+      <div>
+        <h1 class="drafts__title">草稿箱</h1>
+        <p class="drafts__sub">编辑时自动保存的草稿，点标题继续编辑</p>
+      </div>
       <el-button class="drafts__new" type="primary" size="small" @click="router.push('/editor')">
         新建草稿
       </el-button>
@@ -130,27 +132,30 @@ onMounted(() => void load())
 
 <style scoped>
 .drafts {
-  padding-block: var(--wh-space-4);
+  padding-block: var(--wh-space-5) var(--wh-space-8);
 }
 
-/* 标题 + 说明 + 新建按钮一行，底下一条分隔线 */
+/* 标题 + 说明 + 新建按钮，底下一条分隔线 */
 .drafts__head {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--wh-space-3);
-  align-items: center;
+  gap: var(--wh-space-4) var(--wh-space-6);
+  align-items: flex-end;
 
-  padding-bottom: var(--wh-space-3);
+  padding-bottom: var(--wh-space-5);
   border-bottom: var(--wh-border-width) solid var(--wh-border-strong);
 }
 
 .drafts__title {
-  font-size: var(--wh-text-xl);
+  font-size: var(--wh-text-page);
 }
 
 .drafts__sub {
-  font-size: var(--wh-text-sm);
-  color: var(--wh-text-3);
+  max-width: 36rem;
+  margin-top: var(--wh-space-2);
+
+  font-size: var(--wh-text-base);
+  color: var(--wh-text-2);
 }
 
 .drafts__new {

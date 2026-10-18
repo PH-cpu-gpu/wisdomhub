@@ -40,7 +40,7 @@ const router = useRouter()
 }
 
 .not-found__title {
-  font-size: var(--wh-text-xl);
+  font-size: var(--wh-text-page);
 }
 
 .not-found__hint {

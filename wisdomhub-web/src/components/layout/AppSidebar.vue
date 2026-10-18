@@ -2,7 +2,7 @@
 import { EditPen } from '@element-plus/icons-vue'
 import { RouterLink, useRoute } from 'vue-router'
 
-import { accountNav } from '@/config/navigation'
+import { accountNav, exploreNav } from '@/config/navigation'
 import { useUserStore } from '@/stores/user'
 
 /**
@@ -29,6 +29,23 @@ function isActive(to: string): boolean {
       <el-icon><EditPen /></el-icon>
       写文章
     </RouterLink>
+
+    <!-- 探索：未登录时也保留，让侧边栏不是只剩一个按钮 -->
+    <section class="side__group">
+      <h2 class="side__title">探索</h2>
+      <ul class="side__list">
+        <li v-for="item in exploreNav" :key="item.to">
+          <RouterLink
+            class="side__link"
+            :class="{ 'is-active': isActive(item.to) }"
+            :to="item.to"
+          >
+            <el-icon><component :is="item.icon" /></el-icon>
+            {{ item.label }}
+          </RouterLink>
+        </li>
+      </ul>
+    </section>
 
     <!-- 我的：未登录时整组不出现，而不是显示一堆点了就跳登录的入口 -->
     <section v-if="user.isLoggedIn" class="side__group">
@@ -70,17 +87,23 @@ function isActive(to: string): boolean {
   padding: var(--wh-space-3) var(--wh-space-4);
 
   font-weight: var(--wh-weight-medium);
-  color: var(--wh-text-on-fill);
-  background-color: var(--wh-accent);
+  color: var(--wh-action-text);
+  background-color: var(--wh-action-fill);
+  border: var(--wh-border-width) solid var(--wh-action-border);
   border-radius: var(--wh-radius-md);
+  box-shadow: var(--wh-action-highlight);
   text-decoration: none;
 
-  transition: background-color var(--wh-duration-fast) var(--wh-ease);
+  transition:
+    color var(--wh-duration-fast) var(--wh-ease),
+    background-color var(--wh-duration-fast) var(--wh-ease),
+    border-color var(--wh-duration-fast) var(--wh-ease);
 }
 
 .side__cta:hover {
-  color: var(--wh-text-on-fill);
-  background-color: var(--wh-accent-hover);
+  color: var(--wh-action-text);
+  background-color: var(--wh-action-fill-hover);
+  border-color: var(--wh-action-border-hover);
   text-decoration: none;
 }
 

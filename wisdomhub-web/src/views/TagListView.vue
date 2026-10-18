@@ -48,42 +48,52 @@ onMounted(() => void load())
 <template>
   <div class="tags">
     <header class="tags__head">
-      <h1 class="tags__title">标签</h1>
-      <span class="tags__eyebrow wh-mono">技术主题</span>
+      <div>
+        <h1 class="tags__title">标签</h1>
+        <p class="tags__lead">按技术主题浏览文章，或从图谱里看它们之间的关系。</p>
+      </div>
+      <span v-if="!loading" class="tags__total wh-mono">{{ tags.length }} 个标签</span>
     </header>
 
-    <el-skeleton v-if="loading" :rows="6" animated />
+    <div v-if="loading" class="tags__skeleton" role="status" aria-live="polite">
+      <el-skeleton :rows="6" animated />
+    </div>
 
     <template v-else>
-      <section v-if="hotTags.length" class="tags__section">
-        <h2 class="tags__section-title">热门</h2>
+      <section v-if="hotTags.length" class="tags__hot-section">
+        <h2 class="tags__hot-title">热门</h2>
         <ul class="tags__hot">
           <li v-for="tag in hotTags" :key="tag.tagId">
-            <RouterLink class="tags__hot-item" :to="{ name: 'tag-detail', params: { name: tag.name } }">
-              <span class="tags__hot-name">{{ tag.name }}</span>
+            <RouterLink
+              class="tags__hot-link"
+              :to="{ name: 'tag-detail', params: { name: tag.name } }"
+            >
+              <span class="tags__hash" aria-hidden="true">#</span>{{ tag.name }}
               <span class="tags__hot-count wh-mono">{{ tag.articleCount }}</span>
             </RouterLink>
           </li>
         </ul>
       </section>
 
-      <section v-for="group in groups" :key="group.category" class="tags__section">
-        <h2 class="tags__section-title">
-          {{ group.category }}
-          <span class="tags__count wh-mono">{{ group.tags.length }}</span>
-        </h2>
-        <ul class="tags__cloud">
-          <li v-for="tag in group.tags" :key="tag.tagId">
-            <RouterLink
-              class="tags__chip"
-              :to="{ name: 'tag-detail', params: { name: tag.name } }"
-              :title="tag.description"
-            >
-              {{ tag.name }}
-            </RouterLink>
-          </li>
-        </ul>
-      </section>
+      <div class="tags__groups">
+        <section v-for="group in groups" :key="group.category" class="tags__group">
+          <h2 class="tags__group-title">
+            {{ group.category }}
+            <span class="tags__count wh-mono">{{ group.tags.length }}</span>
+          </h2>
+          <ul class="tags__cloud">
+            <li v-for="tag in group.tags" :key="tag.tagId">
+              <RouterLink
+                class="tags__link"
+                :to="{ name: 'tag-detail', params: { name: tag.name } }"
+                :title="tag.description"
+              >
+                <span class="tags__hash" aria-hidden="true">#</span>{{ tag.name }}
+              </RouterLink>
+            </li>
+          </ul>
+        </section>
+      </div>
     </template>
   </div>
 </template>
@@ -91,109 +101,179 @@ onMounted(() => void load())
 <style scoped>
 .tags {
   max-width: var(--wh-container);
-  padding-block: var(--wh-space-4);
+  padding-block: var(--wh-space-5) var(--wh-space-8);
 }
 
-/* 标题与副标签一行，底下一条分隔线 */
 .tags__head {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--wh-space-3);
-  align-items: center;
+  gap: var(--wh-space-3) var(--wh-space-6);
+  align-items: flex-end;
+  justify-content: space-between;
 
-  padding-bottom: var(--wh-space-3);
+  padding-bottom: var(--wh-space-5);
   border-bottom: var(--wh-border-width) solid var(--wh-border-strong);
 }
 
-.tags__eyebrow {
-  font-size: var(--wh-text-xs);
-  letter-spacing: var(--wh-tracking-wide);
-  color: var(--wh-accent);
-}
-
 .tags__title {
-  font-size: var(--wh-text-xl);
+  font-size: var(--wh-text-page);
 }
 
-.tags__section {
-  margin-top: var(--wh-space-5);
+.tags__lead {
+  max-width: 36rem;
+  margin-top: var(--wh-space-2);
+
+  font-size: var(--wh-text-base);
+  line-height: var(--wh-leading-normal);
+  color: var(--wh-text-2);
 }
 
-.tags__section-title {
+.tags__total {
+  padding-bottom: 2px;
+  font-size: var(--wh-text-sm);
+  color: var(--wh-text-3);
+}
+
+.tags__skeleton {
+  padding-top: var(--wh-space-6);
+}
+
+/* ---------- 热门 ---------- */
+.tags__hot-section {
   display: flex;
-  gap: var(--wh-space-2);
+  flex-wrap: wrap;
+  gap: var(--wh-space-3) var(--wh-space-6);
   align-items: baseline;
 
-  padding-bottom: var(--wh-space-2);
-
-  font-size: var(--wh-text-lg);
-  border-bottom: var(--wh-border-width) solid var(--wh-border);
+  padding-block: var(--wh-space-5);
 }
 
-/* 分组标题右侧的条数，压到与「热门」那栏的数字同一档 */
-.tags__count {
-  font-size: var(--wh-text-xs);
+.tags__hot-title {
+  flex: none;
+
+  font-size: var(--wh-text-sm);
+  font-weight: var(--wh-weight-medium);
+  letter-spacing: var(--wh-tracking-wide);
   color: var(--wh-text-3);
 }
 
 .tags__hot {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--wh-space-3);
+  gap: var(--wh-space-2) var(--wh-space-5);
 
-  margin-top: var(--wh-space-4);
+  margin: 0;
+  padding: 0;
   list-style: none;
 }
 
-/* 热门项带条数，用等宽字体让数字对齐 */
-.tags__hot-item {
+.tags__hot-link {
   display: inline-flex;
-  gap: var(--wh-space-2);
+  gap: 4px;
   align-items: baseline;
 
-  padding: var(--wh-space-2) var(--wh-space-3);
-
+  font-size: var(--wh-text-base);
+  font-weight: var(--wh-weight-medium);
   color: var(--wh-text-1);
   text-decoration: none;
-  background-color: var(--wh-bg-raised);
-  border-radius: var(--wh-radius-sm);
 }
 
-.tags__hot-item:hover {
+.tags__hot-link:hover {
+  color: var(--wh-accent);
+  text-decoration: none;
+}
+
+.tags__hash {
+  font-family: var(--wh-font-mono);
+  font-size: 0.85em;
+  color: var(--wh-text-3);
+}
+
+.tags__hot-link:hover .tags__hash {
   color: var(--wh-accent);
 }
 
 .tags__hot-count {
   font-size: var(--wh-text-xs);
+  font-weight: var(--wh-weight-regular);
+  color: var(--wh-text-3);
+}
+
+/* ---------- 分组目录 ---------- */
+.tags__groups {
+  border-top: var(--wh-border-width) solid var(--wh-border);
+}
+
+.tags__group {
+  display: grid;
+  grid-template-columns: 11rem minmax(0, 1fr);
+  gap: var(--wh-space-6);
+  align-items: start;
+
+  padding-block: var(--wh-space-5);
+}
+
+.tags__group + .tags__group {
+  border-top: var(--wh-border-width) solid var(--wh-border);
+}
+
+.tags__group-title {
+  font-size: var(--wh-text-sm);
+  font-weight: var(--wh-weight-medium);
+  letter-spacing: var(--wh-tracking-wide);
+  color: var(--wh-text-3);
+}
+
+.tags__count {
+  display: block;
+  margin-top: var(--wh-space-1);
+
+  font-size: var(--wh-text-xs);
+  font-weight: var(--wh-weight-regular);
+  letter-spacing: normal;
   color: var(--wh-text-3);
 }
 
 .tags__cloud {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--wh-space-2);
+  gap: var(--wh-space-2) var(--wh-space-5);
 
-  margin-top: var(--wh-space-4);
+  margin: 0;
+  padding: 0;
   list-style: none;
 }
 
-.tags__chip {
-  display: inline-block;
-  padding: var(--wh-space-1) var(--wh-space-3);
+.tags__link {
+  display: inline-flex;
+  gap: 3px;
+  align-items: baseline;
 
-  font-size: var(--wh-text-sm);
+  font-size: var(--wh-text-base);
+  line-height: var(--wh-leading-snug);
   color: var(--wh-text-2);
   text-decoration: none;
-  border: var(--wh-border-width) solid var(--wh-border);
-  border-radius: var(--wh-radius-full);
-
-  transition:
-    color var(--wh-duration-fast) var(--wh-ease),
-    border-color var(--wh-duration-fast) var(--wh-ease);
+  transition: color var(--wh-duration-fast) var(--wh-ease);
 }
 
-.tags__chip:hover {
+.tags__link:hover {
   color: var(--wh-accent);
-  border-color: var(--wh-accent);
+  text-decoration: none;
+}
+
+.tags__link:hover .tags__hash {
+  color: var(--wh-accent);
+}
+
+@media (max-width: 700px) {
+  .tags__group {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--wh-space-3);
+  }
+
+  .tags__count {
+    display: inline;
+    margin-left: var(--wh-space-2);
+  }
 }
 </style>

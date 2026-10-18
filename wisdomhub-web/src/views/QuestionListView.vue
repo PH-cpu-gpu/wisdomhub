@@ -76,8 +76,10 @@ onMounted(() => void load())
     <!-- 标题、提问按钮、排序合成一行，省掉一整块页头 -->
     <div class="qa__toolbar">
       <div class="qa__heading">
-        <h1 class="qa__title">问答</h1>
-        <span class="qa__eyebrow wh-mono">技术问答</span>
+        <div>
+          <h1 class="qa__title">问答</h1>
+          <p class="qa__lead">提出具体问题，得到可执行的回答。</p>
+        </div>
       </div>
 
       <div class="qa__controls">
@@ -123,37 +125,40 @@ onMounted(() => void load())
 
 <style scoped>
 .qa {
-  padding-block: var(--wh-space-4);
+  padding-block: var(--wh-space-5) var(--wh-space-8);
 }
 
 /* 标题、提问按钮与排序同处一行 */
 .qa__toolbar {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--wh-space-2) var(--wh-space-4);
-  align-items: center;
+  gap: var(--wh-space-4) var(--wh-space-6);
+  align-items: flex-end;
   justify-content: space-between;
 
-  padding-bottom: var(--wh-space-3);
+  padding-bottom: var(--wh-space-5);
   border-bottom: var(--wh-border-width) solid var(--wh-border-strong);
 }
 
 .qa__heading {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--wh-space-3);
-  align-items: center;
+  gap: var(--wh-space-2);
+  align-items: flex-end;
   min-width: 0;
 }
 
-.qa__eyebrow {
-  font-size: var(--wh-text-xs);
-  letter-spacing: var(--wh-tracking-wide);
-  color: var(--wh-accent);
+.qa__title {
+  font-size: var(--wh-text-page);
 }
 
-.qa__title {
-  font-size: var(--wh-text-xl);
+.qa__lead {
+  max-width: 36rem;
+  margin-top: var(--wh-space-2);
+
+  font-size: var(--wh-text-base);
+  line-height: var(--wh-leading-normal);
+  color: var(--wh-text-2);
 }
 
 .qa__controls {

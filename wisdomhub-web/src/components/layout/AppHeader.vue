@@ -163,7 +163,7 @@ async function onUserCommand(command: string) {
 .hdr__brand {
   flex: none;
 
-  font-size: var(--wh-text-lg);
+  font-size: var(--wh-text-xl);
   font-weight: var(--wh-weight-semibold);
   letter-spacing: var(--wh-tracking-tight);
   color: var(--wh-text-1);
@@ -227,6 +227,25 @@ async function onUserCommand(command: string) {
 
 .hdr__search {
   width: 15rem;
+}
+
+/* 搜索框默认无边框、用抬升面色；聚焦时才出现主色描边 */
+.hdr__search :deep(.el-input__wrapper) {
+  background-color: var(--wh-bg-raised);
+  box-shadow: none;
+}
+
+.hdr__search :deep(.el-input__wrapper:hover) {
+  background-color: var(--wh-bg-hover);
+}
+
+.hdr__search :deep(.el-input__wrapper.is-focus) {
+  background-color: var(--wh-bg-surface);
+  box-shadow: inset 0 0 0 1px var(--wh-accent);
+}
+
+.hdr__search :deep(.el-input__inner::placeholder) {
+  color: var(--wh-text-2);
 }
 
 .hdr__icon-btn {

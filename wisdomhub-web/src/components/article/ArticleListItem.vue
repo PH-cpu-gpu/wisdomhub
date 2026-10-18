@@ -2,7 +2,8 @@
 import { RouterLink } from 'vue-router'
 
 import type { ArticleListItem } from '@/api/article'
-import { userName } from '@/composables/useUserNames'
+import { userAvatar, userName } from '@/composables/useUserNames'
+import UserAvatar from '@/components/UserAvatar.vue'
 import { formatCount, formatDateTime, formatRelativeTime } from '@/utils/format'
 
 /**
@@ -29,8 +30,15 @@ withDefaults(
 
     <p v-if="article.summary" class="item__summary">{{ article.summary }}</p>
 
-    <div class="item__meta wh-mono">
+    <div class="item__meta">
       <RouterLink v-if="!hideAuthor" class="item__author" :to="`/user/${article.authorId}`">
+        <span aria-hidden="true">
+          <UserAvatar
+            :src="userAvatar(article.authorId)"
+            :name="userName(article.authorId)"
+            :size="20"
+          />
+        </span>
         {{ userName(article.authorId) }}
       </RouterLink>
 
@@ -40,10 +48,10 @@ withDefaults(
       >{{ formatRelativeTime(article.publishTime) }}</span>
 
       <span class="item__stats">
-        <span :title="`阅读 ${article.viewCount}`">阅读 {{ formatCount(article.viewCount) }}</span>
-        <span :title="`点赞 ${article.likeCount}`">赞 {{ formatCount(article.likeCount) }}</span>
-        <span :title="`评论 ${article.commentCount}`">评 {{ formatCount(article.commentCount) }}</span>
-        <span :title="`收藏 ${article.favoriteCount}`">藏 {{ formatCount(article.favoriteCount) }}</span>
+        <span :title="`阅读 ${article.viewCount}`">阅读 <span class="wh-mono">{{ formatCount(article.viewCount) }}</span></span>
+        <span :title="`点赞 ${article.likeCount}`">赞 <span class="wh-mono">{{ formatCount(article.likeCount) }}</span></span>
+        <span :title="`评论 ${article.commentCount}`">评 <span class="wh-mono">{{ formatCount(article.commentCount) }}</span></span>
+        <span :title="`收藏 ${article.favoriteCount}`">藏 <span class="wh-mono">{{ formatCount(article.favoriteCount) }}</span></span>
       </span>
 
       <!-- 每行自己的操作（「我的收藏」里的取消收藏等）；不传就是纯展示 -->
@@ -58,6 +66,11 @@ withDefaults(
 .item {
   padding: var(--wh-space-5) 0;
   border-bottom: var(--wh-border-width) solid var(--wh-border);
+  transition: background-color var(--wh-duration-fast) var(--wh-ease);
+}
+
+.item:hover {
+  background-color: color-mix(in srgb, var(--wh-bg-surface) 55%, transparent);
 }
 
 .item:last-child {
@@ -100,13 +113,21 @@ withDefaults(
 
   margin-top: var(--wh-space-3);
 
-  font-size: var(--wh-text-xs);
+  font-size: var(--wh-text-sm);
   color: var(--wh-text-3);
 }
 
 .item__author {
+  display: inline-flex;
+  gap: var(--wh-space-2);
+  align-items: center;
+
   color: var(--wh-text-2);
+  font-weight: var(--wh-weight-medium);
   text-decoration: none;
+
+  --wh-avatar-bg: var(--wh-bg-raised);
+  --wh-avatar-text: var(--wh-text-2);
 }
 
 .item__author:hover {

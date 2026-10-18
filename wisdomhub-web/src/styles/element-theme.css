@@ -45,7 +45,7 @@ html:root:not(.dark) {
 
   /* ---- 主色（只用于动作与焦点，见 tokens.css 的说明） ---------------- */
   --el-color-primary: var(--wh-accent);
-  --el-color-primary-rgb: 4, 120, 87;
+  --el-color-primary-rgb: 15, 107, 79;
   --el-color-primary-light-3: color-mix(in srgb, var(--wh-accent) 70%, white);
   --el-color-primary-light-5: color-mix(in srgb, var(--wh-accent) 50%, white);
   --el-color-primary-light-7: color-mix(in srgb, var(--wh-accent) 30%, white);
@@ -55,7 +55,7 @@ html:root:not(.dark) {
 
   /* ---- 语义色 -------------------------------------------------------- */
   --el-color-success: var(--wh-accent);
-  --el-color-success-rgb: 4, 120, 87;
+  --el-color-success-rgb: 15, 107, 79;
   --el-color-success-light-3: color-mix(in srgb, var(--wh-accent) 70%, white);
   --el-color-success-light-5: color-mix(in srgb, var(--wh-accent) 50%, white);
   --el-color-success-light-7: color-mix(in srgb, var(--wh-accent) 30%, white);
@@ -64,7 +64,7 @@ html:root:not(.dark) {
   --el-color-success-dark-2: color-mix(in srgb, var(--wh-accent) 80%, black);
 
   --el-color-warning: var(--wh-warning);
-  --el-color-warning-rgb: 161, 98, 7;
+  --el-color-warning-rgb: 127, 92, 16;
   --el-color-warning-light-3: color-mix(in srgb, var(--wh-warning) 70%, white);
   --el-color-warning-light-5: color-mix(in srgb, var(--wh-warning) 50%, white);
   --el-color-warning-light-7: color-mix(in srgb, var(--wh-warning) 30%, white);
@@ -74,8 +74,8 @@ html:root:not(.dark) {
 
   --el-color-danger: var(--wh-danger);
   --el-color-error: var(--wh-danger);
-  --el-color-danger-rgb: 185, 28, 28;
-  --el-color-error-rgb: 185, 28, 28;
+  --el-color-danger-rgb: 168, 59, 59;
+  --el-color-error-rgb: 168, 59, 59;
   --el-color-danger-light-3: color-mix(in srgb, var(--wh-danger) 70%, white);
   --el-color-danger-light-5: color-mix(in srgb, var(--wh-danger) 50%, white);
   --el-color-danger-light-7: color-mix(in srgb, var(--wh-danger) 30%, white);
@@ -91,7 +91,7 @@ html:root:not(.dark) {
 
   /* info 用弱化文字色：它是「中性提示」，不该有自己的色相 */
   --el-color-info: var(--wh-text-3);
-  --el-color-info-rgb: 139, 149, 169;
+  --el-color-info-rgb: 95, 101, 95;
   --el-color-info-light-3: color-mix(in srgb, var(--wh-text-3) 70%, white);
   --el-color-info-light-5: color-mix(in srgb, var(--wh-text-3) 50%, white);
   --el-color-info-light-7: color-mix(in srgb, var(--wh-text-3) 30%, white);
@@ -140,7 +140,7 @@ html.dark:root {
   --el-border-radius-round: var(--wh-radius-full);
 
   --el-color-primary: var(--wh-accent);
-  --el-color-primary-rgb: 110, 231, 183;
+  --el-color-primary-rgb: 143, 214, 180;
   --el-color-primary-light-3: color-mix(in srgb, var(--wh-accent) 70%, black);
   --el-color-primary-light-5: color-mix(in srgb, var(--wh-accent) 50%, black);
   --el-color-primary-light-7: color-mix(in srgb, var(--wh-accent) 30%, black);
@@ -149,7 +149,7 @@ html.dark:root {
   --el-color-primary-dark-2: color-mix(in srgb, var(--wh-accent) 80%, white);
 
   --el-color-success: var(--wh-accent);
-  --el-color-success-rgb: 110, 231, 183;
+  --el-color-success-rgb: 143, 214, 180;
   --el-color-success-light-3: color-mix(in srgb, var(--wh-accent) 70%, black);
   --el-color-success-light-5: color-mix(in srgb, var(--wh-accent) 50%, black);
   --el-color-success-light-7: color-mix(in srgb, var(--wh-accent) 30%, black);
@@ -158,7 +158,7 @@ html.dark:root {
   --el-color-success-dark-2: color-mix(in srgb, var(--wh-accent) 80%, white);
 
   --el-color-warning: var(--wh-warning);
-  --el-color-warning-rgb: 251, 191, 36;
+  --el-color-warning-rgb: 215, 180, 106;
   --el-color-warning-light-3: color-mix(in srgb, var(--wh-warning) 70%, black);
   --el-color-warning-light-5: color-mix(in srgb, var(--wh-warning) 50%, black);
   --el-color-warning-light-7: color-mix(in srgb, var(--wh-warning) 30%, black);
@@ -168,8 +168,8 @@ html.dark:root {
 
   --el-color-danger: var(--wh-danger);
   --el-color-error: var(--wh-danger);
-  --el-color-danger-rgb: 248, 113, 113;
-  --el-color-error-rgb: 248, 113, 113;
+  --el-color-danger-rgb: 224, 133, 133;
+  --el-color-error-rgb: 224, 133, 133;
   --el-color-danger-light-3: color-mix(in srgb, var(--wh-danger) 70%, black);
   --el-color-danger-light-5: color-mix(in srgb, var(--wh-danger) 50%, black);
   --el-color-danger-light-7: color-mix(in srgb, var(--wh-danger) 30%, black);
@@ -184,7 +184,7 @@ html.dark:root {
   --el-color-error-dark-2: var(--el-color-danger-dark-2);
 
   --el-color-info: var(--wh-text-3);
-  --el-color-info-rgb: 93, 107, 132;
+  --el-color-info-rgb: 143, 140, 133;
   --el-color-info-light-3: color-mix(in srgb, var(--wh-text-3) 70%, black);
   --el-color-info-light-5: color-mix(in srgb, var(--wh-text-3) 50%, black);
   --el-color-info-light-7: color-mix(in srgb, var(--wh-text-3) 30%, black);
@@ -263,14 +263,27 @@ html .el-tag {
    也不覆盖禁用态：禁用时 EP 会把底色压暗（primary-light-5），
    白字压暗绿约 5:1，比深色字更好。 */
 html .el-button--primary:not(.is-plain):not(.is-text):not(.is-link):not(.is-dashed) {
-  --el-button-text-color: var(--wh-text-on-fill);
-  --el-button-hover-text-color: var(--wh-text-on-fill);
-  --el-button-active-text-color: var(--wh-text-on-fill);
+  --el-button-bg-color: var(--wh-action-fill);
+  --el-button-border-color: var(--wh-action-border);
+  --el-button-hover-bg-color: var(--wh-action-fill-hover);
+  --el-button-hover-border-color: var(--wh-action-border-hover);
+  --el-button-active-bg-color: var(--wh-action-fill-hover);
+  --el-button-active-border-color: var(--wh-action-border-hover);
+  --el-button-text-color: var(--wh-action-text);
+  --el-button-hover-text-color: var(--wh-action-text);
+  --el-button-active-text-color: var(--wh-action-text);
+  --el-button-disabled-bg-color: var(--wh-bg-raised);
+  --el-button-disabled-border-color: var(--wh-border);
+  --el-button-disabled-text-color: var(--wh-text-3);
+
+  box-shadow: var(--wh-action-highlight);
 }
 
-/* 选中态的按钮式单选 / 多选 */
+/* 选中态的单选 / 多选：柔和 accent 底 + 主文本色，选中感交给底色与描边 */
 html .el-radio-button {
-  --el-radio-button-checked-text-color: var(--wh-text-on-fill);
+  --el-radio-button-checked-bg-color: var(--wh-accent-soft);
+  --el-radio-button-checked-text-color: var(--wh-text-1);
+  --el-radio-button-checked-border-color: var(--wh-accent);
 }
 
 html .el-checkbox-button {
@@ -296,9 +309,30 @@ html .el-badge__content {
   color: var(--wh-text-on-fill);
 }
 
-/* 分页（background 模式）的当前页 */
+/* 单选框组：EP 用一条 -1px 的外阴影拼边框，换成内描边更干净 */
+html .el-radio-button.is-active .el-radio-button__original-radio:not(:disabled) + .el-radio-button__inner {
+  box-shadow: inset 0 0 0 1px var(--wh-accent);
+}
+
+/* 分页（background 模式）：去掉默认的块状底，当前页只留一层柔和 accent */
+html .el-pagination.is-background .el-pager li,
+html .el-pagination.is-background .btn-prev,
+html .el-pagination.is-background .btn-next {
+  background-color: transparent;
+  border-radius: var(--wh-radius-sm);
+}
+
+html .el-pagination.is-background .el-pager li:hover,
+html .el-pagination.is-background .btn-prev:hover,
+html .el-pagination.is-background .btn-next:hover {
+  background-color: var(--wh-bg-raised);
+}
+
 html .el-pagination.is-background .el-pager li.is-active,
 html .el-pagination.is-background .btn-prev.is-active,
 html .el-pagination.is-background .btn-next.is-active {
-  color: var(--wh-text-on-fill);
+  color: var(--wh-text-1);
+  background-color: var(--wh-accent-soft);
+  box-shadow: inset 0 0 0 1px var(--wh-accent);
+  font-weight: var(--wh-weight-medium);
 }

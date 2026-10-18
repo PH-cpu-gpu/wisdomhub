@@ -7,6 +7,7 @@ import 'element-plus/es/components/message-box/style/css'
 
 import { ApiError } from '@/api/http'
 import { ApiCode } from '@/api/types'
+import UserAvatar from '@/components/UserAvatar.vue'
 import {
   acceptAnswer,
   cancelAccept,
@@ -22,7 +23,7 @@ import {
   type AnswerItem,
   type QuestionDetail,
 } from '@/api/question'
-import { loadUserNames, userName } from '@/composables/useUserNames'
+import { loadUserNames, userAvatar, userName } from '@/composables/useUserNames'
 import { useUserStore } from '@/stores/user'
 import { formatDateTime, formatRelativeTime } from '@/utils/format'
 
@@ -270,18 +271,25 @@ onMounted(() => {
       <header class="qd__head">
         <h1 class="qd__title">
           {{ question.title }}
-          <span v-if="question.acceptedAnswerId" class="qd__solved wh-mono">已解决</span>
+          <span v-if="question.acceptedAnswerId" class="qd__solved">已解决</span>
         </h1>
 
-        <div class="qd__meta wh-mono">
+        <div class="qd__meta">
           <RouterLink class="qd__author" :to="`/user/${question.userId}`">
+            <span aria-hidden="true">
+              <UserAvatar
+                :src="userAvatar(question.userId)"
+                :name="userName(question.userId)"
+                :size="20"
+              />
+            </span>
             {{ userName(question.userId) }}
           </RouterLink>
           <span :title="formatDateTime(question.createTime)">
             {{ formatRelativeTime(question.createTime) }}
           </span>
-          <span>回答 {{ question.answerCount }}</span>
-          <span>收藏 {{ question.favoriteCount }}</span>
+          <span>回答 <span class="wh-mono">{{ question.answerCount }}</span></span>
+          <span>收藏 <span class="wh-mono">{{ question.favoriteCount }}</span></span>
         </div>
       </header>
 
@@ -339,7 +347,7 @@ onMounted(() => {
             class="qd__answer"
             :class="{ 'is-accepted': question.acceptedAnswerId === answer.answerId }"
           >
-            <div class="qd__answer-meta wh-mono">
+            <div class="qd__answer-meta">
               <span
                 v-if="question.acceptedAnswerId === answer.answerId"
                 class="qd__accepted-badge"
@@ -347,6 +355,13 @@ onMounted(() => {
                 已采纳
               </span>
               <RouterLink class="qd__author" :to="`/user/${answer.userId}`">
+                <span aria-hidden="true">
+                  <UserAvatar
+                    :src="userAvatar(answer.userId)"
+                    :name="userName(answer.userId)"
+                    :size="20"
+                  />
+                </span>
                 {{ userName(answer.userId) }}
               </RouterLink>
               <span :title="formatDateTime(answer.createTime)">
@@ -361,10 +376,25 @@ onMounted(() => {
                 class="qd__op"
                 :class="{ 'is-on': likedAnswers.has(answer.answerId) }"
                 type="button"
+                :aria-pressed="likedAnswers.has(answer.answerId)"
                 @click="onToggleAnswerLike(answer)"
               >
-                {{ likedAnswers.has(answer.answerId) ? '♥' : '♡' }} 赞
-                <span class="wh-mono">{{ answer.likeCount }}</span>
+                <svg class="qd__op-icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path
+                    v-if="likedAnswers.has(answer.answerId)"
+                    d="M12 21s-7.5-4.7-9.3-9.2C1.3 8.5 3.2 5.5 6.3 5.5c1.9 0 3.5 1 4.7 2.6 1.2-1.6 2.8-2.6 4.7-2.6 3.1 0 5 3 3.6 6.3C19.5 16.3 12 21 12 21Z"
+                    fill="currentColor"
+                  />
+                  <path
+                    v-else
+                    d="M12 21s-7.5-4.7-9.3-9.2C1.3 8.5 3.2 5.5 6.3 5.5c1.9 0 3.5 1 4.7 2.6 1.2-1.6 2.8-2.6 4.7-2.6 3.1 0 5 3 3.6 6.3C19.5 16.3 12 21 12 21Z"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.6"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+                赞 <span class="wh-mono">{{ answer.likeCount }}</span>
               </button>
 
               <!-- 采纳只有提问者本人能点（后端也会拦），同一个按钮按状态决定采纳还是取消 -->
@@ -400,8 +430,10 @@ onMounted(() => {
 
 <style scoped>
 .qd {
+  width: 100%;
   max-width: var(--wh-reading);
-  padding-block: var(--wh-space-6);
+  margin-inline: auto;
+  padding-block: var(--wh-space-7) var(--wh-space-9);
 }
 
 .qd__head {
@@ -415,19 +447,19 @@ onMounted(() => {
   gap: var(--wh-space-3);
   align-items: center;
 
-  font-size: var(--wh-text-2xl);
+  font-size: var(--wh-text-page);
   font-weight: var(--wh-weight-semibold);
   line-height: var(--wh-leading-snug);
 }
 
 .qd__solved,
 .qd__accepted-badge {
-  padding: 0 var(--wh-space-2);
+  padding: 1px var(--wh-space-2);
 
   font-size: var(--wh-text-xs);
   color: var(--wh-accent);
   background-color: var(--wh-accent-soft);
-  border-radius: var(--wh-radius-full);
+  border-radius: var(--wh-radius-xs);
 }
 
 .qd__meta,
@@ -439,13 +471,21 @@ onMounted(() => {
 
   margin-top: var(--wh-space-3);
 
-  font-size: var(--wh-text-xs);
+  font-size: var(--wh-text-sm);
   color: var(--wh-text-3);
 }
 
 .qd__author {
+  display: inline-flex;
+  gap: var(--wh-space-2);
+  align-items: center;
+
   color: var(--wh-text-2);
+  font-weight: var(--wh-weight-medium);
   text-decoration: none;
+
+  --wh-avatar-bg: var(--wh-bg-raised);
+  --wh-avatar-text: var(--wh-text-2);
 }
 
 .qd__author:hover {
@@ -455,8 +495,8 @@ onMounted(() => {
 .qd__content {
   margin-top: var(--wh-space-5);
 
-  font-size: var(--wh-text-base);
-  line-height: var(--wh-leading-relaxed);
+  font-size: var(--wh-text-reading);
+  line-height: var(--wh-leading-reading);
   color: var(--wh-text-1);
   white-space: pre-wrap;
 }
@@ -490,7 +530,7 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: var(--wh-space-2);
-  margin: var(--wh-space-4) 0 var(--wh-space-6);
+  margin: var(--wh-space-5) 0 var(--wh-space-7);
 }
 
 .qd__input {
@@ -498,18 +538,28 @@ onMounted(() => {
   padding: var(--wh-space-3);
 
   font-family: inherit;
-  font-size: var(--wh-text-sm);
+  font-size: var(--wh-text-base);
   line-height: var(--wh-leading-normal);
   color: var(--wh-text-1);
+  caret-color: var(--wh-accent);
   background-color: var(--wh-bg-surface);
   border: var(--wh-border-width) solid var(--wh-border);
   border-radius: var(--wh-radius-md);
   outline: none;
   resize: vertical;
+
+  transition:
+    border-color var(--wh-duration-fast) var(--wh-ease),
+    box-shadow var(--wh-duration-fast) var(--wh-ease);
+}
+
+.qd__input::placeholder {
+  color: var(--wh-text-2);
 }
 
 .qd__input:focus {
   border-color: var(--wh-accent);
+  box-shadow: 0 0 0 3px var(--wh-accent-soft);
 }
 
 .qd__composer-foot {
@@ -538,15 +588,15 @@ onMounted(() => {
 /* 被采纳的那条：左侧一条主色竖线 + 淡底，一眼能认出来 */
 .qd__answer.is-accepted {
   background-color: var(--wh-accent-soft);
-  border-left: 2px solid var(--wh-accent);
+  border-left: var(--wh-border-width) solid var(--wh-accent);
   border-radius: var(--wh-radius-sm);
 }
 
 .qd__answer-body {
   margin-top: var(--wh-space-3);
 
-  font-size: var(--wh-text-sm);
-  line-height: var(--wh-leading-relaxed);
+  font-size: var(--wh-text-reading);
+  line-height: var(--wh-leading-reading);
   color: var(--wh-text-1);
   white-space: pre-wrap;
 }
@@ -558,13 +608,23 @@ onMounted(() => {
 }
 
 .qd__op {
+  display: inline-flex;
+  gap: var(--wh-space-2);
+  align-items: center;
+
   padding: 0;
 
-  font-size: var(--wh-text-xs);
+  font-size: var(--wh-text-sm);
   color: var(--wh-text-3);
   background: none;
   border: none;
   cursor: pointer;
+}
+
+.qd__op-icon {
+  flex: none;
+  width: 14px;
+  height: 14px;
 }
 
 .qd__op:hover {
