@@ -16,11 +16,14 @@ import com.wisdomhub.content.domain.dto.ColumnCreateDTO;
 import com.wisdomhub.content.domain.entity.Article;
 import com.wisdomhub.content.domain.entity.Column;
 import com.wisdomhub.content.domain.entity.ColumnArticle;
+import com.wisdomhub.content.domain.entity.ColumnPurchase;
 import com.wisdomhub.content.domain.vo.ArticleListItemVO;
+import com.wisdomhub.content.domain.vo.ColumnTradeInfoVO;
 import com.wisdomhub.content.domain.vo.ColumnVO;
 import com.wisdomhub.content.mapper.ArticleMapper;
 import com.wisdomhub.content.mapper.ColumnArticleMapper;
 import com.wisdomhub.content.mapper.ColumnMapper;
+import com.wisdomhub.content.mapper.ColumnPurchaseMapper;
 import com.wisdomhub.content.service.ColumnService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -41,6 +44,7 @@ public class ColumnServiceImpl implements ColumnService {
 
     private final ColumnMapper columnMapper;
     private final ColumnArticleMapper columnArticleMapper;
+    private final ColumnPurchaseMapper columnPurchaseMapper;
     private final ArticleMapper articleMapper;
 
     // ==================== 读 ====================
@@ -60,6 +64,17 @@ public class ColumnServiceImpl implements ColumnService {
     @Override
     public ColumnVO getColumnDetail(Long columnId) {
         return toVO(requireVisibleColumn(columnId));
+    }
+
+    @Override
+    public ColumnTradeInfoVO getTradeInfo(Long columnId) {
+        Column column = requireVisibleColumn(columnId);
+        return ColumnTradeInfoVO.builder()
+                .columnId(column.getId())
+                .authorId(column.getUserId())
+                .title(column.getTitle())
+                .price(column.getPrice())
+                .build();
     }
 
     @Override
@@ -117,13 +132,23 @@ public class ColumnServiceImpl implements ColumnService {
     @Override
     @Transactional
     public int removeArticle(Long columnId, Long articleId) {
-        Column column = requireVisibleColumn(columnId);
+        Column column = requireVisibleColumnForUpdate(columnId);
         OwnerUtil.assertOwner(column.getUserId());
+        boolean joined = columnArticleMapper.exists(new LambdaQueryWrapper<ColumnArticle>()
+                .eq(ColumnArticle::getColumnId, columnId)
+                .eq(ColumnArticle::getArticleId, articleId));
+        if (!joined) {
+            // 本来就没归入过：幂等，不是错误
+            return column.getArticleCount();
+        }
+        if (hasPurchase(columnId)) {
+            throw new BusinessException(CommonErrorCode.CONFLICT, "专栏已有购买记录，不能移出文章");
+        }
         int deleted = columnArticleMapper.delete(new LambdaQueryWrapper<ColumnArticle>()
                 .eq(ColumnArticle::getColumnId, columnId)
                 .eq(ColumnArticle::getArticleId, articleId));
         if (deleted == 0) {
-            // 本来就没归入过：幂等，不是错误
+            // 并发移出：本次不要再减计数
             return column.getArticleCount();
         }
         bumpArticleCount(columnId, -1);
@@ -133,8 +158,11 @@ public class ColumnServiceImpl implements ColumnService {
     @Override
     @Transactional
     public void deleteColumn(Long columnId) {
-        Column column = requireVisibleColumn(columnId);
+        Column column = requireVisibleColumnForUpdate(columnId);
         OwnerUtil.assertOwner(column.getUserId());
+        if (hasPurchase(columnId)) {
+            throw new BusinessException(CommonErrorCode.CONFLICT, "专栏已有购买记录，不能删除");
+        }
 
         int affected = columnMapper.update(null, new LambdaUpdateWrapper<Column>()
                 .set(Column::getDeleted, ColumnConstants.DELETED.byteValue())
@@ -146,7 +174,7 @@ public class ColumnServiceImpl implements ColumnService {
             throw new BusinessException(CommonErrorCode.CONFLICT, "专栏状态已变化，删除未生效");
         }
         // 关系行没有软删语义，留着就是永久孤儿 → 物理删（同 B1.32 删文章的口径）。
-        // ⚠️ 不动 column_purchase：那是付款凭证，专栏下架/删除不该抹掉用户的购买记录
+        // 有购买记录的专栏已在上面拦截；column_purchase 只在退款时物理删。
         columnArticleMapper.delete(new LambdaQueryWrapper<ColumnArticle>()
                 .eq(ColumnArticle::getColumnId, columnId));
     }
@@ -161,6 +189,31 @@ public class ColumnServiceImpl implements ColumnService {
             throw new BusinessException(CommonErrorCode.NOT_FOUND, "专栏不存在");
         }
         return column;
+    }
+
+    /** 写路径取专栏行并加锁：与购买写 column_purchase 串行化 */
+    private Column requireVisibleColumnForUpdate(Long columnId) {
+        Column column = columnMapper.selectOne(new LambdaQueryWrapper<Column>()
+                .eq(Column::getId, columnId)
+                .last("FOR UPDATE"));
+        if (column == null
+                || column.getDeleted() == ColumnConstants.DELETED.byteValue()
+                || column.getState() != ColumnConstants.NORMAL.byteValue()) {
+            throw new BusinessException(CommonErrorCode.NOT_FOUND, "专栏不存在");
+        }
+        return column;
+    }
+
+    private boolean hasPurchase(Long columnId) {
+        return columnPurchaseMapper.exists(new LambdaQueryWrapper<ColumnPurchase>()
+                .eq(ColumnPurchase::getColumnId, columnId));
+    }
+
+    @Override
+    public boolean hasPurchased(Long columnId, Long userId) {
+        return columnPurchaseMapper.exists(new LambdaQueryWrapper<ColumnPurchase>()
+                .eq(ColumnPurchase::getColumnId, columnId)
+                .eq(ColumnPurchase::getUserId, userId));
     }
 
     /** 只有已发布且未删除的文章能归入专栏，同 B1.26 的 requireVisibleArticle */
