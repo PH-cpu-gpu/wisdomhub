@@ -31,6 +31,9 @@ public final class MqRoutingKeyConstants {
     public static final String ORDER_PAID = "order.paid";
     public static final String ORDER_REFUNDED = "order.refunded";
 
+    /** 用户行为（浏览 / 点赞 / 收藏 / 搜索），recommendation-service 消费 */
+    public static final String BEHAVIOR_RECORDED = "behavior.recorded";
+
     /** Agent 抽取结果，Python 侧产出、knowledge-service 消费 */
     public static final String KNOWLEDGE_EXTRACT = "knowledge.extract";
 

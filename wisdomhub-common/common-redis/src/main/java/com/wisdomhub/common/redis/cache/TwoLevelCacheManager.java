@@ -1,6 +1,7 @@
 package com.wisdomhub.common.redis.cache;
 
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.wisdomhub.common.redis.config.MultiLevelCacheProperties;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.data.redis.cache.RedisCacheManager;
@@ -15,12 +16,16 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class TwoLevelCacheManager implements CacheManager {
 
+    private static final Duration DEFAULT_CAFFEINE_TTL = Duration.ofMinutes(5);
+
     private final Map<String, Cache> caches;
     private final RedisCacheManager redisCacheManager;
+    private final MultiLevelCacheProperties cacheProperties;
 
-    public TwoLevelCacheManager(RedisCacheManager redisCacheManager) {
+    public TwoLevelCacheManager(RedisCacheManager redisCacheManager, MultiLevelCacheProperties cacheProperties) {
         this.caches = new ConcurrentHashMap<>();
         this.redisCacheManager = redisCacheManager;
+        this.cacheProperties = cacheProperties;
     }
 
     @Override
@@ -31,7 +36,7 @@ public class TwoLevelCacheManager implements CacheManager {
     private Cache createCache(String name) {
         com.github.benmanes.caffeine.cache.Cache<Object, Object> caffeineCache = Caffeine.newBuilder()
                 .maximumSize(1000)
-                .expireAfterWrite(Duration.ofMinutes(5))
+                .expireAfterWrite(cacheProperties.getCaffeineTtl().getOrDefault(name, DEFAULT_CAFFEINE_TTL))
                 .build();
         org.springframework.cache.Cache redisCache = redisCacheManager.getCache(name);
         return new TwoLevelCache(name, caffeineCache, redisCache);

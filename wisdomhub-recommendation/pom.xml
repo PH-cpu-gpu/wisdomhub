@@ -43,6 +43,12 @@
             <artifactId>common-feign</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <!-- 消费 behavior.recorded 维护兴趣画像 -->
+        <dependency>
+            <groupId>com.wisdomhub</groupId>
+            <artifactId>common-mq</artifactId>
+            <version>${project.version}</version>
+        </dependency>
 
         <dependency>
             <groupId>org.springframework.boot</groupId>

@@ -21,6 +21,7 @@ import com.wisdomhub.common.core.exception.BusinessException;
 import com.wisdomhub.common.core.result.CommonErrorCode;
 import com.wisdomhub.common.core.result.PageResponse;
 import com.wisdomhub.search.constants.SearchConstants;
+import com.wisdomhub.search.mq.BehaviorEventPublisher;
 import com.wisdomhub.search.domain.document.ArticleIndexDoc;
 import com.wisdomhub.search.domain.document.QuestionIndexDoc;
 import com.wisdomhub.search.domain.document.TagIndexDoc;
@@ -66,12 +67,15 @@ public class SearchServiceImpl implements SearchService {
 
     private final HotWordService hotWordService;
 
+    private final BehaviorEventPublisher behaviorEventPublisher;
+
     // ==================== 文章 ====================
 
     @Override
     public PageResponse<ArticleSearchVO> searchArticles(String keyword, Integer page, Integer pageSize, String sort,
                                                         Long tagId, LocalDateTime startTime, LocalDateTime endTime) {
         hotWordService.record(keyword);
+        behaviorEventPublisher.search(keyword, tagId);
         int pageNo = SearchConstants.clampPage(page);
         int size = SearchConstants.clampPageSize(pageSize);
         Query query = buildQuery(keyword, ARTICLE_FIELDS, bool -> {
@@ -209,6 +213,7 @@ public class SearchServiceImpl implements SearchService {
     @Override
     public PageResponse<TagSearchVO> searchTags(String keyword, Integer page, Integer pageSize, String sort, String category) {
         hotWordService.record(keyword);
+        behaviorEventPublisher.search(keyword, null);
         int pageNo = SearchConstants.clampPage(page);
         int size = SearchConstants.clampPageSize(pageSize);
         Query query = buildQuery(keyword, TAG_FIELDS, bool -> {
