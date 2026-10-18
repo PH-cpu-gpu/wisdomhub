@@ -15,8 +15,9 @@ import {
 import { ApiError } from '@/api/http'
 import { ApiCode } from '@/api/types'
 import CommentSection from '@/components/comment/CommentSection.vue'
+import UserAvatar from '@/components/UserAvatar.vue'
 import { highlightIn } from '@/composables/useMarkdown'
-import { loadUserNames, userName } from '@/composables/useUserNames'
+import { loadUserNames, userAvatar, userName } from '@/composables/useUserNames'
 import { useUserStore } from '@/stores/user'
 import { formatCount, formatDateTime, formatRelativeTime } from '@/utils/format'
 
@@ -201,15 +202,20 @@ onMounted(() => void load())
 
 <template>
   <div class="art">
-    <el-skeleton v-if="loading" :rows="10" animated />
+    <div v-if="loading" class="art__state" role="status" aria-live="polite">
+      <el-skeleton :rows="8" animated />
+      <span class="wh-visually-hidden">正在加载文章</span>
+    </div>
 
-    <el-empty v-else-if="notFound" description="文章不存在或已删除">
-      <el-button type="primary" @click="router.push('/')">回首页</el-button>
-    </el-empty>
+    <div v-else-if="notFound" class="art__state">
+      <el-empty description="文章不存在或已删除" :image-size="96">
+        <el-button type="primary" @click="router.push('/')">回首页</el-button>
+      </el-empty>
+    </div>
 
     <template v-else-if="detail">
       <div class="art__layout" :class="{ 'is-single': toc.length === 0 }">
-        <aside v-if="toc.length" class="art__toc">
+        <aside v-if="toc.length" class="art__toc" aria-label="文章目录">
           <h2 class="art__toc-title">目录</h2>
           <ul class="art__toc-list">
             <li v-for="item in toc" :key="item.id">
@@ -227,16 +233,28 @@ onMounted(() => void load())
 
         <div class="art__main">
           <header class="art__head">
-            <h1 class="art__title">{{ detail.title }}</h1>
+            <h1 id="article-title" class="art__title">{{ detail.title }}</h1>
+            <p v-if="detail.summary" class="art__summary">{{ detail.summary }}</p>
 
-            <div class="art__meta wh-mono">
-              <RouterLink class="art__author" :to="`/user/${detail.authorId}`">
-                {{ userName(detail.authorId) }}
-              </RouterLink>
-              <span :title="formatDateTime(detail.publishTime)">
-                {{ formatRelativeTime(detail.publishTime) }}
-              </span>
-              <span :title="`阅读 ${detail.viewCount}`">阅读 {{ formatCount(detail.viewCount) }}</span>
+            <div class="art__meta">
+              <div class="art__meta-main">
+                <RouterLink class="art__author" :to="`/user/${detail.authorId}`">
+                  <span aria-hidden="true">
+                    <UserAvatar
+                      :src="userAvatar(detail.authorId)"
+                      :name="userName(detail.authorId)"
+                      :size="20"
+                    />
+                  </span>
+                  <span class="art__at" aria-hidden="true">@</span>{{ userName(detail.authorId) }}
+                </RouterLink>
+                <span :title="formatDateTime(detail.publishTime)">
+                  {{ formatRelativeTime(detail.publishTime) }}
+                </span>
+                <span :title="`阅读 ${detail.viewCount}`">
+                  阅读 <span class="wh-mono">{{ formatCount(detail.viewCount) }}</span>
+                </span>
+              </div>
 
               <!-- 只有作者本人能看到编辑入口；已发布文章的改动走「覆盖发布」 -->
               <RouterLink v-if="isOwner" class="art__edit" :to="`/editor/${detail.articleId}`">
@@ -246,17 +264,38 @@ onMounted(() => void load())
           </header>
 
           <!-- 正文：后端渲染 + 消毒过的 HTML -->
-          <article ref="articleEl" class="art__body wh-prose" v-html="detail.html" />
+          <article
+            ref="articleEl"
+            class="art__body wh-prose"
+            aria-labelledby="article-title"
+            v-html="detail.html"
+          ></article>
 
-          <div class="art__actions">
+          <div class="art__actions" role="group" aria-label="文章操作">
             <button
               class="art__action"
               type="button"
               :class="{ 'is-on': detail.liked }"
               :disabled="acting"
+              :aria-pressed="detail.liked"
+              :aria-busy="acting"
               @click="onToggleLike"
             >
-              <span class="art__action-icon">{{ detail.liked ? '♥' : '♡' }}</span>
+              <svg class="art__action-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  v-if="detail.liked"
+                  d="M12 21s-7.5-4.7-9.3-9.2C1.3 8.5 3.2 5.5 6.3 5.5c1.9 0 3.5 1 4.7 2.6 1.2-1.6 2.8-2.6 4.7-2.6 3.1 0 5 3 3.6 6.3C19.5 16.3 12 21 12 21Z"
+                  fill="currentColor"
+                />
+                <path
+                  v-else
+                  d="M12 21s-7.5-4.7-9.3-9.2C1.3 8.5 3.2 5.5 6.3 5.5c1.9 0 3.5 1 4.7 2.6 1.2-1.6 2.8-2.6 4.7-2.6 3.1 0 5 3 3.6 6.3C19.5 16.3 12 21 12 21Z"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                  stroke-linejoin="round"
+                />
+              </svg>
               赞 <span class="wh-mono">{{ detail.likeCount }}</span>
             </button>
 
@@ -265,13 +304,38 @@ onMounted(() => void load())
               type="button"
               :class="{ 'is-on': detail.collected }"
               :disabled="acting"
+              :aria-pressed="detail.collected"
+              :aria-busy="acting"
               @click="onToggleCollect"
             >
-              <span class="art__action-icon">{{ detail.collected ? '★' : '☆' }}</span>
+              <svg class="art__action-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  v-if="detail.collected"
+                  d="m12 3.4 2.7 5.5 6.1.9-4.4 4.3 1 6.1-5.4-2.9-5.4 2.9 1-6.1-4.4-4.3 6.1-.9Z"
+                  fill="currentColor"
+                />
+                <path
+                  v-else
+                  d="m12 3.4 2.7 5.5 6.1.9-4.4 4.3 1 6.1-5.4-2.9-5.4 2.9 1-6.1-4.4-4.3 6.1-.9Z"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                  stroke-linejoin="round"
+                />
+              </svg>
               收藏 <span class="wh-mono">{{ detail.favoriteCount }}</span>
             </button>
 
             <span class="art__action art__action--static">
+              <svg class="art__action-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M20 11.5a8.5 8.5 0 0 1-8.5 8.5H5l1.7-3.5A8.5 8.5 0 1 1 20 11.5Z"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                  stroke-linejoin="round"
+                />
+              </svg>
               评论 <span class="wh-mono">{{ detail.commentCount }}</span>
             </span>
           </div>
@@ -289,33 +353,48 @@ onMounted(() => void load())
 
 <style scoped>
 .art {
+  padding-block: var(--wh-space-7) var(--wh-space-9);
+}
+
+.art__state {
+  width: 100%;
+  max-width: var(--wh-reading);
+  margin-inline: auto;
   padding-block: var(--wh-space-6);
 }
 
-/* 左目录 + 右正文。1fr : 5fr 就是「目录占 1/6，其余全给正文」 */
+/* 左侧目录有视觉重量，左列略宽于右列，正文中心向右补偿约 1.5% */
 .art__layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 5fr);
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, var(--wh-reading)) minmax(0, 0.95fr);
   gap: var(--wh-space-6);
   align-items: start;
 }
 
-/* 文章没有标题时，那一列直接不占，正文吃满 */
+/* 文章没有标题时，目录列不占，正文仍然居中 */
 .art__layout.is-single {
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, var(--wh-reading)) minmax(0, 1fr);
 }
 
 /* 同 DefaultLayout：允许收缩，否则宽表格/长代码块会把这一列撑破 */
 .art__main {
+  grid-column: 2;
+  width: 100%;
   min-width: 0;
 }
 
 .art__toc {
   position: sticky;
-  top: calc(var(--wh-nav-height) + var(--wh-space-4));
+  top: calc(var(--wh-nav-height) + var(--wh-space-5));
+  grid-column: 1;
+  justify-self: end;
 
-  max-height: calc(100vh - var(--wh-nav-height) - var(--wh-space-6));
+  width: 100%;
+  max-width: 13rem;
+  max-height: calc(100vh - var(--wh-nav-height) - var(--wh-space-7));
+  padding-right: var(--wh-space-2);
   overflow-y: auto;
+  scrollbar-width: thin;
 }
 
 .art__toc-title {
@@ -336,7 +415,7 @@ onMounted(() => void load())
 
 .art__toc-link {
   display: block;
-  padding: var(--wh-space-1) 0;
+  padding: 5px 0 5px var(--wh-space-2);
 
   font-size: var(--wh-text-sm);
   line-height: var(--wh-leading-snug);
@@ -344,15 +423,18 @@ onMounted(() => void load())
   text-decoration: none;
 
   border-left: var(--wh-border-width) solid transparent;
+  transition:
+    color var(--wh-duration-fast) var(--wh-ease),
+    border-color var(--wh-duration-fast) var(--wh-ease);
 }
 
 /* 层级只靠缩进表达，不额外上色 */
 .art__toc-link.is-lv2 {
-  padding-left: var(--wh-space-3);
+  padding-left: calc(var(--wh-space-2) + var(--wh-space-3));
 }
 
 .art__toc-link.is-lv3 {
-  padding-left: var(--wh-space-5);
+  padding-left: calc(var(--wh-space-2) + var(--wh-space-5));
 }
 
 .art__toc-link:hover {
@@ -361,6 +443,7 @@ onMounted(() => void load())
 
 .art__toc-link.is-active {
   color: var(--wh-accent);
+  font-weight: var(--wh-weight-medium);
   border-left-color: var(--wh-accent);
 }
 
@@ -369,10 +452,16 @@ onMounted(() => void load())
   scroll-margin-top: calc(var(--wh-nav-height) + var(--wh-space-4));
 }
 
-/* 窄屏放不下目录，退回单列 */
-@media (max-width: 1100px) {
-  .art__layout {
-    grid-template-columns: minmax(0, 1fr);
+/* 窄屏放不下目录，退回单列居中 */
+@media (max-width: 1200px) {
+  .art__layout,
+  .art__layout.is-single {
+    grid-template-columns: minmax(0, var(--wh-reading));
+    justify-content: center;
+  }
+
+  .art__main {
+    grid-column: 1;
   }
 
   .art__toc {
@@ -381,7 +470,7 @@ onMounted(() => void load())
 }
 
 .art__head {
-  padding-bottom: var(--wh-space-4);
+  padding-bottom: var(--wh-space-5);
   border-bottom: var(--wh-border-width) solid var(--wh-border-strong);
 }
 
@@ -392,32 +481,76 @@ onMounted(() => void load())
   letter-spacing: var(--wh-tracking-tight);
 }
 
+.art__summary {
+  margin-top: var(--wh-space-3);
+
+  font-size: var(--wh-text-lg);
+  line-height: var(--wh-leading-normal);
+  color: var(--wh-text-2);
+}
+
 .art__meta {
   display: flex;
   flex-wrap: wrap;
   gap: var(--wh-space-3);
   align-items: center;
+  justify-content: space-between;
 
-  margin-top: var(--wh-space-3);
+  margin-top: var(--wh-space-4);
 
-  font-size: var(--wh-text-xs);
+  font-size: var(--wh-text-sm);
   color: var(--wh-text-3);
 }
 
-.art__author,
-.art__edit {
-  color: var(--wh-text-2);
+.art__meta-main {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--wh-space-2);
+  align-items: center;
+}
+
+.art__meta-main > * + *::before {
+  content: '·';
+  margin-right: var(--wh-space-2);
+  color: var(--wh-text-3);
+}
+
+.art__author {
+  display: inline-flex;
+  gap: var(--wh-space-2);
+  align-items: center;
+
+  color: var(--wh-text-1);
+  font-weight: var(--wh-weight-medium);
   text-decoration: none;
 }
 
-.art__author:hover,
-.art__edit:hover {
+.art__at {
+  margin-right: 2px;
+  color: var(--wh-text-3);
+}
+
+.art__author:hover {
   color: var(--wh-accent);
 }
 
 .art__edit {
-  margin-left: auto;
+  flex: none;
+
+  padding: 2px var(--wh-space-2);
+
+  font-size: var(--wh-text-xs);
+  color: var(--wh-text-2);
+  text-decoration: none;
+
+  border: var(--wh-border-width) solid var(--wh-border);
+  border-radius: var(--wh-radius-sm);
+}
+
+.art__edit:hover {
   color: var(--wh-accent);
+  border-color: var(--wh-accent);
+  text-decoration: none;
 }
 
 .art__body {
@@ -426,14 +559,14 @@ onMounted(() => void load())
 
 .art__actions {
   display: flex;
-  gap: var(--wh-space-3);
-  justify-content: center;
+  flex-wrap: wrap;
+  gap: var(--wh-space-2);
+  align-items: center;
 
   margin-top: var(--wh-space-7);
-  padding-block: var(--wh-space-4);
+  padding-top: var(--wh-space-4);
 
   border-top: var(--wh-border-width) solid var(--wh-border);
-  border-bottom: var(--wh-border-width) solid var(--wh-border);
 }
 
 .art__action {
@@ -441,22 +574,25 @@ onMounted(() => void load())
   gap: var(--wh-space-2);
   align-items: center;
 
-  padding: var(--wh-space-2) var(--wh-space-4);
+  min-height: 36px;
+  padding: var(--wh-space-2) var(--wh-space-3);
 
   font-size: var(--wh-text-sm);
   color: var(--wh-text-2);
-  background-color: var(--wh-bg-surface);
+  background: none;
   border: var(--wh-border-width) solid var(--wh-border);
-  border-radius: var(--wh-radius-full);
+  border-radius: var(--wh-radius-md);
   cursor: pointer;
 
   transition:
     color var(--wh-duration-fast) var(--wh-ease),
+    background-color var(--wh-duration-fast) var(--wh-ease),
     border-color var(--wh-duration-fast) var(--wh-ease);
 }
 
 .art__action:hover:not(:disabled) {
   color: var(--wh-text-1);
+  background-color: var(--wh-bg-raised);
   border-color: var(--wh-border-strong);
 }
 
@@ -472,13 +608,29 @@ onMounted(() => void load())
 }
 
 .art__action--static {
+  color: var(--wh-text-3);
   cursor: default;
   background: none;
   border-color: transparent;
 }
 
 .art__action-icon {
-  font-size: var(--wh-text-base);
-  line-height: 1;
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+
+@media (max-width: 600px) {
+  .art {
+    padding-block: var(--wh-space-5) var(--wh-space-8);
+  }
+
+  .art__title {
+    font-size: var(--wh-text-2xl);
+  }
+
+  .art__head {
+    padding-bottom: var(--wh-space-4);
+  }
 }
 </style>

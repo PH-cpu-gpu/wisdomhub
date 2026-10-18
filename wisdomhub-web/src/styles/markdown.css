@@ -11,9 +11,10 @@
    ========================================================================== */
 
 .wh-prose {
-  font-size: var(--wh-text-base);
-  line-height: var(--wh-leading-relaxed);
+  font-size: var(--wh-text-reading);
+  line-height: var(--wh-leading-reading);
   color: var(--wh-text-1);
+  text-wrap: pretty;
 
   /* 长单词/URL 不撑破容器（中文文章里常见的 BUG） */
   overflow-wrap: break-word;
@@ -22,7 +23,11 @@
 /* 垂直节奏用「相邻兄弟」而不是 margin-bottom：
    后者会在最后一个元素后面留一段空隙，容器 padding 就难对齐了 */
 .wh-prose > * + * {
-  margin-top: var(--wh-space-4);
+  margin-top: var(--wh-space-5);
+}
+
+.wh-prose > :first-child {
+  margin-top: 0;
 }
 
 .wh-prose h1,
@@ -31,10 +36,24 @@
 .wh-prose h4,
 .wh-prose h5,
 .wh-prose h6 {
-  margin-top: var(--wh-space-6);
   font-weight: var(--wh-weight-semibold);
   line-height: var(--wh-leading-snug);
   letter-spacing: var(--wh-tracking-tight);
+}
+
+.wh-prose h1,
+.wh-prose h2 {
+  margin-top: var(--wh-space-7);
+}
+
+.wh-prose h3 {
+  margin-top: var(--wh-space-6);
+}
+
+.wh-prose h4,
+.wh-prose h5,
+.wh-prose h6 {
+  margin-top: var(--wh-space-5);
 }
 
 .wh-prose h1 {
@@ -73,27 +92,34 @@
 }
 
 .wh-prose li + li {
-  margin-top: var(--wh-space-1);
+  margin-top: var(--wh-space-2);
+}
+
+.wh-prose li::marker {
+  color: var(--wh-text-3);
 }
 
 .wh-prose blockquote {
-  padding-left: var(--wh-space-4);
+  padding: var(--wh-space-3) var(--wh-space-4);
 
   color: var(--wh-text-2);
-  border-left: 2px solid var(--wh-border-strong);
+  background-color: color-mix(in srgb, var(--wh-bg-raised) 55%, transparent);
+  border-left: var(--wh-border-width) solid var(--wh-border-strong);
+  border-radius: 0 var(--wh-radius-sm) var(--wh-radius-sm) 0;
 }
 
 .wh-prose hr {
+  margin-block: var(--wh-space-6);
   border: none;
   border-top: var(--wh-border-width) solid var(--wh-border);
 }
 
 /* ---- 行内代码 ---- */
 .wh-prose code {
-  padding: 0.1em 0.35em;
+  padding: 0.12em 0.36em;
 
   font-family: var(--wh-font-mono);
-  font-size: 0.9em;
+  font-size: 0.875em;
   background-color: var(--wh-bg-raised);
   border-radius: var(--wh-radius-xs);
 }
@@ -102,27 +128,30 @@
 .wh-prose pre {
   overflow-x: auto;
 
-  padding: var(--wh-space-4);
+  padding: var(--wh-space-4) var(--wh-space-5);
 
   background-color: var(--wh-bg-raised);
   border: var(--wh-border-width) solid var(--wh-border);
   border-radius: var(--wh-radius-md);
+  tab-size: 2;
 }
 
 /* 块里的 code 不要再套一层背景和内边距 */
 .wh-prose pre code {
   padding: 0;
 
-  font-size: var(--wh-text-sm);
+  font-size: 0.875rem;
   line-height: var(--wh-leading-normal);
   background: none;
   border-radius: 0;
 }
 
 .wh-prose table {
+  display: block;
+  overflow-x: auto;
   width: 100%;
 
-  font-size: var(--wh-text-sm);
+  font-size: 0.875rem;
   border-collapse: collapse;
 }
 
@@ -130,6 +159,7 @@
 .wh-prose td {
   padding: var(--wh-space-2) var(--wh-space-3);
   text-align: left;
+  vertical-align: top;
   border: var(--wh-border-width) solid var(--wh-border);
 }
 
@@ -138,8 +168,13 @@
   background-color: var(--wh-bg-raised);
 }
 
+.wh-prose tbody tr:nth-child(even) {
+  background-color: color-mix(in srgb, var(--wh-bg-raised) 45%, transparent);
+}
+
 .wh-prose img {
   max-width: 100%;
+  height: auto;
   border-radius: var(--wh-radius-md);
 }
 

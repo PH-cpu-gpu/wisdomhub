@@ -33,6 +33,12 @@ export const primaryNav: NavItem[] = [
   { label: 'AI 导师', to: '/ai', icon: MagicStick },
 ]
 
+/** 侧边栏的「探索」分组：把产品最有辨识度的两个入口留在手边。 */
+export const exploreNav: NavItem[] = [
+  { label: '知识图谱', to: '/graph', icon: Connection },
+  { label: 'AI 导师', to: '/ai', icon: MagicStick },
+]
+
 /** 侧边栏的「我的」分组。都要登录（路由上有 requiresAuth），未登录时整组隐藏。 */
 export const accountNav: NavItem[] = [
   { label: '我的资料', to: '/me/profile', icon: User },

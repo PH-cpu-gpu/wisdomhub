@@ -53,9 +53,10 @@ onMounted(() => void loadTags())
     <template v-else>
       <ArticleList :tag-id="tag.tagId" :empty-text="`「${tag.name}」下还没有已发布的文章`">
         <template #heading>
-          <span class="tag__eyebrow wh-mono">标签</span>
-          <h1 class="tag__title">{{ tag.name }}</h1>
-          <span v-if="tag.description" class="tag__desc">{{ tag.description }}</span>
+          <div>
+            <h1 class="tag__title">{{ tag.name }}</h1>
+            <p v-if="tag.description" class="tag__desc">{{ tag.description }}</p>
+          </div>
         </template>
       </ArticleList>
     </template>
@@ -64,22 +65,19 @@ onMounted(() => void loadTags())
 
 <style scoped>
 .tag {
-  padding-block: var(--wh-space-4);
-}
-
-.tag__eyebrow {
-  font-size: var(--wh-text-xs);
-  letter-spacing: var(--wh-tracking-wide);
-  color: var(--wh-accent);
+  padding-block: var(--wh-space-5) var(--wh-space-8);
 }
 
 .tag__title {
-  font-size: var(--wh-text-xl);
+  font-size: var(--wh-text-page);
 }
 
 .tag__desc {
-  font-size: var(--wh-text-sm);
+  max-width: 36rem;
+  margin-top: var(--wh-space-2);
+
+  font-size: var(--wh-text-base);
   line-height: var(--wh-leading-normal);
-  color: var(--wh-text-3);
+  color: var(--wh-text-2);
 }
 </style>

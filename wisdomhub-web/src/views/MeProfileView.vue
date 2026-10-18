@@ -175,7 +175,7 @@ onMounted(() => void loadProfile())
 
 <style scoped>
 .mp {
-  padding-block: var(--wh-space-6);
+  padding-block: var(--wh-space-7) var(--wh-space-8);
 }
 
 .mp__head {
@@ -183,7 +183,7 @@ onMounted(() => void loadProfile())
 }
 
 .mp__title {
-  font-size: var(--wh-text-2xl);
+  font-size: var(--wh-text-page);
 }
 
 .mp__sub {

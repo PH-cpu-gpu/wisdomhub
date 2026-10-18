@@ -130,8 +130,10 @@ onMounted(() => {
 <template>
   <div class="fav">
     <header class="fav__head">
-      <h1 class="fav__title">我的收藏</h1>
-      <span class="fav__sub">按收藏时间倒序；已删除的内容不会出现在这里</span>
+      <div>
+        <h1 class="fav__title">我的收藏</h1>
+        <p class="fav__sub">按收藏时间倒序；已删除的内容不会出现在这里</p>
+      </div>
     </header>
 
     <div class="fav__tabs" role="tablist">
@@ -237,27 +239,30 @@ onMounted(() => {
 
 <style scoped>
 .fav {
-  padding-block: var(--wh-space-4);
+  padding-block: var(--wh-space-5) var(--wh-space-8);
 }
 
-/* 与 ArticleList 的工具栏同一套版式：标题与说明一行，底下一条分隔线 */
+/* 与 ArticleList 的工具栏同一套版式：标题与说明，底下一条分隔线 */
 .fav__head {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--wh-space-3);
-  align-items: center;
+  gap: var(--wh-space-4) var(--wh-space-6);
+  align-items: flex-end;
 
-  padding-bottom: var(--wh-space-3);
+  padding-bottom: var(--wh-space-5);
   border-bottom: var(--wh-border-width) solid var(--wh-border-strong);
 }
 
 .fav__title {
-  font-size: var(--wh-text-xl);
+  font-size: var(--wh-text-page);
 }
 
 .fav__sub {
-  font-size: var(--wh-text-sm);
-  color: var(--wh-text-3);
+  max-width: 36rem;
+  margin-top: var(--wh-space-2);
+
+  font-size: var(--wh-text-base);
+  color: var(--wh-text-2);
 }
 
 /* Tab：不用 el-tabs —— 那两个面板的骨架/空态/分页都得自己管，

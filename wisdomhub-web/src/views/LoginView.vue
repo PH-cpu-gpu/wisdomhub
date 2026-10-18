@@ -264,7 +264,7 @@ function finishBind() {
 <template>
   <div class="auth">
     <div class="auth__card">
-      <p class="auth__eyebrow wh-mono">WisdomHub</p>
+      <p class="auth__brand"><span class="auth__mark" aria-hidden="true">▍</span>WisdomHub</p>
       <h1 class="auth__title">{{ title }}</h1>
       <p class="auth__sub">
         <template v-if="isRegister">
@@ -338,6 +338,8 @@ function finishBind() {
       </div>
     </div>
 
+    <p class="auth__foot">内容社区 · 知识图谱 · AI 导师</p>
+
     <!-- 补绑邮箱：登录成功后若账号还没有邮箱，先问一次，可以跳过 -->
     <el-dialog
       v-model="showBind"
@@ -376,8 +378,12 @@ function finishBind() {
 
 <style scoped>
 .auth {
-  display: grid;
-  place-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: var(--wh-space-5);
+  align-items: center;
+  justify-content: center;
+
   min-height: 100dvh;
   padding: var(--wh-space-6) var(--wh-space-4);
 }
@@ -385,34 +391,45 @@ function finishBind() {
 .auth__card {
   width: 100%;
   max-width: 26rem;
-  padding: var(--wh-space-6);
+  padding: var(--wh-space-7) var(--wh-space-6);
 
   background-color: var(--wh-bg-surface);
   border: var(--wh-border-width) solid var(--wh-border);
   border-radius: var(--wh-radius-md);
+  box-shadow: var(--wh-surface-highlight), var(--wh-shadow-float);
 }
 
-.auth__eyebrow {
-  font-size: var(--wh-text-xs);
-  letter-spacing: var(--wh-tracking-wide);
+.auth__brand {
+  font-size: var(--wh-text-base);
+  font-weight: var(--wh-weight-semibold);
+  letter-spacing: var(--wh-tracking-tight);
+  color: var(--wh-text-1);
+}
+
+.auth__mark {
+  margin-right: 2px;
   color: var(--wh-accent);
 }
 
 .auth__title {
-  margin-top: var(--wh-space-1);
-  font-size: var(--wh-text-xl);
+  margin-top: var(--wh-space-5);
+  font-size: var(--wh-text-page);
 }
 
 .auth__sub {
-  margin: var(--wh-space-2) 0 var(--wh-space-5);
+  margin: var(--wh-space-2) 0 var(--wh-space-6);
 
-  font-size: var(--wh-text-sm);
+  font-size: var(--wh-text-base);
   line-height: var(--wh-leading-normal);
-  color: var(--wh-text-3);
+  color: var(--wh-text-2);
 }
 
 .auth__sub strong {
   color: var(--wh-text-1);
+}
+
+.auth__card :deep(.el-input__wrapper) {
+  min-height: 40px;
 }
 
 .auth__code-row {
@@ -421,8 +438,13 @@ function finishBind() {
   width: 100%;
 }
 
+.auth__code-row :deep(.el-button) {
+  height: 40px;
+}
+
 .auth__submit {
   width: 100%;
+  height: 40px;
   margin-top: var(--wh-space-2);
 }
 
@@ -434,7 +456,7 @@ function finishBind() {
   line-height: var(--wh-leading-normal);
   color: var(--wh-text-3);
   background-color: var(--wh-bg-raised);
-  border-left: 2px solid var(--wh-warning);
+  border-left: var(--wh-border-width) solid var(--wh-warning);
   border-radius: var(--wh-radius-xs);
 }
 
@@ -476,5 +498,17 @@ function finishBind() {
   font-size: var(--wh-text-sm);
   line-height: var(--wh-leading-normal);
   color: var(--wh-text-3);
+}
+
+.auth__foot {
+  font-size: var(--wh-text-xs);
+  letter-spacing: var(--wh-tracking-wide);
+  color: var(--wh-text-3);
+}
+
+@media (max-width: 480px) {
+  .auth__card {
+    padding: var(--wh-space-6) var(--wh-space-5);
+  }
 }
 </style>

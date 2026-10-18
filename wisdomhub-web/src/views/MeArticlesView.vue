@@ -28,8 +28,10 @@ const myId = computed(() => user.userId ?? '')
       empty-text="你还没有发布过文章"
     >
       <template #heading>
-        <h1 class="me__title">我的文章</h1>
-        <span class="me__sub">只有已发布的文章，草稿在「草稿箱」</span>
+        <div>
+          <h1 class="me__title">我的文章</h1>
+          <p class="me__sub">只有已发布的文章，草稿在「草稿箱」</p>
+        </div>
         <el-button type="primary" size="small" @click="router.push('/editor')">写文章</el-button>
       </template>
     </ArticleList>
@@ -38,15 +40,17 @@ const myId = computed(() => user.userId ?? '')
 
 <style scoped>
 .me {
-  padding-block: var(--wh-space-4);
+  padding-block: var(--wh-space-5) var(--wh-space-8);
 }
 
 .me__title {
-  font-size: var(--wh-text-xl);
+  font-size: var(--wh-text-page);
 }
 
 .me__sub {
-  font-size: var(--wh-text-sm);
-  color: var(--wh-text-3);
+  margin-top: var(--wh-space-2);
+
+  font-size: var(--wh-text-base);
+  color: var(--wh-text-2);
 }
 </style>

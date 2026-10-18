@@ -55,7 +55,6 @@ async function onSubmit() {
 <template>
   <div class="ask">
     <header class="ask__head">
-      <p class="ask__eyebrow wh-mono">技术问答</p>
       <h1 class="ask__title">提问</h1>
       <p class="ask__sub">把问题描述清楚，注意到什么、试过什么、卡在哪里。</p>
     </header>
@@ -87,18 +86,14 @@ async function onSubmit() {
 <style scoped>
 /* 表单页例外：窄一点更好填，沿用阅读页的宽度令牌 */
 .ask {
+  width: 100%;
   max-width: var(--wh-reading);
-  padding-block: var(--wh-space-6);
-}
-
-.ask__eyebrow {
-  font-size: var(--wh-text-xs);
-  letter-spacing: var(--wh-tracking-wide);
-  color: var(--wh-accent);
+  margin-inline: auto;
+  padding-block: var(--wh-space-7) var(--wh-space-8);
 }
 
 .ask__title {
-  font-size: var(--wh-text-2xl);
+  font-size: var(--wh-text-page);
 }
 
 .ask__sub {

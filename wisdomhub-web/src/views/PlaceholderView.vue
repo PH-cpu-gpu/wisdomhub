@@ -15,8 +15,6 @@ const title = computed(() => (route.meta.title as string | undefined) ?? '页面
 
 <template>
   <div class="ph">
-    <p class="ph__eyebrow wh-mono">开发中</p>
-
     <h1 class="ph__title">{{ title }}</h1>
 
     <p class="ph__hint">这个功能还在开发中，敬请期待。</p>
@@ -33,27 +31,17 @@ const title = computed(() => (route.meta.title as string | undefined) ?? '页面
   flex-direction: column;
   gap: var(--wh-space-3);
   max-width: var(--wh-reading);
-  padding-block: var(--wh-space-7);
-}
-
-.ph__eyebrow {
-  font-size: var(--wh-text-xs);
-  letter-spacing: var(--wh-tracking-wide);
-  color: var(--wh-accent);
+  padding-block: var(--wh-space-8);
 }
 
 .ph__title {
-  font-size: var(--wh-text-2xl);
+  font-size: var(--wh-text-page);
 }
 
 .ph__hint {
-  padding: var(--wh-space-4);
-
-  font-size: var(--wh-text-sm);
-  color: var(--wh-text-3);
-  background-color: var(--wh-bg-surface);
-  border: var(--wh-border-width) dashed var(--wh-border-strong);
-  border-radius: var(--wh-radius-md);
+  font-size: var(--wh-text-base);
+  line-height: var(--wh-leading-reading);
+  color: var(--wh-text-2);
 }
 
 .ph__actions {

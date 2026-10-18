@@ -2,7 +2,8 @@
 import { RouterLink } from 'vue-router'
 
 import type { QuestionListItem } from '@/api/question'
-import { userName } from '@/composables/useUserNames'
+import { userAvatar, userName } from '@/composables/useUserNames'
+import UserAvatar from '@/components/UserAvatar.vue'
 import { formatCount, formatDateTime, formatRelativeTime } from '@/utils/format'
 
 /**
@@ -21,8 +22,15 @@ defineProps<{ question: QuestionListItem }>()
       <span v-if="question.solved" class="qitem__solved wh-mono">已解决</span>
     </h2>
 
-    <div class="qitem__meta wh-mono">
+    <div class="qitem__meta">
       <RouterLink class="qitem__author" :to="`/user/${question.userId}`">
+        <span aria-hidden="true">
+          <UserAvatar
+            :src="userAvatar(question.userId)"
+            :name="userName(question.userId)"
+            :size="20"
+          />
+        </span>
         {{ userName(question.userId) }}
       </RouterLink>
       <span :title="formatDateTime(question.createTime)">
@@ -30,8 +38,8 @@ defineProps<{ question: QuestionListItem }>()
       </span>
 
       <span class="qitem__stats">
-        <span>回答 {{ formatCount(question.answerCount) }}</span>
-        <span>收藏 {{ formatCount(question.favoriteCount) }}</span>
+        <span>回答 <span class="wh-mono">{{ formatCount(question.answerCount) }}</span></span>
+        <span>收藏 <span class="wh-mono">{{ formatCount(question.favoriteCount) }}</span></span>
       </span>
 
       <!-- 每行自己的操作（收藏页的「取消收藏」）；不传就是纯展示 -->
@@ -46,6 +54,11 @@ defineProps<{ question: QuestionListItem }>()
 .qitem {
   padding: var(--wh-space-5) 0;
   border-bottom: var(--wh-border-width) solid var(--wh-border);
+  transition: background-color var(--wh-duration-fast) var(--wh-ease);
+}
+
+.qitem:hover {
+  background-color: color-mix(in srgb, var(--wh-bg-surface) 55%, transparent);
 }
 
 .qitem__title {
@@ -70,12 +83,12 @@ defineProps<{ question: QuestionListItem }>()
 
 .qitem__solved {
   flex: none;
-  padding: 0 var(--wh-space-2);
+  padding: 1px var(--wh-space-2);
 
   font-size: var(--wh-text-xs);
   color: var(--wh-accent);
   background-color: var(--wh-accent-soft);
-  border-radius: var(--wh-radius-full);
+  border-radius: var(--wh-radius-xs);
 }
 
 .qitem__meta {
@@ -86,13 +99,21 @@ defineProps<{ question: QuestionListItem }>()
 
   margin-top: var(--wh-space-3);
 
-  font-size: var(--wh-text-xs);
+  font-size: var(--wh-text-sm);
   color: var(--wh-text-3);
 }
 
 .qitem__author {
+  display: inline-flex;
+  gap: var(--wh-space-2);
+  align-items: center;
+
   color: var(--wh-text-2);
+  font-weight: var(--wh-weight-medium);
   text-decoration: none;
+
+  --wh-avatar-bg: var(--wh-bg-raised);
+  --wh-avatar-text: var(--wh-text-2);
 }
 
 .qitem__author:hover {

@@ -57,8 +57,8 @@ const initial = computed(() => (props.name?.trim().slice(0, 1) || 'U').toUpperCa
   flex: none;
 
   font-weight: var(--wh-weight-semibold);
-  color: var(--wh-text-on-fill);
-  background-color: var(--wh-accent);
+  color: var(--wh-avatar-text, var(--wh-text-on-fill));
+  background-color: var(--wh-avatar-bg, var(--wh-accent));
   border-radius: var(--wh-radius-full);
 }
 

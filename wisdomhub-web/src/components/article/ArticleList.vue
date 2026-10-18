@@ -193,11 +193,11 @@ onMounted(() => void load())
 .list__toolbar {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--wh-space-2) var(--wh-space-4);
-  align-items: center;
+  gap: var(--wh-space-4) var(--wh-space-6);
+  align-items: flex-end;
   justify-content: space-between;
 
-  padding-bottom: var(--wh-space-3);
+  padding-bottom: var(--wh-space-5);
   border-bottom: var(--wh-border-width) solid var(--wh-border-strong);
 }
 
@@ -205,8 +205,8 @@ onMounted(() => void load())
 .list__heading {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--wh-space-3);
-  align-items: center;
+  gap: var(--wh-space-2);
+  align-items: flex-end;
   min-width: 0;
 }
 

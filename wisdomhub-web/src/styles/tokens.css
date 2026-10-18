@@ -41,11 +41,14 @@
   --wh-text-xl: 1.25rem; /* 20px  区块标题 */
   --wh-text-2xl: 1.5rem; /* 24px  页面标题 */
   --wh-text-3xl: 2rem; /* 32px  首页主标题 */
+  --wh-text-page: 1.75rem; /* 28px  列表页标题 */
+  --wh-text-reading: 1rem; /* 16px  长文正文，比 UI 正文大一档 */
 
   --wh-leading-tight: 1.25;
   --wh-leading-snug: 1.4;
   --wh-leading-normal: 1.6;
-  --wh-leading-relaxed: 1.75; /* 文章正文 */
+  --wh-leading-relaxed: 1.75; /* 宽松正文（评论） */
+  --wh-leading-reading: 1.8; /* 长文正文 */
 
   --wh-weight-regular: 400;
   --wh-weight-medium: 500;
@@ -101,55 +104,58 @@
    2. 亮色主题
    ========================================================================== */
 :root {
-  /* 底色。2026-10-11 换掉原来那套 flat 冷白（#f7f8fa）：白卡片压上去只有 1.06:1、
-     描边 1.19:1，整页发飘没骨架。亮色的层次全靠描边，这套把描边收到 1.35:1。 */
-  --wh-bg-base: #fafafa; /* 页面底 */
-  --wh-bg-surface: #ffffff; /* 卡片、面板 */
-  --wh-bg-raised: #f0f0f1; /* 悬浮、输入框、代码块 */
-  --wh-bg-hover: #e8e8ea; /* 行悬停 */
+  /* 冷石绿纸底：不用暖米色，避免掉进「AI 默认米白」；层次仍靠描边撑住。 */
+  --wh-bg-base: #eef0ee; /* 页面底 */
+  --wh-bg-surface: #f8f9f7; /* 卡片、面板 */
+  --wh-bg-raised: #e4e7e4; /* 悬浮、输入框、代码块 */
+  --wh-bg-hover: #dbdfdb; /* 行悬停 */
 
   /* 描边 */
-  --wh-border: #d9d9dc;
-  --wh-border-strong: #b8b8bd;
+  --wh-border: #cfd3cf;
+  --wh-border-strong: #aeb4ae;
 
-  /* 文本。只有三级：主要 / 次要 / 弱化。
-     再细分会出现「区别看不出来但维护成本翻倍」的中间态。 */
-  --wh-text-1: #1c1c20; /* 正文、标题 */
-  --wh-text-2: #4f5058; /* 次要说明 */
-  --wh-text-3: #6f7079; /* 时间、计数、占位符。原 #8b95a9 只有 2.84:1，压到 4.71:1 */
-  --wh-text-inverse: #ffffff;
+  /* 文本。只有三级：主要 / 次要 / 弱化。 */
+  --wh-text-1: #1b1d1b; /* 正文、标题 */
+  --wh-text-2: #4f544f; /* 次要说明 */
+  --wh-text-3: #5f655f; /* 时间、计数、占位符 */
+  --wh-text-inverse: #f8f9f7;
 
-  /* 主色。只用于「动作」与「焦点」：按钮、链接、激活态、focus ring。
-     信息性的着色全部让给下面的技术类别色，主色铺满会让每条信息都在喊。 */
-  --wh-accent: #047857; /* 亮底上压深，否则对比度不到 4.5:1 */
-  --wh-accent-hover: #036449;
-  /* 压在任何深色填充上的文字色。亮色主题的填充都是深的，所以是白字。 */
-  --wh-text-on-fill: #ffffff;
+  /* 主色：深林绿。只用于动作、焦点与激活态。 */
+  --wh-accent: #0f6b4f;
+  --wh-accent-hover: #0b5740;
+  --wh-text-on-fill: #f8f9f7;
+
+  /* 大块主按钮的填充。 */
+  --wh-action-fill: #0f6b4f;
+  --wh-action-fill-hover: #0b5740;
+  --wh-action-border: #0f6b4f;
+  --wh-action-border-hover: #0b5740;
+  --wh-action-text: #f8f9f7;
+  --wh-action-highlight: inset 0 1px 0 rgb(255 255 255 / 18%);
+
+  /* 面与浮层的材料感：抬升面加一道极淡的高光，浮层用带偏移的柔影。 */
+  --wh-surface-highlight: inset 0 1px 0 rgb(255 255 255 / 75%);
+  --wh-shadow-float: 0 12px 32px rgb(40 52 46 / 10%);
 
   /* 语义色 */
-  --wh-danger: #b91c1c;
-  --wh-warning: #a16207;
-  --wh-info: #0369a1;
+  --wh-danger: #a83b3b;
+  --wh-warning: #7f5c10;
+  --wh-info: #28607a;
 
-  /* 技术类别色（对应技术文档 7.13 的 category 枚举）。
-     亮底上统一压深，保证作为文字用时对比度 ≥ 4.5:1。 */
-  --wh-cat-language: #9a6700; /* LANGUAGE    编程语言：Java / Go / Python */
-  --wh-cat-framework: #6d28d9; /* FRAMEWORK   框架：Spring / MyBatis */
-  --wh-cat-middleware: #0369a1; /* MIDDLEWARE  中间件：Redis / RabbitMQ / Kafka */
-  --wh-cat-database: #be123c; /* DATABASE    数据库：MySQL / ES / Neo4j */
-  --wh-cat-concept: #475569; /* CONCEPT     概念：AOP / MVCC / 分布式锁。故意最低饱和 ——
-                                           概念是五类里最抽象的一类 */
+  /* 技术类别色：统一降低饱和度，像矿物色而不是霓虹。 */
+  --wh-cat-language: #7f5c10; /* LANGUAGE    编程语言 */
+  --wh-cat-framework: #5f4b8b; /* FRAMEWORK   框架 */
+  --wh-cat-middleware: #2c617d; /* MIDDLEWARE  中间件 */
+  --wh-cat-database: #9b3a4a; /* DATABASE    数据库 */
+  --wh-cat-concept: #555b63; /* CONCEPT     概念 */
 
-  /* 代码高亮（highlight.js 的 .hljs-* 类映射到这几个）。
-     刻意**不引入 highlight.js 自带的主题 CSS** —— 那些主题是固定色的，
-     在亮/暗两套主题下必有一套难看；这里的取值直接复用上面的色相，
-     亮度关系与类别色一致，切主题时「什么颜色代表什么」不会变。 */
-  --wh-code-keyword: #6d28d9; /* 关键字：复用 FRAMEWORK 的紫 */
-  --wh-code-string: #047857; /* 字符串：复用主色绿 */
-  --wh-code-number: #be123c; /* 数字/字面量：复用 DATABASE 的绯 */
-  --wh-code-function: #0369a1; /* 函数名/属性：复用 MIDDLEWARE 的蓝 */
-  --wh-code-type: #9a6700; /* 类名/类型/标签：复用 LANGUAGE 的琥珀 */
-  --wh-code-comment: #6f7079; /* 注释：用最弱的文本色，注释本来就该退到背景里 */
+  /* 代码高亮：与类别色同一套色相，在代码块底色上保持 ≥4.5:1。 */
+  --wh-code-keyword: #5f4b8b;
+  --wh-code-string: #0f6b4f;
+  --wh-code-number: #9b3a4a;
+  --wh-code-function: #2c617d;
+  --wh-code-type: #7f5c10;
+  --wh-code-comment: #5f655f;
 }
 
 /* ==========================================================================
@@ -157,49 +163,53 @@
    —— 把每一处取值和上面亮色一一对齐；新增令牌时两边都要加。
    ========================================================================== */
 html.dark {
-  /* 底色。用带蓝调的深色而不是纯黑 #000：
-     纯黑上放卡片只能靠加亮，层级会挤成一团；略高的底色留出加亮空间。
-     2026-10-11 整体抬亮一档（原 #0a0e17 比 GitHub Dark 还黑），色相走 Tokyo Night 的蓝紫。 */
-  --wh-bg-base: #1a1b26;
-  --wh-bg-surface: #1f2335;
-  --wh-bg-raised: #292e42;
-  --wh-bg-hover: #323852;
+  /* 暖墨中性底：不用纯黑，也不走蓝紫；用低饱和炭色留出层次，正文偏暖白。 */
+  --wh-bg-base: #141517;
+  --wh-bg-surface: #1a1c1e;
+  --wh-bg-raised: #222528;
+  --wh-bg-hover: #2a2e31;
 
-  /* 比 Tokyo Night 原版略强：底色抬亮后原版 #2f334d 只有 1.38:1，
-     比抬亮前的 1.40:1 还弱，会把「用 1px 框线分区」这条原则削掉 */
-  --wh-border: #353a54;
-  --wh-border-strong: #444b6e;
+  --wh-border: #2f3336;
+  --wh-border-strong: #444a4e;
 
-  --wh-text-1: #c0caf5; /* 不用纯白：大面积纯白文字在暗底上会发光刺眼 */
-  --wh-text-2: #9aa5ce;
-  --wh-text-3: #7c86ad; /* 原版 muted #565f89 只有 2.76:1，比抬亮前还糊，提到 4.78:1 */
-  --wh-text-inverse: #1a1b26;
+  --wh-text-1: #e8e4dc; /* 暖白，不用纯白，避免大面积发光 */
+  --wh-text-2: #a8a49b;
+  --wh-text-3: #8f8c85;
+  --wh-text-inverse: #141517;
 
-  --wh-accent: #6ee7b7;
-  --wh-accent-hover: #8df0c9;
-  /* 暗色主题的填充都很亮（主色 #6ee7b7、危险色 #f87171……），所以压深字。
-     暗色下沿用白字是这类主题最常见的坑：白字压亮绿只有约 1.8:1，几乎看不清。 */
-  --wh-text-on-fill: #04140d;
+  --wh-accent: #8fd6b4; /* 玉色：比霓虹薄荷低饱和 */
+  --wh-accent-hover: #a6e3c7;
+  --wh-text-on-fill: #0c1712;
 
-  --wh-danger: #f87171;
-  --wh-warning: #fbbf24;
-  --wh-info: #38bdf8;
+  /* 大块主按钮：深玉底 + 浅玉字，避免大面积高亮色。 */
+  --wh-action-fill: #1a3b2f;
+  --wh-action-fill-hover: #214a3b;
+  --wh-action-border: #2f6b54;
+  --wh-action-border-hover: #3d8468;
+  --wh-action-text: #a6e3c7;
+  --wh-action-highlight: inset 0 1px 0 rgb(255 255 255 / 8%);
 
-  /* 技术类别色：暗底上提亮。亮度关系与亮色主题保持一致，
-     这样「FRAMEWORK 是紫的」这条认知不会随主题切换而失效。 */
-  --wh-cat-language: #f0b429;
-  --wh-cat-framework: #a78bfa;
-  --wh-cat-middleware: #38bdf8;
-  --wh-cat-database: #fb7185;
-  --wh-cat-concept: #8fa0bc;
+  --wh-surface-highlight: inset 0 1px 0 rgb(255 255 255 / 4%);
+  --wh-shadow-float: 0 16px 40px rgb(0 0 0 / 45%);
 
-  /* 代码高亮：暗底上按同一色相提亮，与类别色的处理方式一致 */
-  --wh-code-keyword: #a78bfa;
-  --wh-code-string: #6ee7b7;
-  --wh-code-number: #fb7185;
-  --wh-code-function: #38bdf8;
-  --wh-code-type: #f0b429;
-  --wh-code-comment: #7c86ad; /* 跟随 text-3 一起提亮，它俩是同一个「最弱文本」角色 */
+  --wh-danger: #e08585;
+  --wh-warning: #d7b46a;
+  --wh-info: #8fb8d0;
+
+  /* 技术类别色：暗底上提亮，但保持低饱和的矿物色。 */
+  --wh-cat-language: #d8b56a;
+  --wh-cat-framework: #b3a3dd;
+  --wh-cat-middleware: #8fb8d0;
+  --wh-cat-database: #d98f9a;
+  --wh-cat-concept: #9ca5ae;
+
+  /* 代码高亮：与类别色同一套色相。 */
+  --wh-code-keyword: #b3a3dd;
+  --wh-code-string: #8fd6b4;
+  --wh-code-number: #d98f9a;
+  --wh-code-function: #8fb8d0;
+  --wh-code-type: #d8b56a;
+  --wh-code-comment: #979b94;
 }
 
 /* ==========================================================================
