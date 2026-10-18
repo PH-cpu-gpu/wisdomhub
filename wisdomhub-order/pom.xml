@@ -12,7 +12,7 @@
 
     <artifactId>wisdomhub-order</artifactId>
     <name>wisdomhub-order</name>
-    <description>订单、支付流水、会员权益、付费专栏（技术文档 5.8、7.16）</description>
+    <description>订单、支付流水、付费专栏（技术文档 5.8、7.16）</description>
 
     <dependencies>
         <dependency>

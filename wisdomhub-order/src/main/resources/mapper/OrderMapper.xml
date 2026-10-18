@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.wisdomhub.order.mapper.OrderMapper">
+
+    <!-- 复用旧单：同用户 + 同商品 + 待支付 + 未过期，取最新一条 -->
+    <select id="selectReusable" resultType="com.wisdomhub.order.domain.entity.Order">
+        SELECT o.*
+        FROM `order` o
+                 JOIN order_item i ON i.order_id = o.id
+        WHERE o.user_id = #{userId}
+          AND o.state = 0
+          AND o.expire_time &gt; #{now}
+          AND i.item_type = #{itemType}
+          AND i.item_id = #{itemId}
+        ORDER BY o.create_time DESC, o.id DESC
+        LIMIT 1
+    </select>
+
+</mapper>

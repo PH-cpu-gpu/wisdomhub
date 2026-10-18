@@ -37,6 +37,7 @@ import com.wisdomhub.content.domain.entity.ArticleLike;
 import com.wisdomhub.content.domain.entity.ArticleTag;
 import com.wisdomhub.content.domain.entity.Column;
 import com.wisdomhub.content.domain.entity.ColumnArticle;
+import com.wisdomhub.content.domain.entity.ColumnPurchase;
 import com.wisdomhub.content.domain.entity.Comment;
 import com.wisdomhub.content.domain.vo.ArticleBriefVO;
 import com.wisdomhub.content.domain.vo.ArticleDetailVO;
@@ -52,6 +53,7 @@ import com.wisdomhub.content.mapper.ArticleMapper;
 import com.wisdomhub.content.mapper.ArticleTagMapper;
 import com.wisdomhub.content.mapper.ColumnArticleMapper;
 import com.wisdomhub.content.mapper.ColumnMapper;
+import com.wisdomhub.content.mapper.ColumnPurchaseMapper;
 import com.wisdomhub.content.mapper.CommentMapper;
 import com.wisdomhub.content.repository.ArticleContentRepository;
 import com.wisdomhub.content.service.ArticleService;
@@ -102,6 +104,7 @@ public class ArticleServiceImpl implements ArticleService {
     private final ArticleLikeMapper articleLikeMapper;
     private final ArticleFavoriteMapper articleFavoriteMapper;
     private final ColumnArticleMapper columnArticleMapper;
+    private final ColumnPurchaseMapper columnPurchaseMapper;
     private final ColumnMapper columnMapper;
     private final CommentMapper commentMapper;
     private final ArticleContentRepository articleContentRepository;
@@ -661,6 +664,9 @@ public class ArticleServiceImpl implements ArticleService {
 
         // 一个事务：先让行不可见，再清它自己库里的关联行
         transactionTemplate.executeWithoutResult(status -> {
+            if (isInSoldColumn(articleId)) {
+                throw new BusinessException(CommonErrorCode.CONFLICT, "文章已在已售专栏中，不能删除");
+            }
             int affected = articleMapper.update(null, new LambdaUpdateWrapper<Article>()
                     .set(Article::getDeleted, ArticleConstants.DELETED.byteValue())
                     .set(Article::getUpdateTime, LocalDateTime.now(ZoneOffset.UTC))
@@ -688,6 +694,27 @@ public class ArticleServiceImpl implements ArticleService {
                 .articleId(articleId)
                 .authorId(article.getAuthorId())
                 .build()), articleId);
+    }
+
+    /** 文章在已有购买记录的专栏里时禁止删除；先锁专栏行 */
+    private boolean isInSoldColumn(Long articleId) {
+        // 先做锁定读：RR 下普通读会过早建立一致性快照，可能看不到等待锁期间刚提交的购买行
+        List<Long> columnIds = columnArticleMapper.selectList(new LambdaQueryWrapper<ColumnArticle>()
+                        .eq(ColumnArticle::getArticleId, articleId)
+                        .last("FOR UPDATE"))
+                .stream()
+                .map(ColumnArticle::getColumnId)
+                .toList();
+        if (columnIds.isEmpty()) {
+            return false;
+        }
+        // 按 id 升序锁，避免两个删文章事务互锁
+        columnMapper.selectList(new LambdaQueryWrapper<Column>()
+                .in(Column::getId, columnIds)
+                .orderByAsc(Column::getId)
+                .last("FOR UPDATE"));
+        return columnPurchaseMapper.exists(
+                new LambdaQueryWrapper<ColumnPurchase>().in(ColumnPurchase::getColumnId, columnIds));
     }
 
     /**

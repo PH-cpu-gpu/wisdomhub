@@ -3,6 +3,7 @@ package com.wisdomhub.content.service;
 import com.wisdomhub.common.core.result.PageResponse;
 import com.wisdomhub.content.domain.dto.ColumnCreateDTO;
 import com.wisdomhub.content.domain.vo.ArticleListItemVO;
+import com.wisdomhub.content.domain.vo.ColumnTradeInfoVO;
 import com.wisdomhub.content.domain.vo.ColumnVO;
 
 public interface ColumnService {
@@ -33,4 +34,10 @@ public interface ColumnService {
 
     /** 删除专栏：仅创建者本人。软删专栏行，并物理删掉它的归入关系行（文章本身不受影响） */
     void deleteColumn(Long columnId);
+
+    /** 下单用快照。仅 state=1 且未删除的专栏可见，B2.23 起供 order-service 内部调用 */
+    ColumnTradeInfoVO getTradeInfo(Long columnId);
+
+    /** 用户是否已购买该专栏。下单与支付前拦截重复购买 */
+    boolean hasPurchased(Long columnId, Long userId);
 }
