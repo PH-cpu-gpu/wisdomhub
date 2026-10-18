@@ -164,7 +164,7 @@ onMounted(() => {
       <el-skeleton v-if="loading && items.length === 0" :rows="5" animated />
 
       <el-empty v-else-if="items.length === 0" description="还没有收藏任何文章">
-        <el-button type="primary" @click="$router.push('/')">去逛逛</el-button>
+        <el-button type="primary" @click="$router.push('/home')">去逛逛</el-button>
       </el-empty>
 
       <template v-else>

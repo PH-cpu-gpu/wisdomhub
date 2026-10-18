@@ -12,7 +12,7 @@ const router = useRouter()
       地址可能拼错了，或者内容已经被删除。检查一下 URL，也可以直接回首页。
     </p>
     <div class="not-found__actions">
-      <el-button type="primary" @click="router.push('/')">回到首页</el-button>
+      <el-button type="primary" @click="router.push('/home')">回到首页</el-button>
       <el-button @click="router.back()">返回上一页</el-button>
     </div>
   </div>

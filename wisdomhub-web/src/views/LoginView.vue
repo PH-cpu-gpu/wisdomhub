@@ -179,7 +179,7 @@ function switchMode() {
 /** 登录成功后的落点：优先回 401 拦截器记下的 redirect，否则首页 */
 function redirectTarget(): string {
   const redirect = route.query.redirect
-  return typeof redirect === 'string' && redirect.startsWith('/') ? redirect : '/'
+  return typeof redirect === 'string' && redirect.startsWith('/') ? redirect : '/home'
 }
 
 function afterAuthenticated() {

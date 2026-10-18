@@ -34,8 +34,6 @@ const keyword = ref('')
 const unreadCount = ref(0)
 
 function isActive(to: string): boolean {
-  // 首页要精确匹配，否则所有路径都会点亮它
-  if (to === '/') return route.path === '/'
   return route.path === to || route.path.startsWith(`${to}/`)
 }
 
@@ -72,7 +70,7 @@ async function onUserCommand(command: string) {
         <el-icon><component :is="sidebarOpen ? Close : Menu" /></el-icon>
       </button>
 
-      <RouterLink class="hdr__brand" to="/">
+      <RouterLink class="hdr__brand" to="/home">
         <span class="hdr__brand-mark">▍</span>WisdomHub
       </RouterLink>
 

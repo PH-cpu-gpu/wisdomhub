@@ -174,7 +174,7 @@ onMounted(() => void loadProfile())
     <el-skeleton v-if="loading" :rows="6" animated />
 
     <el-empty v-else-if="notFound" description="用户不存在">
-      <el-button type="primary" @click="router.push('/')">回首页</el-button>
+      <el-button type="primary" @click="router.push('/home')">回首页</el-button>
     </el-empty>
 
     <template v-else-if="profile">
