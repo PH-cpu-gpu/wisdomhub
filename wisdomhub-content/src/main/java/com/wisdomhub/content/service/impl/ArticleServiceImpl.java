@@ -13,7 +13,10 @@ import com.wisdomhub.common.mq.event.ArticleCreatedEvent;
 import com.wisdomhub.common.mq.event.ArticleDeletedEvent;
 import com.wisdomhub.common.mq.event.ArticleUpdatedEvent;
 import com.wisdomhub.common.mq.event.BaseEvent;
+import com.wisdomhub.common.mq.event.BehaviorRecordedEvent;
 import com.wisdomhub.common.mq.event.payload.ArticleDeletedPayload;
+import com.wisdomhub.common.mq.event.payload.BehaviorRecordedPayload;
+import com.wisdomhub.common.mq.constants.BehaviorTypeConstants;
 import com.wisdomhub.common.mq.event.payload.ArticleEventPayload;
 import com.wisdomhub.common.mq.util.EventPublisher;
 import com.wisdomhub.common.redis.constants.RedisTtl;
@@ -569,6 +572,9 @@ public class ArticleServiceImpl implements ArticleService {
                 return current;
             }
             Long latest = stringRedisTemplate.opsForValue().increment(countKey);
+            if (latest != null) {
+                sendViewBehavior(article.getId(), userId);
+            }
             // 真正计数的那次返回 INCR 之后的值，让用户看到自己 +1
             return latest == null ? current : Math.toIntExact(latest);
         } catch (Exception e) {
@@ -580,6 +586,19 @@ public class ArticleServiceImpl implements ArticleService {
 
     private int snapshotViewCount(Article article) {
         return article.getViewCount() == null ? 0 : article.getViewCount();
+    }
+
+    /** 浏览行为只记首次计数，失败不影响详情页 */
+    private void sendViewBehavior(Long articleId, Long userId) {
+        try {
+            List<Long> tagIds = articleTagMapper.selectList(new LambdaQueryWrapper<ArticleTag>()
+                            .eq(ArticleTag::getArticleId, articleId))
+                    .stream().map(ArticleTag::getTagId).toList();
+            eventPublisher.send(new BehaviorRecordedEvent(BehaviorRecordedPayload.builder()
+                    .userId(userId).articleId(articleId).behaviorType(BehaviorTypeConstants.VIEW).tagIds(tagIds).build()));
+        } catch (Exception e) {
+            log.warn("浏览行为事件发送失败, articleId={}, userId={}", articleId, userId, e);
+        }
     }
 
     /**

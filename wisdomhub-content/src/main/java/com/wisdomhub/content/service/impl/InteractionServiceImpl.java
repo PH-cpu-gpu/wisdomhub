@@ -5,8 +5,11 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.toolkit.support.SFunction;
 import com.wisdomhub.common.core.exception.BusinessException;
 import com.wisdomhub.common.core.result.CommonErrorCode;
+import com.wisdomhub.common.mq.constants.BehaviorTypeConstants;
 import com.wisdomhub.common.mq.event.ArticleLikedEvent;
+import com.wisdomhub.common.mq.event.BehaviorRecordedEvent;
 import com.wisdomhub.common.mq.event.payload.ArticleLikedPayload;
+import com.wisdomhub.common.mq.event.payload.BehaviorRecordedPayload;
 import com.wisdomhub.common.mq.util.EventPublisher;
 import com.wisdomhub.common.redis.constants.RedisTtl;
 import com.wisdomhub.common.web.util.CurrentUserUtil;
@@ -15,9 +18,11 @@ import com.wisdomhub.content.constants.ArticleRedisKeyConstants;
 import com.wisdomhub.content.domain.entity.Article;
 import com.wisdomhub.content.domain.entity.ArticleFavorite;
 import com.wisdomhub.content.domain.entity.ArticleLike;
+import com.wisdomhub.content.domain.entity.ArticleTag;
 import com.wisdomhub.content.mapper.ArticleFavoriteMapper;
 import com.wisdomhub.content.mapper.ArticleLikeMapper;
 import com.wisdomhub.content.mapper.ArticleMapper;
+import com.wisdomhub.content.mapper.ArticleTagMapper;
 import com.wisdomhub.content.service.InteractionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,6 +30,8 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 @Slf4j
 @Service
@@ -37,6 +44,7 @@ public class InteractionServiceImpl implements InteractionService {
     private final ArticleMapper articleMapper;
     private final ArticleLikeMapper articleLikeMapper;
     private final ArticleFavoriteMapper articleFavoriteMapper;
+    private final ArticleTagMapper articleTagMapper;
     private final StringRedisTemplate stringRedisTemplate;
     private final EventPublisher eventPublisher;
 
@@ -63,6 +71,7 @@ public class InteractionServiceImpl implements InteractionService {
             throw new BusinessException(CommonErrorCode.NOT_FOUND, "文章不存在");
         }
         sendLikeEvent(articleId, userId, article.getAuthorId());
+        sendBehaviorEvent(articleId, userId, BehaviorTypeConstants.LIKE);
         return readCount(articleId, Article::getLikeCount);
     }
 
@@ -104,6 +113,7 @@ public class InteractionServiceImpl implements InteractionService {
             clearGate(gateKey);
             throw new BusinessException(CommonErrorCode.NOT_FOUND, "文章不存在");
         }
+        sendBehaviorEvent(articleId, userId, BehaviorTypeConstants.COLLECT);
         return readCount(articleId, Article::getFavoriteCount);
     }
 
@@ -185,6 +195,19 @@ public class InteractionServiceImpl implements InteractionService {
                     .build()));
         } catch (Exception e) {
             log.error("文章点赞事件发送失败, articleId={}, userId={}", articleId, userId, e);
+        }
+    }
+
+    /** 画像采集失败只记日志，不影响点赞 / 收藏结果 */
+    private void sendBehaviorEvent(Long articleId, Long userId, String behaviorType) {
+        try {
+            List<Long> tagIds = articleTagMapper.selectList(new LambdaQueryWrapper<ArticleTag>()
+                            .eq(ArticleTag::getArticleId, articleId))
+                    .stream().map(ArticleTag::getTagId).toList();
+            eventPublisher.send(new BehaviorRecordedEvent(BehaviorRecordedPayload.builder()
+                    .userId(userId).articleId(articleId).behaviorType(behaviorType).tagIds(tagIds).build()));
+        } catch (Exception e) {
+            log.error("行为事件发送失败, articleId={}, userId={}, type={}", articleId, userId, behaviorType, e);
         }
     }
 
