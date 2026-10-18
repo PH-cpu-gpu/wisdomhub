@@ -26,7 +26,7 @@ export interface NavItem {
 
 /** 主导航。按技术文档 21 章的产品形态取：内容 → 问答 → 标签 → 图谱 → AI。 */
 export const primaryNav: NavItem[] = [
-  { label: '首页', to: '/', icon: House },
+  { label: '首页', to: '/home', icon: House },
   { label: '问答', to: '/questions', icon: QuestionFilled },
   { label: '标签', to: '/tags', icon: Collection },
   { label: '知识图谱', to: '/graph', icon: Connection },

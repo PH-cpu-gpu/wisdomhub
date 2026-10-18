@@ -54,6 +54,35 @@ function placeholder(
 
 export const routes: RouteRecordRaw[] = [
   // ==========================================================================
+  // 无外壳：开始页、登录页与设计系统页
+  // ⚠️ 必须排在 DefaultLayout 之前：`path: ''` 的根路由只能挂在第一个 `/` 上，否则访问 `/` 匹配不到任何路由。
+  // ==========================================================================
+  {
+    path: '/',
+    component: BlankLayout,
+    children: [
+      {
+        path: '',
+        name: 'start',
+        component: () => import('@/views/StartView.vue'),
+        meta: { title: '开始' },
+      },
+      {
+        path: 'login',
+        name: 'login',
+        component: () => import('@/views/LoginView.vue'),
+        meta: { title: '登录' },
+      },
+      {
+        path: 'design',
+        name: 'design',
+        component: () => import('@/views/DesignSystemView.vue'),
+        meta: { title: '设计系统' },
+      },
+    ],
+  },
+
+  // ==========================================================================
   // 默认外壳：顶部导航 + 侧边栏 + 页脚
   // ==========================================================================
   {
@@ -61,7 +90,7 @@ export const routes: RouteRecordRaw[] = [
     component: DefaultLayout,
     children: [
       {
-        path: '',
+        path: 'home',
         name: 'home',
         component: () => import('@/views/HomeView.vue'),
         meta: { title: '首页' },
@@ -216,28 +245,6 @@ export const routes: RouteRecordRaw[] = [
         name: 'not-found',
         component: () => import('@/views/NotFoundView.vue'),
         meta: { title: '页面不存在' },
-      },
-    ],
-  },
-
-  // ==========================================================================
-  // 无外壳：登录页与设计系统页
-  // ==========================================================================
-  {
-    path: '/',
-    component: BlankLayout,
-    children: [
-      {
-        path: 'login',
-        name: 'login',
-        component: () => import('@/views/LoginView.vue'),
-        meta: { title: '登录' },
-      },
-      {
-        path: 'design',
-        name: 'design',
-        component: () => import('@/views/DesignSystemView.vue'),
-        meta: { title: '设计系统' },
       },
     ],
   },

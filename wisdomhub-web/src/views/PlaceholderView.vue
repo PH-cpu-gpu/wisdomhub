@@ -20,7 +20,7 @@ const title = computed(() => (route.meta.title as string | undefined) ?? '页面
     <p class="ph__hint">这个功能还在开发中，敬请期待。</p>
 
     <div class="ph__actions">
-      <el-button type="primary" @click="$router.push('/')">回到首页</el-button>
+      <el-button type="primary" @click="$router.push('/home')">回到首页</el-button>
     </div>
   </div>
 </template>

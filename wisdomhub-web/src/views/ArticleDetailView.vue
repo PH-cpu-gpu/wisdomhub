@@ -209,7 +209,7 @@ onMounted(() => void load())
 
     <div v-else-if="notFound" class="art__state">
       <el-empty description="文章不存在或已删除" :image-size="96">
-        <el-button type="primary" @click="router.push('/')">回首页</el-button>
+        <el-button type="primary" @click="router.push('/home')">回首页</el-button>
       </el-empty>
     </div>
 
