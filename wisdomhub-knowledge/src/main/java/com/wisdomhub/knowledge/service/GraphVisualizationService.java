@@ -4,11 +4,13 @@ import com.wisdomhub.common.core.exception.BusinessException;
 import com.wisdomhub.common.core.result.CommonErrorCode;
 import com.wisdomhub.knowledge.api.ArticleBriefFeign;
 import com.wisdomhub.knowledge.api.dto.ArticleBriefDTO;
+import com.wisdomhub.knowledge.constants.KnowledgeCacheConstants;
 import com.wisdomhub.knowledge.domain.vo.GraphEdgeVO;
 import com.wisdomhub.knowledge.domain.vo.GraphNodeVO;
 import com.wisdomhub.knowledge.domain.vo.GraphVO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.neo4j.core.Neo4jClient;
 import org.springframework.stereotype.Service;
 
@@ -51,15 +53,19 @@ public class GraphVisualizationService {
     private final ArticleBriefFeign articleBriefFeign;
 
     /** 总览：整张技术图。Tag 是人工维护的话题级词表（130 条封顶），文章数无界所以不进这里 */
+    @Cacheable(cacheNames = KnowledgeCacheConstants.CACHE_GRAPH, key = "'all'")
     public GraphVO overview() {
-        List<GraphNodeVO> nodes = neo4jClient.query(ALL_TAG_NODES).fetch().all().stream()
+        // 缓存值不能含 JDK 不可变集合，否则 Redis 读回失败
+        List<GraphNodeVO> nodes = new ArrayList<>(neo4jClient.query(ALL_TAG_NODES).fetch().all().stream()
                 .map(GraphVisualizationService::toTagNode)
-                .toList();
-        List<GraphEdgeVO> edges = mapEdges(neo4jClient.query(ALL_TAG_EDGES).fetch().all());
+                .toList());
+        List<GraphEdgeVO> edges = new ArrayList<>(mapEdges(neo4jClient.query(ALL_TAG_EDGES).fetch().all()));
         return GraphVO.builder().nodes(nodes).edges(edges).articlesTruncated(false).build();
     }
 
     /** 邻域：中心 + depth 跳内的 Tag + 它们之间的边 + 只挂中心的文章 */
+    @Cacheable(cacheNames = KnowledgeCacheConstants.CACHE_GRAPH_NEIGHBORHOOD,
+            key = "#tagId + ':' + #depth + ':' + #articleLimit")
     public GraphVO neighborhood(String tagId, int depth, int articleLimit) {
         if (depth < 1 || depth > MAX_DEPTH) {
             throw new BusinessException(CommonErrorCode.BAD_REQUEST, "depth 需在 1~" + MAX_DEPTH + " 之间");

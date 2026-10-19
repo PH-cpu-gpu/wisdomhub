@@ -2,6 +2,7 @@ package com.wisdomhub.knowledge.service;
 
 import com.wisdomhub.common.core.exception.BusinessException;
 import com.wisdomhub.common.core.result.CommonErrorCode;
+import com.wisdomhub.knowledge.constants.KnowledgeCacheConstants;
 import com.wisdomhub.knowledge.domain.vo.PrerequisiteLevelVO;
 import com.wisdomhub.knowledge.domain.vo.PrerequisiteTreeVO;
 import com.wisdomhub.knowledge.domain.vo.RelationGroupVO;
@@ -10,6 +11,7 @@ import com.wisdomhub.knowledge.domain.vo.TagDetailVO;
 import com.wisdomhub.knowledge.domain.vo.TagRelationsVO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.neo4j.core.Neo4jClient;
 import org.springframework.stereotype.Service;
 
@@ -52,6 +54,7 @@ public class GraphQueryService {
     private final Neo4jClient neo4jClient;
 
     /** 技术详情 = 节点属性 + 相关技术 */
+    @Cacheable(cacheNames = KnowledgeCacheConstants.CACHE_TAG_DETAIL, key = "#tagId")
     public TagDetailVO detail(String tagId) {
         Map<String, Object> tag = findTag(tagId);
         return TagDetailVO.builder()
@@ -64,6 +67,7 @@ public class GraphQueryService {
     }
 
     /** 相关技术 = 该技术的全部直接邻居，按关系类型分组 */
+    @Cacheable(cacheNames = KnowledgeCacheConstants.CACHE_TAG_RELATED, key = "#tagId")
     public TagRelationsVO related(String tagId) {
         Map<String, Object> tag = findTag(tagId);
         return TagRelationsVO.builder()
@@ -73,6 +77,8 @@ public class GraphQueryService {
                 .build();
     }
 
+    /** 自调用不走代理，所以 ?tech= 这条入口必须自己带缓存注解 */
+    @Cacheable(cacheNames = KnowledgeCacheConstants.CACHE_TAG_RELATED, key = "'tech:' + #tech")
     public TagRelationsVO relatedByTechName(String tech) {
         if (tech == null || tech.isBlank()) {
             throw new BusinessException(CommonErrorCode.BAD_REQUEST, "tech 不能为空");
@@ -84,6 +90,7 @@ public class GraphQueryService {
     }
 
     /** 前置知识链：沿 PREREQUISITE 出边按层展开，visited 挡环 */
+    @Cacheable(cacheNames = KnowledgeCacheConstants.CACHE_TAG_PREREQUISITES, key = "#tagId + ':' + #maxDepth")
     public PrerequisiteTreeVO prerequisites(String tagId, int maxDepth) {
         if (maxDepth < 1 || maxDepth > MAX_DEPTH_LIMIT) {
             throw new BusinessException(CommonErrorCode.BAD_REQUEST, "maxDepth 需在 1~" + MAX_DEPTH_LIMIT + " 之间");
@@ -98,9 +105,10 @@ public class GraphQueryService {
         boolean truncated = false;
 
         for (int depth = 1; depth <= maxDepth; depth++) {
-            List<TagBriefVO> next = loadPrerequisites(frontier).stream()
+            // 缓存值不能含 JDK 不可变集合，否则 Redis 读回失败
+            List<TagBriefVO> next = new ArrayList<>(loadPrerequisites(frontier).stream()
                     .filter(pre -> !visited.contains(pre.getTagId()))
-                    .toList();
+                    .toList());
             if (next.isEmpty()) {
                 break;
             }

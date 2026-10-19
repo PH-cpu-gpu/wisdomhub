@@ -4,9 +4,12 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wisdomhub.knowledge.api.ContentTagFeign;
 import com.wisdomhub.knowledge.api.dto.TagInternalDTO;
+import com.wisdomhub.knowledge.constants.KnowledgeCacheConstants;
 import com.wisdomhub.knowledge.domain.vo.SeedResultVO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.neo4j.core.Neo4jClient;
 import org.springframework.stereotype.Service;
@@ -32,6 +35,13 @@ public class GraphSeedService {
     private final Neo4jClient neo4jClient;
     private final ObjectMapper objectMapper;
 
+    @Caching(evict = {
+            @CacheEvict(cacheNames = KnowledgeCacheConstants.CACHE_TAG_DETAIL, allEntries = true),
+            @CacheEvict(cacheNames = KnowledgeCacheConstants.CACHE_TAG_RELATED, allEntries = true),
+            @CacheEvict(cacheNames = KnowledgeCacheConstants.CACHE_TAG_PREREQUISITES, allEntries = true),
+            @CacheEvict(cacheNames = KnowledgeCacheConstants.CACHE_GRAPH, allEntries = true),
+            @CacheEvict(cacheNames = KnowledgeCacheConstants.CACHE_GRAPH_NEIGHBORHOOD, allEntries = true)
+    })
     public SeedResultVO seed() {
         List<TagInternalDTO> tags = contentTagFeign.listAllTags();
         seedNodes(tags);
