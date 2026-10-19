@@ -27,6 +27,8 @@ public class OrderVO {
 
     private LocalDateTime paidTime;
 
+    private LocalDateTime refundTime;
+
     private LocalDateTime createTime;
 
     private List<OrderItemVO> items;

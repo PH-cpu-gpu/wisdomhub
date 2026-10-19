@@ -3,6 +3,7 @@ package com.wisdomhub.order.service;
 import com.wisdomhub.common.core.result.PageResponse;
 import com.wisdomhub.order.domain.dto.OrderCreateDTO;
 import com.wisdomhub.order.domain.dto.OrderPayDTO;
+import com.wisdomhub.order.domain.dto.RefundDTO;
 import com.wisdomhub.order.domain.vo.OrderListItemVO;
 import com.wisdomhub.order.domain.vo.OrderVO;
 
@@ -16,6 +17,9 @@ public interface OrderService {
 
     /** 取消待支付订单，0 → 2；重复取消幂等 */
     void cancel(String orderNo);
+
+    /** 退款：发起 + 模拟完成/失败/处理中；仅订单买家本人 */
+    OrderVO refund(String orderNo, RefundDTO dto);
 
     /** 订单详情，只能看自己的 */
     OrderVO getOrder(String orderNo);

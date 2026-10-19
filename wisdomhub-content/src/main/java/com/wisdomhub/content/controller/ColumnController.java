@@ -5,6 +5,7 @@ import com.wisdomhub.common.core.result.R;
 import com.wisdomhub.content.domain.dto.ColumnCreateDTO;
 import com.wisdomhub.content.domain.vo.ArticleListItemVO;
 import com.wisdomhub.content.domain.vo.ColumnVO;
+import com.wisdomhub.content.domain.vo.PurchasedColumnVO;
 import com.wisdomhub.content.service.ColumnService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -41,6 +42,13 @@ public class ColumnController {
     public R<PageResponse<ColumnVO>> mine(@RequestParam(defaultValue = "1") Integer page,
                                           @RequestParam(defaultValue = "10") Integer pageSize) {
         return R.success(columnService.listMyColumns(page, pageSize));
+    }
+
+    @Operation(summary = "我的已购专栏")
+    @GetMapping("/purchased")
+    public R<PageResponse<PurchasedColumnVO>> purchased(@RequestParam(defaultValue = "1") Integer page,
+                                                        @RequestParam(defaultValue = "10") Integer pageSize) {
+        return R.success(columnService.listPurchasedColumns(page, pageSize));
     }
 
     @Operation(summary = "专栏详情")

@@ -17,6 +17,7 @@ import com.wisdomhub.order.config.OrderProperties;
 import com.wisdomhub.order.constants.OrderConstants;
 import com.wisdomhub.order.domain.dto.OrderCreateDTO;
 import com.wisdomhub.order.domain.dto.OrderPayDTO;
+import com.wisdomhub.order.domain.dto.RefundDTO;
 import com.wisdomhub.order.domain.entity.Order;
 import com.wisdomhub.order.domain.entity.OrderItem;
 import com.wisdomhub.order.domain.entity.PaymentRecord;
@@ -60,6 +61,8 @@ public class OrderServiceImpl implements OrderService {
     private final OrderProperties orderProperties;
     private final PlatformTransactionManager transactionManager;
     private final OrderPaymentExecutor paymentExecutor;
+    private final RefundStarter refundStarter;
+    private final RefundExecutor refundExecutor;
 
     // ==================== 下单 ====================
 
@@ -215,6 +218,82 @@ public class OrderServiceImpl implements OrderService {
         template.execute(status -> expireOrder(orderId, now));
     }
 
+    // ==================== 退款 ====================
+
+    @Override
+    public OrderVO refund(String orderNo, RefundDTO dto) {
+        Long userId = CurrentUserUtil.id();
+        Order order = requireOwnOrder(orderNo, userId);
+        int state = toInt(order.getState());
+
+        if (state == OrderConstants.REFUNDED) {
+            return toOrderVO(order);
+        }
+        if (state == OrderConstants.REFUNDING) {
+            return completeRefund(order, userId);
+        }
+        if (state != OrderConstants.PAID) {
+            throw new BusinessException(CommonErrorCode.CONFLICT, "只有已支付订单可以退款");
+        }
+
+        PaymentRecord payment = requireSuccessfulPayment(order.getId());
+        OrderItem item = requireSingleItem(order.getId());
+        String simulate = resolveSimulate(dto);
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
+
+        // 发起退款先单独提交：content 失败时订单要停在“退款中”，不能被全局回滚回已支付
+        refundStarter.start(order.getId(), payment.getId(), order.getAmount(), now);
+        if ("failure".equals(simulate)) {
+            refundStarter.fail(order.getId(), payment.getId(), now);
+        } else if (!"processing".equals(simulate)) {
+            refundExecutor.complete(order.getId(), payment.getId(), item.getItemId(), userId, now);
+        }
+        return toOrderVO(orderMapper.selectById(order.getId()));
+    }
+
+    private OrderVO completeRefund(Order order, Long userId) {
+        PaymentRecord payment = requireRefundProcessingPayment(order.getId());
+        OrderItem item = requireSingleItem(order.getId());
+        refundExecutor.complete(order.getId(), payment.getId(), item.getItemId(), userId,
+                LocalDateTime.now(ZoneOffset.UTC));
+        return toOrderVO(orderMapper.selectById(order.getId()));
+    }
+
+    private PaymentRecord requireSuccessfulPayment(Long orderId) {
+        PaymentRecord payment = paymentRecordMapper.selectOne(new LambdaQueryWrapper<PaymentRecord>()
+                .eq(PaymentRecord::getOrderId, orderId)
+                .eq(PaymentRecord::getState, (byte) OrderConstants.PAYMENT_SUCCESS)
+                .orderByDesc(PaymentRecord::getId)
+                .last("LIMIT 1"));
+        if (payment == null) {
+            throw new BusinessException(CommonErrorCode.INTERNAL_ERROR, "支付流水缺失");
+        }
+        return payment;
+    }
+
+    private PaymentRecord requireRefundProcessingPayment(Long orderId) {
+        PaymentRecord payment = paymentRecordMapper.selectOne(new LambdaQueryWrapper<PaymentRecord>()
+                .eq(PaymentRecord::getOrderId, orderId)
+                .eq(PaymentRecord::getState, (byte) OrderConstants.PAYMENT_SUCCESS)
+                .eq(PaymentRecord::getRefundState, (byte) OrderConstants.REFUND_PROCESSING)
+                .orderByDesc(PaymentRecord::getId)
+                .last("LIMIT 1"));
+        if (payment == null) {
+            throw new BusinessException(CommonErrorCode.CONFLICT, "退款流水状态异常");
+        }
+        return payment;
+    }
+
+    private String resolveSimulate(RefundDTO dto) {
+        String simulate = (dto == null || dto.getSimulate() == null || dto.getSimulate().isBlank())
+                ? "success" : dto.getSimulate();
+        if (!"success".equals(simulate) && !"failure".equals(simulate) && !"processing".equals(simulate)) {
+            throw new BusinessException(CommonErrorCode.BAD_REQUEST,
+                    "simulate 只支持 success/failure/processing");
+        }
+        return simulate;
+    }
+
     // ==================== 查询 ====================
 
     @Override
@@ -309,6 +388,7 @@ public class OrderServiceImpl implements OrderService {
                 .state(toInt(order.getState()))
                 .expireTime(order.getExpireTime())
                 .paidTime(order.getPaidTime())
+                .refundTime(order.getRefundTime())
                 .createTime(order.getCreateTime())
                 .items(items.stream().map(this::toItemVO).toList())
                 .payment(payment == null ? null : PaymentVO.builder()
@@ -316,6 +396,10 @@ public class OrderServiceImpl implements OrderService {
                         .payType(toInt(payment.getPayType()))
                         .state(toInt(payment.getState()))
                         .paidTime(payment.getPaidTime())
+                        .refundNo(payment.getRefundNo())
+                        .refundAmount(payment.getRefundAmount())
+                        .refundState(toInt(payment.getRefundState()))
+                        .refundTime(payment.getRefundTime())
                         .build())
                 .build();
     }

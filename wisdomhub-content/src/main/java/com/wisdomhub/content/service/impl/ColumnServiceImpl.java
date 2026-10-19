@@ -22,6 +22,7 @@ import com.wisdomhub.content.domain.entity.ColumnPurchase;
 import com.wisdomhub.content.domain.vo.ArticleListItemVO;
 import com.wisdomhub.content.domain.vo.ColumnTradeInfoVO;
 import com.wisdomhub.content.domain.vo.ColumnVO;
+import com.wisdomhub.content.domain.vo.PurchasedColumnVO;
 import com.wisdomhub.content.mapper.ArticleMapper;
 import com.wisdomhub.content.mapper.ColumnArticleMapper;
 import com.wisdomhub.content.mapper.ColumnMapper;
@@ -36,6 +37,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -88,6 +91,47 @@ public class ColumnServiceImpl implements ColumnService {
         IPage<Article> result = articleMapper.selectColumnArticlePage(PageUtil.of(page, pageSize),
                 columnId, ArticleConstants.PUBLISH, ArticleConstants.NOT_DELETED);
         List<ArticleListItemVO> items = result.getRecords().stream().map(this::toListItem).toList();
+        return PageUtil.toResponse(result, items);
+    }
+
+    @Override
+    public PageResponse<PurchasedColumnVO> listPurchasedColumns(Integer page, Integer pageSize) {
+        Page<ColumnPurchase> result = columnPurchaseMapper.selectPage(PageUtil.of(page, pageSize),
+                new LambdaQueryWrapper<ColumnPurchase>()
+                        .eq(ColumnPurchase::getUserId, CurrentUserUtil.id())
+                        .orderByDesc(ColumnPurchase::getCreateTime)
+                        .orderByDesc(ColumnPurchase::getId));
+        List<ColumnPurchase> purchases = result.getRecords();
+        if (purchases.isEmpty()) {
+            return PageUtil.toResponse(result, List.of());
+        }
+
+        Map<Long, Column> columns = columnMapper.selectList(new LambdaQueryWrapper<Column>()
+                        .in(Column::getId, purchases.stream().map(ColumnPurchase::getColumnId).toList()))
+                .stream()
+                .collect(Collectors.toMap(Column::getId, column -> column));
+        List<PurchasedColumnVO> items = purchases.stream()
+                .filter(purchase -> {
+                    Column column = columns.get(purchase.getColumnId());
+                    return column != null
+                            && column.getDeleted() == ColumnConstants.NOT_DELETED.byteValue();
+                })
+                .map(purchase -> {
+                    Column column = columns.get(purchase.getColumnId());
+                    return PurchasedColumnVO.builder()
+                            .columnId(column.getId())
+                            .userId(column.getUserId())
+                            .title(column.getTitle())
+                            .description(column.getDescription())
+                            .cover(column.getCover())
+                            .articleCount(column.getArticleCount())
+                            .state(column.getState() == null ? null : column.getState().intValue())
+                            .price(purchase.getPrice())
+                            .orderId(purchase.getOrderId())
+                            .purchaseTime(purchase.getCreateTime())
+                            .build();
+                })
+                .toList();
         return PageUtil.toResponse(result, items);
     }
 
@@ -259,6 +303,20 @@ public class ColumnServiceImpl implements ColumnService {
         return columnPurchaseMapper.selectOne(new LambdaQueryWrapper<ColumnPurchase>()
                 .eq(ColumnPurchase::getUserId, userId)
                 .eq(ColumnPurchase::getColumnId, columnId));
+    }
+
+    @Override
+    @Transactional
+    public void refundPurchase(Long columnId, Long userId, Long orderId) {
+        // 锁专栏行，与移出/删除路径串行化；下架或软删的专栏也要能退
+        columnMapper.selectOne(new LambdaQueryWrapper<Column>()
+                .eq(Column::getId, columnId)
+                .last("FOR UPDATE"));
+        // 必须带 orderId：退款后重购的新记录属于另一个订单，不能被旧回调删掉
+        columnPurchaseMapper.delete(new LambdaQueryWrapper<ColumnPurchase>()
+                .eq(ColumnPurchase::getUserId, userId)
+                .eq(ColumnPurchase::getColumnId, columnId)
+                .eq(ColumnPurchase::getOrderId, orderId));
     }
 
     /** 只有已发布且未删除的文章能归入专栏，同 B1.26 的 requireVisibleArticle */

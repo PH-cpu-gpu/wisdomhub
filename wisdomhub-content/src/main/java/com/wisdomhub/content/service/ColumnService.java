@@ -6,6 +6,7 @@ import com.wisdomhub.content.domain.dto.ColumnPurchaseDTO;
 import com.wisdomhub.content.domain.vo.ArticleListItemVO;
 import com.wisdomhub.content.domain.vo.ColumnTradeInfoVO;
 import com.wisdomhub.content.domain.vo.ColumnVO;
+import com.wisdomhub.content.domain.vo.PurchasedColumnVO;
 
 public interface ColumnService {
 
@@ -44,4 +45,10 @@ public interface ColumnService {
 
     /** 支付成功后写入购买记录。同 orderId 重试幂等，已购（不同订单）返回 409 */
     void purchase(Long columnId, ColumnPurchaseDTO dto);
+
+    /** 退款成功后删除购买记录；按 orderId 精确删除，同订单幂等 */
+    void refundPurchase(Long columnId, Long userId, Long orderId);
+
+    /** 我的已购专栏分页，按购买时间倒序 */
+    PageResponse<PurchasedColumnVO> listPurchasedColumns(Integer page, Integer pageSize);
 }
