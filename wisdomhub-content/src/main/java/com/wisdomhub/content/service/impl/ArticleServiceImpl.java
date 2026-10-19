@@ -39,7 +39,9 @@ import com.wisdomhub.content.domain.entity.Column;
 import com.wisdomhub.content.domain.entity.ColumnArticle;
 import com.wisdomhub.content.domain.entity.ColumnPurchase;
 import com.wisdomhub.content.domain.entity.Comment;
+import com.wisdomhub.content.domain.vo.ArticleAccessVO;
 import com.wisdomhub.content.domain.vo.ArticleBriefVO;
+import com.wisdomhub.content.domain.vo.ArticleColumnVO;
 import com.wisdomhub.content.domain.vo.ArticleDetailVO;
 import com.wisdomhub.content.domain.vo.ArticleInternalVO;
 import com.wisdomhub.content.domain.vo.ArticleListItemVO;
@@ -75,7 +77,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -515,18 +519,24 @@ public class ArticleServiceImpl implements ArticleService {
                 || article.getState() != ArticleConstants.PUBLISH.byteValue()) {
             throw new BusinessException(CommonErrorCode.NOT_FOUND, "文章不存在");
         }
-        ArticleContent content = articleContentRepository.findById(articleId).orElse(null);
-        if (content == null) {
-            // 不变式被破坏：行可见却没有正文。属服务端数据问题，不能当空文章返回
-            log.error("文章正文缺失, articleId={}", articleId);
-            throw new BusinessException(CommonErrorCode.INTERNAL_ERROR, "文章正文缺失");
+        ArticleAccessVO access = resolveArticleAccess(article);
+        ArticleContent content = null;
+        if (!Boolean.TRUE.equals(access.getLocked())) {
+            content = articleContentRepository.findById(articleId).orElse(null);
+            if (content == null) {
+                // 不变式被破坏：行可见却没有正文。属服务端数据问题，不能当空文章返回
+                log.error("文章正文缺失, articleId={}", articleId);
+                throw new BusinessException(CommonErrorCode.INTERNAL_ERROR, "文章正文缺失");
+            }
         }
         return ArticleDetailVO.builder()
                 .articleId(article.getId())
                 .authorId(article.getAuthorId())
                 .title(article.getTitle())
                 .summary(article.getSummary())
-                .html(content.getHtml())
+                .html(content == null ? null : content.getHtml())
+                .locked(access.getLocked())
+                .columns(access.getColumns())
                 .publishTime(article.getPublishTime())
                 .liked(resolveLiked(article.getId()))
                 .collected(resolveCollected(article.getId()))
@@ -535,6 +545,65 @@ public class ArticleServiceImpl implements ArticleService {
                 .commentCount(article.getCommentCount())
                 .favoriteCount(article.getFavoriteCount())
                 .build();
+    }
+
+    /**
+     * 付费墙：本地查 column / column_purchase，不跨服务。
+     * 作者本人、专栏属主、任一免费专栏、任一已购付费专栏都可读；否则锁定。
+     */
+    private ArticleAccessVO resolveArticleAccess(Article article) {
+        List<Long> columnIds = columnArticleMapper.selectList(new LambdaQueryWrapper<ColumnArticle>()
+                        .eq(ColumnArticle::getArticleId, article.getId()))
+                .stream()
+                .map(ColumnArticle::getColumnId)
+                .toList();
+        if (columnIds.isEmpty()) {
+            return ArticleAccessVO.builder().locked(false).columns(List.of()).build();
+        }
+
+        List<Column> columns = columnMapper.selectList(new LambdaQueryWrapper<Column>()
+                .in(Column::getId, columnIds)
+                .eq(Column::getDeleted, ColumnConstants.NOT_DELETED)
+                .orderByAsc(Column::getId));
+        if (columns.isEmpty()) {
+            return ArticleAccessVO.builder().locked(false).columns(List.of()).build();
+        }
+
+        Long userId = UserContext.getUserId();
+        Set<Long> purchased = userId == null ? Set.of() : columnPurchaseMapper.selectList(
+                        new LambdaQueryWrapper<ColumnPurchase>()
+                                .eq(ColumnPurchase::getUserId, userId)
+                                .in(ColumnPurchase::getColumnId, columnIds))
+                .stream()
+                .map(ColumnPurchase::getColumnId)
+                .collect(Collectors.toSet());
+
+        boolean locked = userId == null || !userId.equals(article.getAuthorId());
+        if (locked) {
+            for (Column column : columns) {
+                if (isFree(column)
+                        || (userId != null && userId.equals(column.getUserId()))
+                        || purchased.contains(column.getId())) {
+                    locked = false;
+                    break;
+                }
+            }
+        }
+
+        List<ArticleColumnVO> columnVOs = columns.stream()
+                .map(column -> ArticleColumnVO.builder()
+                        .columnId(column.getId())
+                        .title(column.getTitle())
+                        .price(column.getPrice())
+                        .purchased(purchased.contains(column.getId()))
+                        .purchasable(column.getState() == ColumnConstants.NORMAL.byteValue())
+                        .build())
+                .toList();
+        return ArticleAccessVO.builder().locked(locked).columns(columnVOs).build();
+    }
+
+    private boolean isFree(Column column) {
+        return column.getPrice() != null && column.getPrice() == 0;
     }
 
     /**

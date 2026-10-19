@@ -23,13 +23,7 @@ CREATE TABLE article_tag (
     INDEX idx_tag_id (tag_id)
 ) ENGINE=InnoDB COMMENT='文章标签';
 
--- 种子标签。项目没有管理后台，标签字典靠人工调 CRUD 接口维护，冷启动得先有一批可选的。
--- 小整数 ID 是给种子保留的，与雪花 ID（>= 10^18）不可能冲突。
--- ⚠️ 本文件只在「空数据卷首次建库」时执行一次；已有库得手工把整段 INSERT 复制过去跑。
--- 手工跑必须带 SET NAMES utf8mb4（或客户端 --default-character-set=utf8mb4）：容器里的
--- mysql 客户端默认 latin1，只是 cp 这几十行 INSERT 过去会漏掉第 5 行那句，中文会被双写一遍写坏。
--- 用 INSERT IGNORE 就是为了这个场景：按 id / uk_name 跳过已存在的行，不覆盖人工改过的名字。
--- category 只是展示分组，分组顺序由前端 wisdomhub-web/src/config/tag-categories.ts 决定，库里不排。
+-- 种子标签。
 INSERT IGNORE INTO tag (id, name, description, category, create_time, update_time) VALUES
     (1,   'Java',                'Java 语言与 JVM',                     '编程语言',      NOW(), NOW()),
     (2,   'Spring',              'Spring Framework',                    '后端与框架',    NOW(), NOW()),
@@ -230,3 +224,15 @@ CREATE TABLE column_purchase (
     INDEX idx_column_id (column_id),
     INDEX idx_order_id (order_id)
 ) ENGINE=InnoDB COMMENT='专栏购买记录';
+
+-- Seata AT 模式分支回滚表。表名与列名由 Seata 客户端写死，不能改
+CREATE TABLE undo_log (
+    branch_id BIGINT NOT NULL COMMENT '分支事务 ID',
+    xid VARCHAR(128) NOT NULL COMMENT '全局事务 ID',
+    context VARCHAR(128) NOT NULL COMMENT 'undo_log 上下文，如序列化方式',
+    rollback_info LONGBLOB NOT NULL COMMENT '回滚信息',
+    log_status INT NOT NULL COMMENT '0-正常 1-防悬挂',
+    log_created DATETIME(6) NOT NULL COMMENT '创建时间',
+    log_modified DATETIME(6) NOT NULL COMMENT '修改时间',
+    UNIQUE KEY ux_undo_log (xid, branch_id)
+) ENGINE=InnoDB COMMENT='Seata AT 模式 undo_log';

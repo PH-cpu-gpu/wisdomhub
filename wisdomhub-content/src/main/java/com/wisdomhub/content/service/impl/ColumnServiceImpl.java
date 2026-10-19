@@ -7,12 +7,14 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.wisdomhub.common.core.exception.BusinessException;
 import com.wisdomhub.common.core.result.CommonErrorCode;
 import com.wisdomhub.common.core.result.PageResponse;
+import com.wisdomhub.common.security.context.UserContext;
 import com.wisdomhub.common.web.util.CurrentUserUtil;
 import com.wisdomhub.common.web.util.OwnerUtil;
 import com.wisdomhub.common.web.util.PageUtil;
 import com.wisdomhub.content.constants.ArticleConstants;
 import com.wisdomhub.content.constants.ColumnConstants;
 import com.wisdomhub.content.domain.dto.ColumnCreateDTO;
+import com.wisdomhub.content.domain.dto.ColumnPurchaseDTO;
 import com.wisdomhub.content.domain.entity.Article;
 import com.wisdomhub.content.domain.entity.Column;
 import com.wisdomhub.content.domain.entity.ColumnArticle;
@@ -63,7 +65,10 @@ public class ColumnServiceImpl implements ColumnService {
 
     @Override
     public ColumnVO getColumnDetail(Long columnId) {
-        return toVO(requireVisibleColumn(columnId));
+        ColumnVO vo = toVO(requireVisibleColumn(columnId));
+        Long userId = UserContext.getUserId();
+        vo.setPurchased(userId != null && hasPurchased(columnId, userId));
+        return vo;
     }
 
     @Override
@@ -214,6 +219,46 @@ public class ColumnServiceImpl implements ColumnService {
         return columnPurchaseMapper.exists(new LambdaQueryWrapper<ColumnPurchase>()
                 .eq(ColumnPurchase::getColumnId, columnId)
                 .eq(ColumnPurchase::getUserId, userId));
+    }
+
+    @Override
+    @Transactional
+    public void purchase(Long columnId, ColumnPurchaseDTO dto) {
+        Long userId = CurrentUserUtil.id();
+        // 与移出文章 / 删除专栏 / 删除文章用同一把专栏行锁，售出后不允许再改内容
+        Column column = requireVisibleColumnForUpdate(columnId);
+        if (userId.equals(column.getUserId())) {
+            throw new BusinessException(CommonErrorCode.CONFLICT, "不能购买自己的专栏");
+        }
+
+        ColumnPurchase existing = findPurchase(userId, columnId);
+        if (existing != null) {
+            if (dto.getOrderId().equals(existing.getOrderId())) {
+                return;
+            }
+            throw new BusinessException(CommonErrorCode.CONFLICT, "已购买该专栏");
+        }
+        try {
+            columnPurchaseMapper.insert(ColumnPurchase.builder()
+                    .userId(userId)
+                    .columnId(columnId)
+                    .orderId(dto.getOrderId())
+                    .price(dto.getPrice())
+                    .build());
+        } catch (DuplicateKeyException e) {
+            // 并发写入：同订单视为 Seata 重试，其他订单才是重复购买
+            ColumnPurchase latest = findPurchase(userId, columnId);
+            if (latest != null && dto.getOrderId().equals(latest.getOrderId())) {
+                return;
+            }
+            throw new BusinessException(CommonErrorCode.CONFLICT, "已购买该专栏");
+        }
+    }
+
+    private ColumnPurchase findPurchase(Long userId, Long columnId) {
+        return columnPurchaseMapper.selectOne(new LambdaQueryWrapper<ColumnPurchase>()
+                .eq(ColumnPurchase::getUserId, userId)
+                .eq(ColumnPurchase::getColumnId, columnId));
     }
 
     /** 只有已发布且未删除的文章能归入专栏，同 B1.26 的 requireVisibleArticle */

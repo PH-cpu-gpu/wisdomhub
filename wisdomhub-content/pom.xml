@@ -75,6 +75,13 @@
             <artifactId>spring-boot-starter-data-mongodb</artifactId>
         </dependency>
 
+        <!-- 跨服务事务：content 写 column_purchase 与 order 写单在同一全局事务（技术文档 7.16、B2.24）。
+             该 starter 会传递引入 druid、fastjson、commons-lang:2.6 等，属已知现象。 -->
+        <dependency>
+            <groupId>com.alibaba.cloud</groupId>
+            <artifactId>spring-cloud-starter-alibaba-seata</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>com.alibaba.cloud</groupId>
             <artifactId>spring-cloud-starter-alibaba-nacos-discovery</artifactId>

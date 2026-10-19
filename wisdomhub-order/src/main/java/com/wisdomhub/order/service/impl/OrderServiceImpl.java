@@ -59,6 +59,7 @@ public class OrderServiceImpl implements OrderService {
     private final EventPublisher eventPublisher;
     private final OrderProperties orderProperties;
     private final PlatformTransactionManager transactionManager;
+    private final OrderPaymentExecutor paymentExecutor;
 
     // ==================== 下单 ====================
 
@@ -120,7 +121,6 @@ public class OrderServiceImpl implements OrderService {
     // ==================== 支付 ====================
 
     @Override
-    @Transactional
     public OrderVO pay(String orderNo, OrderPayDTO dto) {
         Long userId = CurrentUserUtil.id();
         int payType = resolvePayType(dto);
@@ -151,45 +151,12 @@ public class OrderServiceImpl implements OrderService {
             throw new BusinessException(CommonErrorCode.CONFLICT, "已购买该专栏");
         }
 
-        insertPayment(order, payType, now);
-        int affected = orderMapper.update(null, new LambdaUpdateWrapper<Order>()
-                .set(Order::getState, (byte) OrderConstants.PAID)
-                .set(Order::getPaidTime, now)
-                // update(null, wrapper) 不触发自动填充，update_time 要自己补
-                .set(Order::getUpdateTime, now)
-                .eq(Order::getId, order.getId())
-                .eq(Order::getState, (byte) OrderConstants.PENDING));
-        if (affected == 0) {
-            // 并发支付只有一笔能成功；另一笔抛出去回滚刚插入的成功流水
-            throw new BusinessException(CommonErrorCode.CONFLICT, "订单状态已变化，支付未生效");
-        }
+        // 全局事务只包支付与开通权限；前置检查留在外面，避免惰性过期的置 2 被全局回滚
+        paymentExecutor.payAndOpen(order, item, payType, now);
 
+        // 全局事务提交成功后才发通知，回滚不发
         sendPaidEvent(order, item);
         return toOrderVO(orderMapper.selectById(order.getId()));
-    }
-
-    private void insertPayment(Order order, int payType, LocalDateTime now) {
-        for (int attempt = 0; attempt < NO_RETRY; attempt++) {
-            PaymentRecord payment = PaymentRecord.builder()
-                    .paymentNo(OrderNoGenerator.nextPaymentNo())
-                    .orderId(order.getId())
-                    .amount(order.getAmount())
-                    .payType((byte) payType)
-                    .state((byte) OrderConstants.PAYMENT_SUCCESS)
-                    // 模拟支付没有真实渠道：transaction_id / refund_no 保持 NULL，不能写空串
-                    .expireTime(order.getExpireTime())
-                    .paidTime(now)
-                    .refundAmount(0)
-                    .refundState((byte) OrderConstants.REFUND_NONE)
-                    .build();
-            try {
-                paymentRecordMapper.insert(payment);
-                return;
-            } catch (DuplicateKeyException e) {
-                log.warn("支付单号冲突，重试, attempt={}", attempt + 1);
-            }
-        }
-        throw new BusinessException(CommonErrorCode.INTERNAL_ERROR, "支付单号生成失败，请重试");
     }
 
     private void sendPaidEvent(Order order, OrderItem item) {
