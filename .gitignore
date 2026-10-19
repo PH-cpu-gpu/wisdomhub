@@ -49,6 +49,3 @@ docker/elasticsearch/plugins/
 
 ### XXL-JOB 执行器运行时日志（按 xxl.job.executor.log-path 落在仓库根下）###
 logs/
-
-### impeccable 临时文件
-.impeccable/
