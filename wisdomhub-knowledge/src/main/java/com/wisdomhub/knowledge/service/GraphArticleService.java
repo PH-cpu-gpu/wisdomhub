@@ -1,7 +1,9 @@
 package com.wisdomhub.knowledge.service;
 
+import com.wisdomhub.knowledge.constants.KnowledgeCacheConstants;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.neo4j.core.Neo4jClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,6 +41,7 @@ public class GraphArticleService {
      * 整篇重建该文章的 ABOUT 边。
      */
     @Transactional
+    @CacheEvict(cacheNames = KnowledgeCacheConstants.CACHE_GRAPH_NEIGHBORHOOD, allEntries = true)
     public void rebuildAbout(Long articleId, Collection<String> names) {
         String id = String.valueOf(articleId);
         Set<String> wanted = names.stream()
@@ -72,6 +75,7 @@ public class GraphArticleService {
     }
 
     /** 文章删除：节点与它的 ABOUT 边一起走 */
+    @CacheEvict(cacheNames = KnowledgeCacheConstants.CACHE_GRAPH_NEIGHBORHOOD, allEntries = true)
     public void deleteArticle(Long articleId) {
         neo4jClient.query(DELETE_ARTICLE).bind(String.valueOf(articleId)).to("articleId").run();
         log.info("文章已清出图谱: articleId={}", articleId);
