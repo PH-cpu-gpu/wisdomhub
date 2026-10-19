@@ -3,6 +3,7 @@ package com.wisdomhub.order.api.content;
 import com.wisdomhub.order.api.content.dto.ColumnPurchaseDTO;
 import com.wisdomhub.order.api.content.dto.ColumnTradeInfoDTO;
 import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -21,4 +22,9 @@ public interface ContentFeign {
 
     @PostMapping("/column/{columnId}/purchase")
     void purchase(@PathVariable("columnId") Long columnId, @RequestBody ColumnPurchaseDTO dto);
+
+    @DeleteMapping("/column/{columnId}/purchase")
+    void refundPurchase(@PathVariable("columnId") Long columnId,
+                        @RequestParam("userId") Long userId,
+                        @RequestParam("orderId") Long orderId);
 }

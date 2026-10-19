@@ -29,4 +29,7 @@ public final class OrderConstants {
 
     /** 退款状态：0 无 1 处理中 2 成功 3 失败 */
     public static final int REFUND_NONE = 0;
+    public static final int REFUND_PROCESSING = 1;
+    public static final int REFUND_SUCCESS = 2;
+    public static final int REFUND_FAILED = 3;
 }

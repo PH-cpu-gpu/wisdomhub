@@ -21,4 +21,14 @@ public class PaymentVO {
     private Integer state;
 
     private LocalDateTime paidTime;
+
+    private String refundNo;
+
+    /** 退款金额，单位为分 */
+    private Integer refundAmount;
+
+    /** 0 无 1 处理中 2 成功 3 失败 */
+    private Integer refundState;
+
+    private LocalDateTime refundTime;
 }

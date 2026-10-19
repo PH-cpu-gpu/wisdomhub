@@ -4,6 +4,7 @@ import com.wisdomhub.common.core.result.PageResponse;
 import com.wisdomhub.common.core.result.R;
 import com.wisdomhub.order.domain.dto.OrderCreateDTO;
 import com.wisdomhub.order.domain.dto.OrderPayDTO;
+import com.wisdomhub.order.domain.dto.RefundDTO;
 import com.wisdomhub.order.domain.vo.OrderListItemVO;
 import com.wisdomhub.order.domain.vo.OrderVO;
 import com.wisdomhub.order.service.OrderService;
@@ -47,6 +48,13 @@ public class OrderController {
     public R<Void> cancel(@PathVariable String orderNo) {
         orderService.cancel(orderNo);
         return R.success();
+    }
+
+    @Operation(summary = "退款（模拟渠道）")
+    @PostMapping("/{orderNo}/refund")
+    public R<OrderVO> refund(@PathVariable String orderNo,
+                             @RequestBody(required = false) RefundDTO refundDTO) {
+        return R.success(orderService.refund(orderNo, refundDTO));
     }
 
     @Operation(summary = "我的订单")

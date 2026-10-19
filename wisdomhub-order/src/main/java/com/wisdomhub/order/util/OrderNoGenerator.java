@@ -23,6 +23,10 @@ public final class OrderNoGenerator {
         return next("P");
     }
 
+    public static String nextRefundNo() {
+        return next("R");
+    }
+
     private static String next(String prefix) {
         String time = LocalDateTime.now(ZoneOffset.UTC).format(FORMATTER);
         int random = ThreadLocalRandom.current().nextInt(RANDOM_BOUND);

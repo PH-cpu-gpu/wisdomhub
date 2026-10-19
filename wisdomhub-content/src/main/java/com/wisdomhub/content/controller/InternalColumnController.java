@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -42,6 +43,15 @@ public class InternalColumnController {
     @PostMapping("/{columnId}/purchase")
     public R<Void> purchase(@PathVariable Long columnId, @Valid @RequestBody ColumnPurchaseDTO dto) {
         columnService.purchase(columnId, dto);
+        return R.success();
+    }
+
+    @Operation(summary = "退款成功后删除购买记录（Seata 分支）")
+    @DeleteMapping("/{columnId}/purchase")
+    public R<Void> refundPurchase(@PathVariable Long columnId,
+                                  @RequestParam Long userId,
+                                  @RequestParam Long orderId) {
+        columnService.refundPurchase(columnId, userId, orderId);
         return R.success();
     }
 }
