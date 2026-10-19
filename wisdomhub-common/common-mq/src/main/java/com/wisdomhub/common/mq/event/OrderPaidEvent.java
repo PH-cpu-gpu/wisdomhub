@@ -7,9 +7,7 @@ import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 
-/**
- * 订单支付成功。消费者：content-service 写 column_purchase（若走最终一致），notification-service 通知专栏作者。
- */
+/** 订单支付成功。B2.24 起购买权限由 Seata 同步写，本事件只供 notification-service 通知专栏作者 */
 @Data
 @NoArgsConstructor
 @EqualsAndHashCode(callSuper = true)

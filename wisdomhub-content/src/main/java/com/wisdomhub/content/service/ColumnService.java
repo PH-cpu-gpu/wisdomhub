@@ -2,6 +2,7 @@ package com.wisdomhub.content.service;
 
 import com.wisdomhub.common.core.result.PageResponse;
 import com.wisdomhub.content.domain.dto.ColumnCreateDTO;
+import com.wisdomhub.content.domain.dto.ColumnPurchaseDTO;
 import com.wisdomhub.content.domain.vo.ArticleListItemVO;
 import com.wisdomhub.content.domain.vo.ColumnTradeInfoVO;
 import com.wisdomhub.content.domain.vo.ColumnVO;
@@ -40,4 +41,7 @@ public interface ColumnService {
 
     /** 用户是否已购买该专栏。下单与支付前拦截重复购买 */
     boolean hasPurchased(Long columnId, Long userId);
+
+    /** 支付成功后写入购买记录。同 orderId 重试幂等，已购（不同订单）返回 409 */
+    void purchase(Long columnId, ColumnPurchaseDTO dto);
 }

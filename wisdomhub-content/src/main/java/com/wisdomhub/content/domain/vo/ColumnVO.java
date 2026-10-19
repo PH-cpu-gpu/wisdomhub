@@ -33,5 +33,8 @@ public class ColumnVO {
 
     private Integer articleCount;
 
+    /** 当前用户是否已购买；仅专栏详情填充，我的专栏列表为 null */
+    private Boolean purchased;
+
     private LocalDateTime createTime;
 }

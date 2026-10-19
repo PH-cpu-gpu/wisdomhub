@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 /** 文章详情。正文给消毒后的 html；markdown 原文只走属主私有的 /source */
 @Data
@@ -23,8 +24,14 @@ public class ArticleDetailVO {
 
     private String summary;
 
-    /** 渲染并消毒后的正文 */
+    /** 渲染并消毒后的正文；locked=true 时为 null */
     private String html;
+
+    /** 是否被付费墙锁住。摘要仍返回，作为试读 */
+    private Boolean locked;
+
+    /** 包含本文的专栏及当前用户的购买状态；不在任何专栏时为空列表 */
+    private List<ArticleColumnVO> columns;
 
     private LocalDateTime publishTime;
 

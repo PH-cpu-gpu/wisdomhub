@@ -57,3 +57,15 @@ CREATE TABLE payment_record (
     INDEX idx_order_id (order_id),
     INDEX idx_state_expire (state, expire_time)
 ) ENGINE=InnoDB COMMENT='支付流水';
+
+-- Seata AT 模式分支回滚表。表名与列名由 Seata 客户端写死，不能改
+CREATE TABLE undo_log (
+    branch_id BIGINT NOT NULL COMMENT '分支事务 ID',
+    xid VARCHAR(128) NOT NULL COMMENT '全局事务 ID',
+    context VARCHAR(128) NOT NULL COMMENT 'undo_log 上下文，如序列化方式',
+    rollback_info LONGBLOB NOT NULL COMMENT '回滚信息',
+    log_status INT NOT NULL COMMENT '0-正常 1-防悬挂',
+    log_created DATETIME(6) NOT NULL COMMENT '创建时间',
+    log_modified DATETIME(6) NOT NULL COMMENT '修改时间',
+    UNIQUE KEY ux_undo_log (xid, branch_id)
+) ENGINE=InnoDB COMMENT='Seata AT 模式 undo_log';
