@@ -1,13 +1,11 @@
-package com.wisdomhub.user.config;
+package com.wisdomhub.common.job.config;
 
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.context.annotation.Configuration;
 
 @Data
-@Configuration
 @ConfigurationProperties(prefix = "xxl.job")
-public class XxlJobPropertyConfiguration {
+public class XxlJobProperties {
 
     /**
      * 调度中心地址，多个用逗号分隔
@@ -35,7 +33,7 @@ public class XxlJobPropertyConfiguration {
         private String appname;
 
         /**
-         * 执行器端口，调度中心靠回连这个端口触发任务
+         * 执行器端口，调度中心靠回连这个端口触发任务；每服务必须错开
          */
         private int port = 9999;
 

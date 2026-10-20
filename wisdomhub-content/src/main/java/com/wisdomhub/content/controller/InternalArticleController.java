@@ -55,4 +55,10 @@ public class InternalArticleController {
             @RequestParam(required = false) Integer size) {
         return R.success(articleService.syncArticles(since, lastId, size));
     }
+
+    @Operation(summary = "批量判断文章是否存在（未删除），供 knowledge 图谱对账")
+    @GetMapping("/article/exists")
+    public R<List<Long>> exists(@RequestParam("articleIds") List<Long> articleIds) {
+        return R.success(articleService.existingArticleIds(articleIds));
+    }
 }

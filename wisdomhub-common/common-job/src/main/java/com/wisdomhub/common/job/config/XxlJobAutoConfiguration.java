@@ -1,31 +1,29 @@
-package com.wisdomhub.user.config;
+package com.wisdomhub.common.job.config;
 
 import cn.hutool.core.util.StrUtil;
 import com.xxl.job.core.executor.impl.XxlJobSpringExecutor;
-import lombok.RequiredArgsConstructor;
+import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
 
 /**
- *
- * 没配 admin-addresses 就不建 bean：它是可选基础设施，不该让缺一个配置把整个服务拖垮。
- * 漏配的表现是调度中心触发时报「handler 不存在」，比启动失败好排查。
+ * 没配 admin-addresses 就不建 bean。
  */
-@Configuration
-@RequiredArgsConstructor
+@AutoConfiguration
+@EnableConfigurationProperties(XxlJobProperties.class)
 @ConditionalOnProperty(prefix = "xxl.job", name = "admin-addresses")
-public class XxlJobConfiguration {
-
-    private final XxlJobPropertyConfiguration xxlJobPropertyConfiguration;
+public class XxlJobAutoConfiguration {
 
     @Bean
-    public XxlJobSpringExecutor xxlJobSpringExecutor() {
-        XxlJobPropertyConfiguration.Executor executor = xxlJobPropertyConfiguration.getExecutor();
+    @ConditionalOnMissingBean
+    public XxlJobSpringExecutor xxlJobSpringExecutor(XxlJobProperties properties) {
+        XxlJobProperties.Executor executor = properties.getExecutor();
         XxlJobSpringExecutor xxlJobExecutor = new XxlJobSpringExecutor();
-        xxlJobExecutor.setEnabled(xxlJobPropertyConfiguration.getEnabled());
-        xxlJobExecutor.setAdminAddresses(xxlJobPropertyConfiguration.getAdminAddresses());
-        xxlJobExecutor.setAccessToken(xxlJobPropertyConfiguration.getAccessToken());
+        xxlJobExecutor.setEnabled(properties.getEnabled());
+        xxlJobExecutor.setAdminAddresses(properties.getAdminAddresses());
+        xxlJobExecutor.setAccessToken(properties.getAccessToken());
         xxlJobExecutor.setAppname(executor.getAppname());
         xxlJobExecutor.setPort(executor.getPort());
         xxlJobExecutor.setLogPath(executor.getLogPath());

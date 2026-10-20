@@ -14,4 +14,8 @@ public interface ArticleBriefFeign {
     /** 批量取文章摘要；返回顺序不保证与入参一致，调用方要自己按 id 重排 */
     @GetMapping("/brief")
     List<ArticleBriefDTO> listBrief(@RequestParam("articleIds") List<Long> articleIds);
+
+    /** 批量判活：只返回存在且未删除的文章 ID，供图谱对账 */
+    @GetMapping("/article/exists")
+    List<Long> existingArticleIds(@RequestParam("articleIds") List<Long> articleIds);
 }

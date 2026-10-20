@@ -920,6 +920,20 @@ public class ArticleServiceImpl implements ArticleService {
         return result;
     }
 
+    @Override
+    public List<Long> existingArticleIds(List<Long> articleIds) {
+        if (articleIds == null || articleIds.isEmpty()) {
+            return List.of();
+        }
+        return articleMapper.selectList(new LambdaQueryWrapper<Article>()
+                        .select(Article::getId)
+                        .in(Article::getId, articleIds)
+                        .eq(Article::getDeleted, ArticleConstants.NOT_DELETED))
+                .stream()
+                .map(Article::getId)
+                .toList();
+    }
+
     private ArticleInternalVO toInternalVO(Article article, String markdown, List<ArticleTagVO> tags) {
         return ArticleInternalVO.builder()
                 .articleId(article.getId())

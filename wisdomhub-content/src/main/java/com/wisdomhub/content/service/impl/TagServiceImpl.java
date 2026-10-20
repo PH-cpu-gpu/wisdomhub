@@ -3,6 +3,7 @@ package com.wisdomhub.content.service.impl;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.wisdomhub.common.core.exception.BusinessException;
 import com.wisdomhub.common.core.result.CommonErrorCode;
 import com.wisdomhub.common.mq.event.BaseEvent;
@@ -19,6 +20,7 @@ import com.wisdomhub.content.domain.dto.TagDTO;
 import com.wisdomhub.content.domain.entity.ArticleTag;
 import com.wisdomhub.content.domain.entity.Tag;
 import com.wisdomhub.content.domain.vo.HotTagVO;
+import com.wisdomhub.content.domain.vo.TagSyncVO;
 import com.wisdomhub.content.domain.vo.TagVO;
 import com.wisdomhub.content.mapper.ArticleTagMapper;
 import com.wisdomhub.content.mapper.TagMapper;
@@ -40,6 +42,9 @@ import java.util.List;
 @RequiredArgsConstructor
 public class TagServiceImpl implements TagService {
 
+    private static final int SYNC_DEFAULT_SIZE = 200;
+    private static final int SYNC_MAX_SIZE = 500;
+
     private final TagMapper tagMapper;
     private final ArticleTagMapper articleTagMapper;
     private final EventPublisher eventPublisher;
@@ -60,6 +65,31 @@ public class TagServiceImpl implements TagService {
                     .build());
         }
         return result;
+    }
+
+    @Override
+    public List<TagSyncVO> syncTags(LocalDateTime since, Long lastId, Integer size) {
+        int limit = (size == null || size <= 0) ? SYNC_DEFAULT_SIZE : Math.min(size, SYNC_MAX_SIZE);
+        long cursor = lastId == null ? 0L : lastId;
+        LambdaQueryWrapper<Tag> wrapper = new LambdaQueryWrapper<>();
+        if (since == null) {
+            wrapper.gt(Tag::getId, cursor).orderByAsc(Tag::getId);
+        } else {
+            wrapper.and(q -> q.gt(Tag::getUpdateTime, since)
+                            .or(o -> o.eq(Tag::getUpdateTime, since).gt(Tag::getId, cursor)))
+                    .orderByAsc(Tag::getUpdateTime)
+                    .orderByAsc(Tag::getId);
+        }
+        return tagMapper.selectPage(new Page<>(1, limit, false), wrapper).getRecords().stream()
+                .map(tag -> TagSyncVO.builder()
+                        .tagId(tag.getId())
+                        .name(tag.getName())
+                        .category(tag.getCategory())
+                        .description(tag.getDescription())
+                        .createTime(tag.getCreateTime())
+                        .updateTime(tag.getUpdateTime())
+                        .build())
+                .toList();
     }
 
     @Override

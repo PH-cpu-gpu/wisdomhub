@@ -3,7 +3,13 @@ package com.wisdomhub.search.service;
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import co.elastic.clients.elasticsearch._types.Conflicts;
 import co.elastic.clients.elasticsearch._types.ScriptLanguage;
+import co.elastic.clients.elasticsearch.core.GetResponse;
+import co.elastic.clients.elasticsearch.core.MgetResponse;
+import co.elastic.clients.elasticsearch.core.SearchResponse;
 import co.elastic.clients.elasticsearch.core.UpdateByQueryResponse;
+import co.elastic.clients.elasticsearch.core.get.GetResult;
+import co.elastic.clients.elasticsearch.core.mget.MultiGetResponseItem;
+import co.elastic.clients.elasticsearch.core.search.Hit;
 import co.elastic.clients.json.JsonData;
 import com.wisdomhub.common.core.exception.BusinessException;
 import com.wisdomhub.common.core.result.CommonErrorCode;
@@ -16,6 +22,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -97,6 +105,100 @@ public class EsIndexService {
     public void removeTagFromArticles(Long tagId) {
         updateTagInArticles("标签删除", REMOVE_TAG_FROM_ARTICLES, tagId,
                 Map.of("tagId", JsonData.of(String.valueOf(tagId))));
+    }
+
+    // ==================== 对账读取（B2.29）====================
+
+    public ArticleIndexDoc getArticle(Long articleId) {
+        return get(ARTICLE_INDEX, articleId, ArticleIndexDoc.class);
+    }
+
+    public QuestionIndexDoc getQuestion(Long questionId) {
+        return get(QUESTION_INDEX, questionId, QuestionIndexDoc.class);
+    }
+
+    public TagIndexDoc getTag(Long tagId) {
+        return get(TAG_INDEX, tagId, TagIndexDoc.class);
+    }
+
+    public Map<Long, ArticleIndexDoc> mgetArticles(List<Long> articleIds) {
+        return mget(ARTICLE_INDEX, articleIds, ArticleIndexDoc.class);
+    }
+
+    public Map<Long, QuestionIndexDoc> mgetQuestions(List<Long> questionIds) {
+        return mget(QUESTION_INDEX, questionIds, QuestionIndexDoc.class);
+    }
+
+    public Map<Long, TagIndexDoc> mgetTags(List<Long> tagIds) {
+        return mget(TAG_INDEX, tagIds, TagIndexDoc.class);
+    }
+
+    /** 按 ID 字段升序扫一页文档 ID，供全量孤儿检测；afterId 为上一页最后一个 ID */
+    public List<Long> scanArticleIds(String afterId, int size) {
+        return scanIds(ARTICLE_INDEX, "articleId", afterId, size);
+    }
+
+    public List<Long> scanQuestionIds(String afterId, int size) {
+        return scanIds(QUESTION_INDEX, "questionId", afterId, size);
+    }
+
+    public List<Long> scanTagIds(String afterId, int size) {
+        return scanIds(TAG_INDEX, "tagId", afterId, size);
+    }
+
+    private <T> T get(String indexName, Long id, Class<T> type) {
+        try {
+            GetResponse<T> response = elasticsearchClient.get(g -> g
+                    .index(indexName)
+                    .id(String.valueOf(id)), type);
+            return response.found() ? response.source() : null;
+        } catch (IOException e) {
+            throw new BusinessException(CommonErrorCode.INTERNAL_ERROR, "读取 ES 文档失败: " + e.getMessage());
+        }
+    }
+
+    private <T> Map<Long, T> mget(String indexName, List<Long> ids, Class<T> type) {
+        if (ids == null || ids.isEmpty()) {
+            return Map.of();
+        }
+        try {
+            MgetResponse<T> response = elasticsearchClient.mget(m -> m
+                    .index(indexName)
+                    .ids(ids.stream().map(String::valueOf).toList()), type);
+            Map<Long, T> result = new HashMap<>(ids.size());
+            for (MultiGetResponseItem<T> item : response.docs()) {
+                if (item.isResult()) {
+                    GetResult<T> doc = item.result();
+                    if (doc.found() && doc.source() != null) {
+                        result.put(Long.valueOf(doc.id()), doc.source());
+                    }
+                }
+            }
+            return result;
+        } catch (IOException e) {
+            throw new BusinessException(CommonErrorCode.INTERNAL_ERROR, "批量读取 ES 文档失败: " + e.getMessage());
+        }
+    }
+
+    private List<Long> scanIds(String indexName, String idField, String afterId, int size) {
+        try {
+            SearchResponse<Object> response = elasticsearchClient.search(s -> {
+                s.index(indexName)
+                        .size(size)
+                        .source(src -> src.fetch(false))
+                        .sort(so -> so.field(f -> f.field(idField)));
+                if (afterId != null) {
+                    s.searchAfter(afterId);
+                }
+                return s;
+            }, Object.class);
+            return response.hits().hits().stream()
+                    .map(Hit::id)
+                    .map(Long::valueOf)
+                    .toList();
+        } catch (IOException e) {
+            throw new BusinessException(CommonErrorCode.INTERNAL_ERROR, "扫描 ES 文档失败: " + e.getMessage());
+        }
     }
 
     private void index(String indexName, String label, Long id, Object doc) {

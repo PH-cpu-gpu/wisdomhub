@@ -4,6 +4,10 @@ import com.wisdomhub.common.core.result.PageResponse;
 import com.wisdomhub.content.domain.dto.QuestionCreateDTO;
 import com.wisdomhub.content.domain.vo.QuestionDetailVO;
 import com.wisdomhub.content.domain.vo.QuestionListItemVO;
+import com.wisdomhub.content.domain.vo.QuestionSyncVO;
+
+import java.time.LocalDateTime;
+import java.util.List;
 
 public interface QuestionService {
 
@@ -39,4 +43,7 @@ public interface QuestionService {
 
     /** 我的问题收藏分页，按收藏时间倒序 */
     PageResponse<QuestionListItemVO> listMyFavoriteQuestions(Integer page, Integer pageSize);
+
+    /** 对账分页：按 (updateTime, id) 游标，since 为 epoch 表示全量；**包含已删行**，供增量发 question.deleted */
+    List<QuestionSyncVO> syncQuestions(LocalDateTime since, Long lastId, Integer size);
 }

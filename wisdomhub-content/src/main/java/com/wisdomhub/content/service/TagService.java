@@ -2,14 +2,19 @@ package com.wisdomhub.content.service;
 
 import com.wisdomhub.content.domain.dto.TagDTO;
 import com.wisdomhub.content.domain.vo.HotTagVO;
+import com.wisdomhub.content.domain.vo.TagSyncVO;
 import com.wisdomhub.content.domain.vo.TagVO;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 public interface TagService {
 
     /** 全量标签字典。走两级缓存 */
     List<TagVO> listAllTags();
+
+    /** 对账分页：按 (updateTime, id) 游标，since 为 epoch 表示全量。不走缓存 */
+    List<TagSyncVO> syncTags(LocalDateTime since, Long lastId, Integer size);
 
     /** 热门标签。入参 limit 必须已由 TagConstants.clampHotLimit 钳制过。走两级缓存 */
     List<HotTagVO> listHotTags(Integer limit);
