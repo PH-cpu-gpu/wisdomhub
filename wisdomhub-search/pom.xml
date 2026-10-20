@@ -78,10 +78,11 @@
             <artifactId>spring-cloud-starter-alibaba-nacos-config</artifactId>
         </dependency>
 
-        <!-- ES / 死信队列 定时对账（任务 B2.29、B2.30） -->
+        <!-- XXL-JOB 执行器自动配置（任务 B2.28）；ES 对账任务（B2.29）复用 -->
         <dependency>
-            <groupId>com.xuxueli</groupId>
-            <artifactId>xxl-job-core</artifactId>
+            <groupId>com.wisdomhub</groupId>
+            <artifactId>common-job</artifactId>
+            <version>${project.version}</version>
         </dependency>
 
         <dependency>

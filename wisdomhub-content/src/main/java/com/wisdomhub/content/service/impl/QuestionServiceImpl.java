@@ -31,6 +31,7 @@ import com.wisdomhub.content.domain.entity.QuestionFavorite;
 import com.wisdomhub.content.domain.vo.AnswerVO;
 import com.wisdomhub.content.domain.vo.QuestionDetailVO;
 import com.wisdomhub.content.domain.vo.QuestionListItemVO;
+import com.wisdomhub.content.domain.vo.QuestionSyncVO;
 import com.wisdomhub.content.mapper.AnswerLikeMapper;
 import com.wisdomhub.content.mapper.AnswerMapper;
 import com.wisdomhub.content.mapper.CommentMapper;
@@ -48,6 +49,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Locale;
 
 @Slf4j
@@ -56,6 +58,9 @@ import java.util.Locale;
 public class QuestionServiceImpl implements QuestionService {
 
     private static final String FAVORITE_COUNT_COLUMN = "favorite_count";
+
+    private static final int SYNC_DEFAULT_SIZE = 200;
+    private static final int SYNC_MAX_SIZE = 500;
 
     private final QuestionMapper questionMapper;
     private final QuestionFavoriteMapper questionFavoriteMapper;
@@ -361,6 +366,38 @@ public class QuestionServiceImpl implements QuestionService {
         return userId != null && questionFavoriteMapper.exists(new LambdaQueryWrapper<QuestionFavorite>()
                 .eq(QuestionFavorite::getUserId, userId)
                 .eq(QuestionFavorite::getQuestionId, questionId));
+    }
+
+    @Override
+    public List<QuestionSyncVO> syncQuestions(LocalDateTime since, Long lastId, Integer size) {
+        int limit = (size == null || size <= 0) ? SYNC_DEFAULT_SIZE : Math.min(size, SYNC_MAX_SIZE);
+        long cursor = lastId == null ? 0L : lastId;
+        LambdaQueryWrapper<Question> wrapper = new LambdaQueryWrapper<Question>()
+                .select(Question::getId, Question::getUserId, Question::getTitle, Question::getContent,
+                        Question::getAnswerCount, Question::getFavoriteCount, Question::getAcceptedAnswerId,
+                        Question::getCreateTime, Question::getUpdateTime, Question::getDeleted);
+        if (since == null) {
+            wrapper.gt(Question::getId, cursor).orderByAsc(Question::getId);
+        } else {
+            wrapper.and(q -> q.gt(Question::getUpdateTime, since)
+                            .or(o -> o.eq(Question::getUpdateTime, since).gt(Question::getId, cursor)))
+                    .orderByAsc(Question::getUpdateTime)
+                    .orderByAsc(Question::getId);
+        }
+        return questionMapper.selectPage(new Page<>(1, limit, false), wrapper).getRecords().stream()
+                .map(question -> QuestionSyncVO.builder()
+                        .questionId(question.getId())
+                        .userId(question.getUserId())
+                        .title(question.getTitle())
+                        .content(question.getContent())
+                        .answerCount(question.getAnswerCount())
+                        .favoriteCount(question.getFavoriteCount())
+                        .acceptedAnswerId(question.getAcceptedAnswerId())
+                        .createTime(question.getCreateTime())
+                        .updateTime(question.getUpdateTime())
+                        .deleted(question.getDeleted() == null ? 0 : question.getDeleted().intValue())
+                        .build())
+                .toList();
     }
 
     private QuestionListItemVO toListItem(Question question) {

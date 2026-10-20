@@ -65,4 +65,7 @@ public interface ArticleService {
      * 增量分页，供 ES 全量对账。游标是 (since, lastId) 复合键，不是单纯的 since
      */
     List<ArticleInternalVO> syncArticles(LocalDateTime since, Long lastId, Integer size);
+
+    /** 批量判断文章是否存在（未删除），供 knowledge 图谱对账 */
+    List<Long> existingArticleIds(List<Long> articleIds);
 }

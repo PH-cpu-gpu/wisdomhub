@@ -78,10 +78,11 @@
             <artifactId>spring-cloud-starter-alibaba-nacos-config</artifactId>
         </dependency>
 
-        <!-- Neo4j 定时全量对账 -->
+        <!-- XXL-JOB 执行器自动配置（任务 B2.28）；Neo4j 对账任务（B2.29）复用 -->
         <dependency>
-            <groupId>com.xuxueli</groupId>
-            <artifactId>xxl-job-core</artifactId>
+            <groupId>com.wisdomhub</groupId>
+            <artifactId>common-job</artifactId>
+            <version>${project.version}</version>
         </dependency>
 
         <dependency>
