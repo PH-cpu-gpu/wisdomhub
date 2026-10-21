@@ -1,6 +1,7 @@
 package com.wisdomhub.notification.mq;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.rabbitmq.client.Channel;
 import com.wisdomhub.common.mq.constants.MqRoutingKeyConstants;
 import com.wisdomhub.common.mq.event.payload.AgentAnalysisCompletedPayload;
 import com.wisdomhub.common.mq.event.payload.AnswerCreatedPayload;
@@ -19,9 +20,12 @@ import com.wisdomhub.notification.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.springframework.amqp.support.AmqpHeaders;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
 
+import java.io.IOException;
 import java.util.Map;
 
 /**
@@ -38,7 +42,13 @@ public class NotificationEventConsumer {
     private final NotificationPushService notificationPushService;
 
     @RabbitListener(queues = NotificationMqConfiguration.NOTIFICATION_QUEUE)
-    public void onEvent(NotificationEventEnvelope event) {
+    public void onEvent(NotificationEventEnvelope event, Channel channel,
+                        @Header(AmqpHeaders.DELIVERY_TAG) long deliveryTag) throws IOException {
+        handle(event);
+        channel.basicAck(deliveryTag, false);
+    }
+
+    private void handle(NotificationEventEnvelope event) {
         if (!handled(event.getEventType())) {
             log.debug("忽略不关心的路由键: {}", event.getEventType());
             return;

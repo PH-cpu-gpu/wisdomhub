@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.wisdomhub.content.mapper.CountReconcileMapper">
+
+    <select id="countArticleLikesByArticle" resultType="java.util.Map">
+        SELECT article_id AS articleId, COUNT(*) AS cnt
+        FROM article_like
+        GROUP BY article_id
+    </select>
+
+    <select id="countArticleFavoritesByArticle" resultType="java.util.Map">
+        SELECT article_id AS articleId, COUNT(*) AS cnt
+        FROM article_favorite
+        GROUP BY article_id
+    </select>
+
+    <select id="countAnswerLikesByAnswer" resultType="java.util.Map">
+        SELECT answer_id AS answerId, COUNT(*) AS cnt
+        FROM answer_like
+        GROUP BY answer_id
+    </select>
+
+    <select id="countQuestionFavoritesByQuestion" resultType="java.util.Map">
+        SELECT question_id AS questionId, COUNT(*) AS cnt
+        FROM question_favorite
+        GROUP BY question_id
+    </select>
+
+    <select id="countColumnArticlesByColumn" resultType="java.util.Map">
+        SELECT column_id AS columnId, COUNT(*) AS cnt
+        FROM column_article
+        GROUP BY column_id
+    </select>
+
+    <select id="countCommentsByTarget" resultType="java.util.Map">
+        SELECT target_id AS targetId, COUNT(*) AS cnt
+        FROM comment
+        WHERE target_type = #{targetType} AND deleted = 0
+        GROUP BY target_id
+    </select>
+
+    <select id="countAnswersByQuestion" resultType="java.util.Map">
+        SELECT question_id AS questionId, COUNT(*) AS cnt
+        FROM answer
+        WHERE deleted = 0
+        GROUP BY question_id
+    </select>
+
+</mapper>

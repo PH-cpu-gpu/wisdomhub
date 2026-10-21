@@ -24,5 +24,7 @@ CREATE TABLE article (
     INDEX idx_state_publish (state, publish_time),
     INDEX idx_state_view (state, view_count),
     -- B2.1 内部增量同步按 (update_time, id) 复合游标扫；缺它这条查询要全表扫 + filesort
-    INDEX idx_update_time_id (update_time, id)
+    INDEX idx_update_time_id (update_time, id),
+    -- B2.32 墓碑清理：WHERE deleted=1 AND update_time < ? ORDER BY update_time, id
+    INDEX idx_deleted_update (deleted, update_time)
 ) ENGINE=InnoDB COMMENT='文章';
