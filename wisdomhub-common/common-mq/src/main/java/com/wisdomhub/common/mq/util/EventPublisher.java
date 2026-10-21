@@ -2,6 +2,7 @@ package com.wisdomhub.common.mq.util;
 
 import com.wisdomhub.common.mq.constants.MqTopologyConstants;
 import com.wisdomhub.common.mq.event.BaseEvent;
+import org.springframework.amqp.rabbit.connection.CorrelationData;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 
 public class EventPublisher {
@@ -24,7 +25,8 @@ public class EventPublisher {
                 message -> {
                     message.getMessageProperties().setMessageId(event.getEventId());
                     return message;
-                }
+                },
+                new CorrelationData(event.getEventId())
         );
     }
 }

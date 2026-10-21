@@ -1,5 +1,6 @@
 package com.wisdomhub.search.mq;
 
+import com.rabbitmq.client.Channel;
 import com.wisdomhub.common.mq.constants.MqRoutingKeyConstants;
 import com.wisdomhub.common.mq.event.payload.QuestionEventPayload;
 import com.wisdomhub.search.config.SearchMqConfiguration;
@@ -8,7 +9,11 @@ import com.wisdomhub.search.service.EsIndexService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.springframework.amqp.support.AmqpHeaders;
+import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
+
+import java.io.IOException;
 
 /**
  * 消费 question.* 事件维护 question_index。
@@ -23,7 +28,13 @@ public class QuestionIndexConsumer {
     private final EsIndexService esIndexService;
 
     @RabbitListener(queues = SearchMqConfiguration.QUESTION_QUEUE)
-    public void onQuestionEvent(QuestionEventEnvelope event) {
+    public void onQuestionEvent(QuestionEventEnvelope event, Channel channel,
+                                @Header(AmqpHeaders.DELIVERY_TAG) long deliveryTag) throws IOException {
+        handle(event);
+        channel.basicAck(deliveryTag, false);
+    }
+
+    private void handle(QuestionEventEnvelope event) {
         Long questionId = requireQuestionId(event);
         switch (event.getEventType()) {
             case MqRoutingKeyConstants.QUESTION_CREATED -> esIndexService.indexQuestion(toDoc(event.getPayload()));

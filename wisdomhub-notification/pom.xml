@@ -48,6 +48,12 @@
             <artifactId>common-mq</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <!-- 死信扫描与重投的 XXL-JOB 执行器（B2.30） -->
+        <dependency>
+            <groupId>com.wisdomhub</groupId>
+            <artifactId>common-job</artifactId>
+            <version>${project.version}</version>
+        </dependency>
 
         <dependency>
             <groupId>org.springframework.boot</groupId>

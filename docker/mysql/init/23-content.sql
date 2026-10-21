@@ -168,7 +168,8 @@ CREATE TABLE comment (
     deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除 0-未删除 1-已删除',
     INDEX idx_target (target_type, target_id, create_time),
     INDEX idx_user_id (user_id),
-    INDEX idx_parent_id (parent_id)
+    INDEX idx_parent_id (parent_id),
+    INDEX idx_deleted_update (deleted, update_time)
 ) ENGINE=InnoDB COMMENT='评论';
 
 CREATE TABLE article_like (
@@ -201,7 +202,8 @@ CREATE TABLE `column` (
     create_time DATETIME NOT NULL COMMENT '创建时间',
     update_time DATETIME NOT NULL COMMENT '更新时间',
     deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除 0-未删除 1-已删除',
-    INDEX idx_user_id (user_id)
+    INDEX idx_user_id (user_id),
+    INDEX idx_deleted_update (deleted, update_time)
 ) ENGINE=InnoDB COMMENT='专栏';
 
 CREATE TABLE column_article (

@@ -1,6 +1,7 @@
 package com.wisdomhub.recommendation.mq;
 
 import cn.hutool.core.util.StrUtil;
+import com.rabbitmq.client.Channel;
 import com.wisdomhub.common.mq.constants.MqRoutingKeyConstants;
 import com.wisdomhub.common.mq.event.payload.BehaviorRecordedPayload;
 import com.wisdomhub.recommendation.config.RecommendationMqConfiguration;
@@ -9,8 +10,12 @@ import com.wisdomhub.recommendation.service.InterestProfileService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.springframework.amqp.support.AmqpHeaders;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
+
+import java.io.IOException;
 
 /** 行为采集消费端：eventId 去重后写入画像 */
 @Slf4j
@@ -22,7 +27,13 @@ public class BehaviorEventConsumer {
     private final InterestProfileService interestProfileService;
 
     @RabbitListener(queues = RecommendationMqConfiguration.BEHAVIOR_QUEUE)
-    public void onEvent(BehaviorEventEnvelope event) {
+    public void onEvent(BehaviorEventEnvelope event, Channel channel,
+                        @Header(AmqpHeaders.DELIVERY_TAG) long deliveryTag) throws IOException {
+        handle(event);
+        channel.basicAck(deliveryTag, false);
+    }
+
+    private void handle(BehaviorEventEnvelope event) {
         if (!MqRoutingKeyConstants.BEHAVIOR_RECORDED.equals(event.getEventType())) {
             log.debug("忽略不关心的路由键: {}", event.getEventType());
             return;

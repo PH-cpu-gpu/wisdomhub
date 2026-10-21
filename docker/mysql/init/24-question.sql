@@ -16,7 +16,8 @@ CREATE TABLE question (
     update_time DATETIME NOT NULL COMMENT '更新时间',
     deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除 0-未删除 1-已删除',
     INDEX idx_user_id (user_id),
-    INDEX idx_create_time (create_time)
+    INDEX idx_create_time (create_time),
+    INDEX idx_deleted_update (deleted, update_time)
 ) ENGINE=InnoDB COMMENT='问题';
 
 CREATE TABLE answer (
@@ -30,7 +31,8 @@ CREATE TABLE answer (
     update_time DATETIME NOT NULL COMMENT '更新时间',
     deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除 0-未删除 1-已删除',
     INDEX idx_question_id (question_id, create_time),
-    INDEX idx_user_id (user_id)
+    INDEX idx_user_id (user_id),
+    INDEX idx_deleted_update (deleted, update_time)
 ) ENGINE=InnoDB COMMENT='回答';
 
 CREATE TABLE answer_like (

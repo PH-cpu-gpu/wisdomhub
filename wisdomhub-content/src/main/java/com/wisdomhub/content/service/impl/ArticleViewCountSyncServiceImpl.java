@@ -38,6 +38,7 @@ public class ArticleViewCountSyncServiceImpl implements ArticleViewCountSyncServ
         int scanned = 0;
         int written = 0;
         int skipped = 0;
+        int orphanDeleted = 0;
         int failedBatches = 0;
 
         // 边扫边攒批：SCAN 游标只走一遍，不在内存里留全量 key
@@ -51,6 +52,7 @@ public class ArticleViewCountSyncServiceImpl implements ArticleViewCountSyncServ
                     BatchResult result = flushBatch(batch);
                     written += result.written();
                     skipped += result.skipped();
+                    orphanDeleted += result.orphanDeleted();
                     failedBatches += result.failed() ? 1 : 0;
                     batch.clear();
                 }
@@ -61,11 +63,13 @@ public class ArticleViewCountSyncServiceImpl implements ArticleViewCountSyncServ
             BatchResult result = flushBatch(batch);
             written += result.written();
             skipped += result.skipped();
+            orphanDeleted += result.orphanDeleted();
             failedBatches += result.failed() ? 1 : 0;
         }
 
         String summary = "扫描阅读量 key " + scanned + " 个，回写 article.view_count " + written
-                + " 处，跳过 " + skipped + " 个（文章不存在 / 值非法 / 读不到），失败 " + failedBatches + " 批";
+                + " 处，删除孤儿 key " + orphanDeleted + " 个，跳过 " + skipped
+                + " 个（值非法 / 读不到），失败 " + failedBatches + " 批";
         if (failedBatches > 0) {
             // 写的是绝对值、重跑幂等；但要抛出去让调度中心把这次执行标红，而不是静默成功
             throw new IllegalStateException(summary);
@@ -79,7 +83,7 @@ public class ArticleViewCountSyncServiceImpl implements ArticleViewCountSyncServ
             return doFlushBatch(keys);
         } catch (RuntimeException e) {
             log.error("阅读量落库批失败, 跳过继续: size={}", keys.size(), e);
-            return new BatchResult(0, 0, true);
+            return new BatchResult(0, 0, 0, true);
         }
     }
 
@@ -96,7 +100,7 @@ public class ArticleViewCountSyncServiceImpl implements ArticleViewCountSyncServ
             }
         }
         if (articleIds.isEmpty()) {
-            return new BatchResult(0, skipped, false);
+            return new BatchResult(0, skipped, 0, false);
         }
 
         // MGET 一次往返取全部值（本项目 Redis 是单节点，不涉及 Cluster 的 CROSSSLOT）
@@ -118,7 +122,7 @@ public class ArticleViewCountSyncServiceImpl implements ArticleViewCountSyncServ
             redisCounts.put(articleIds.get(i), count);
         }
         if (redisCounts.isEmpty()) {
-            return new BatchResult(0, skipped, false);
+            return new BatchResult(0, skipped, 0, false);
         }
 
         // 先查出当前值再比对：只有真的变了才发 UPDATE，且顺带得到「文章是否存在」的判据
@@ -132,12 +136,21 @@ public class ArticleViewCountSyncServiceImpl implements ArticleViewCountSyncServ
         }
 
         int written = 0;
+        int orphanDeleted = 0;
         for (Map.Entry<Long, Integer> entry : redisCounts.entrySet()) {
             Integer dbValue = dbCounts.get(entry.getKey());
             if (dbValue == null) {
-                // 文章不存在/已逻辑删除 = 孤儿 key。
-                skipped++;
-                log.debug("阅读量孤儿 key, 文章不存在: articleId={}", entry.getKey());
+                // 文章不存在/已逻辑删除 = 孤儿 key，直接删掉，不能留成永久 key
+                String orphanKey = KEY_PREFIX + entry.getKey();
+                try {
+                    if (Boolean.TRUE.equals(stringRedisTemplate.delete(orphanKey))) {
+                        orphanDeleted++;
+                    }
+                    log.debug("删除阅读量孤儿 key: articleId={}", entry.getKey());
+                } catch (RuntimeException e) {
+                    log.warn("删除阅读量孤儿 key 失败: {}", orphanKey, e);
+                    skipped++;
+                }
                 continue;
             }
             if (dbValue.equals(entry.getValue())) {
@@ -149,7 +162,7 @@ public class ArticleViewCountSyncServiceImpl implements ArticleViewCountSyncServ
                     .eq(Article::getId, entry.getKey())
                     .eq(Article::getDeleted, ArticleConstants.NOT_DELETED));
         }
-        return new BatchResult(written, skipped, false);
+        return new BatchResult(written, skipped, orphanDeleted, false);
     }
 
     /** 解析计数；非数字、负数、超 INT 上限都返回 null 让调用方跳过 */
@@ -167,6 +180,6 @@ public class ArticleViewCountSyncServiceImpl implements ArticleViewCountSyncServ
         }
     }
 
-    private record BatchResult(int written, int skipped, boolean failed) {
+    private record BatchResult(int written, int skipped, int orphanDeleted, boolean failed) {
     }
 }

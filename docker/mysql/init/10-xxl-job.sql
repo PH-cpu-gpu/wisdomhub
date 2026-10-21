@@ -149,7 +149,8 @@ INSERT INTO `xxl_job_group`(`id`, `app_name`, `title`, `address_type`, `address_
     VALUES (1, 'wisdomhub-user-executor', '用户服务执行器', 0, NULL, now()),
            (2, 'wisdomhub-content-executor', '内容服务执行器', 0, NULL, now()),
            (3, 'wisdomhub-search-executor', '搜索服务执行器', 0, NULL, now()),
-           (4, 'wisdomhub-knowledge-executor', '知识服务执行器', 0, NULL, now());
+           (4, 'wisdomhub-knowledge-executor', '知识服务执行器', 0, NULL, now()),
+           (5, 'wisdomhub-notification-executor', '通知服务执行器', 0, NULL, now());
 
 INSERT INTO `xxl_job_info`(`id`, `job_group`, `job_desc`, `add_time`, `update_time`, `author`, `alarm_email`,
                            `schedule_type`, `schedule_conf`, `misfire_strategy`, `executor_route_strategy`,
@@ -179,6 +180,18 @@ VALUES (1, 1, '矫正用户关注数/粉丝数', now(), now(), 'WisdomHub', '', 
         now(), '', 0),
        (8, 4, 'Neo4j Article 节点对账', now(), now(), 'WisdomHub', '', 'CRON', '0 45 4 * * ?',
         'DO_NOTHING', 'FIRST', 'graphReconcileHandler', '', 'SERIAL_EXECUTION', 0, 0, 'BEAN', '', 'GLUE代码初始化',
+        now(), '', 0),
+       (9, 5, 'MQ 死信扫描与重投', now(), now(), 'WisdomHub', '', 'CRON', '0 */5 * * * ?',
+        'DO_NOTHING', 'FIRST', 'mqDeadLetterReplayHandler', '', 'SERIAL_EXECUTION', 0, 0, 'BEAN', '', 'GLUE代码初始化',
+        now(), '', 0),
+       (10, 2, '已删除数据墓碑清理', now(), now(), 'WisdomHub', '', 'CRON', '0 0 5 * * ?',
+        'DO_NOTHING', 'FIRST', 'deletedDataCleanupHandler', '', 'SERIAL_EXECUTION', 0, 0, 'BEAN', '', 'GLUE代码初始化',
+        now(), '', 0),
+       (11, 2, 'Mongo 正文孤儿清理', now(), now(), 'WisdomHub', '', 'CRON', '0 15 5 * * ?',
+        'DO_NOTHING', 'FIRST', 'mongoContentOrphanCleanupHandler', '', 'SERIAL_EXECUTION', 0, 0, 'BEAN', '', 'GLUE代码初始化',
+        now(), '', 0),
+       (12, 2, '计数快照列对账', now(), now(), 'WisdomHub', '', 'CRON', '0 50 4 * * ?',
+        'DO_NOTHING', 'FIRST', 'countReconcileHandler', '', 'SERIAL_EXECUTION', 0, 0, 'BEAN', '', 'GLUE代码初始化',
         now(), '', 0);
 
 INSERT INTO `xxl_job_user`(`id`, `username`, `password`, `role`, `permission`)

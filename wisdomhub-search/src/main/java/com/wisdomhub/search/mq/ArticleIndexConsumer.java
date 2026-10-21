@@ -1,5 +1,6 @@
 package com.wisdomhub.search.mq;
 
+import com.rabbitmq.client.Channel;
 import com.wisdomhub.common.core.exception.BusinessException;
 import com.wisdomhub.common.core.result.CommonErrorCode;
 import com.wisdomhub.common.mq.constants.MqRoutingKeyConstants;
@@ -12,8 +13,11 @@ import com.wisdomhub.search.service.EsIndexService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.springframework.amqp.support.AmqpHeaders;
+import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
 
+import java.io.IOException;
 import java.util.List;
 
 /**
@@ -35,7 +39,13 @@ public class ArticleIndexConsumer {
     private final EsIndexService esIndexService;
 
     @RabbitListener(queues = SearchMqConfiguration.ARTICLE_QUEUE)
-    public void onArticleEvent(ArticleEventEnvelope event) {
+    public void onArticleEvent(ArticleEventEnvelope event, Channel channel,
+                               @Header(AmqpHeaders.DELIVERY_TAG) long deliveryTag) throws IOException {
+        handle(event);
+        channel.basicAck(deliveryTag, false);
+    }
+
+    private void handle(ArticleEventEnvelope event) {
         Long articleId = event.getPayload() == null ? null : event.getPayload().getArticleId();
         if (articleId == null) {
             // payload 残缺没法处理，抛出去让它重试耗尽后进死信，别静默 ACK 掉
