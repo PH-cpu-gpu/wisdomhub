@@ -192,6 +192,12 @@ VALUES (1, 1, '矫正用户关注数/粉丝数', now(), now(), 'WisdomHub', '', 
         now(), '', 0),
        (12, 2, '计数快照列对账', now(), now(), 'WisdomHub', '', 'CRON', '0 50 4 * * ?',
         'DO_NOTHING', 'FIRST', 'countReconcileHandler', '', 'SERIAL_EXECUTION', 0, 0, 'BEAN', '', 'GLUE代码初始化',
+        now(), '', 0),
+       (13, 3, 'user_index 增量对账', now(), now(), 'WisdomHub', '', 'CRON', '0 25,55 * * * ?',
+        'DO_NOTHING', 'FIRST', 'userReconcileHandler', '', 'SERIAL_EXECUTION', 0, 0, 'BEAN', '', 'GLUE代码初始化',
+        now(), '', 0),
+       (14, 3, 'user_index 全量对账', now(), now(), 'WisdomHub', '', 'CRON', '0 30 4 * * ?',
+        'DO_NOTHING', 'FIRST', 'userReconcileHandler', 'full', 'SERIAL_EXECUTION', 0, 0, 'BEAN', '', 'GLUE代码初始化',
         now(), '', 0);
 
 INSERT INTO `xxl_job_user`(`id`, `username`, `password`, `role`, `permission`)

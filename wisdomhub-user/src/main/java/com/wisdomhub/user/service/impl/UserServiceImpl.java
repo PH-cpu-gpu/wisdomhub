@@ -12,6 +12,7 @@ import cn.hutool.core.util.StrUtil;
 import cn.hutool.crypto.digest.DigestUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.wisdomhub.common.core.exception.BusinessException;
 import com.wisdomhub.common.core.result.CommonErrorCode;
 import com.wisdomhub.common.core.result.PageResponse;
@@ -35,6 +36,7 @@ import com.wisdomhub.user.domain.entity.User;
 import com.wisdomhub.user.domain.entity.UserFollow;
 import com.wisdomhub.user.domain.vo.UserBriefVO;
 import com.wisdomhub.user.domain.vo.UserProfileVO;
+import com.wisdomhub.user.domain.vo.UserSyncVO;
 import com.wisdomhub.user.mapper.UserFollowMapper;
 import com.wisdomhub.user.mapper.UserMapper;
 import com.wisdomhub.user.service.UserService;
@@ -49,6 +51,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.time.LocalDateTime;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Supplier;
 
@@ -229,10 +232,9 @@ public class UserServiceImpl implements UserService {
         String username = profileDTO.getUsername();
 
         // 预检用户名是否被别人占用
-        if (StrUtil.isNotBlank(username)
-                && userMapper.exists(new LambdaQueryWrapper<User>()
-                        .eq(User::getUsername, username)
-                        .ne(User::getId, userId))) {
+        if (StrUtil.isNotBlank(username) && userMapper.exists(new LambdaQueryWrapper<User>()
+                .eq(User::getUsername, username)
+                .ne(User::getId, userId))) {
             throw new BusinessException(CommonErrorCode.CONFLICT, "用户名已被占用");
         }
 
@@ -274,7 +276,9 @@ public class UserServiceImpl implements UserService {
         stringRedisTemplate.delete(key);
     }
 
-    /** 一次最多问 100 个 ID —— 只是防滥用，列表页去重后远小于这个数 */
+    /**
+     * 一次最多问 100 个 ID —— 只是防滥用，列表页去重后远小于这个数
+     */
     private static final int MAX_BRIEF_IDS = 100;
 
     @Override
@@ -289,6 +293,38 @@ public class UserServiceImpl implements UserService {
                         .username(user.getUsername())
                         .avatar(user.getAvatar())
                         .bio(user.getBio())
+                        .build())
+                .toList();
+    }
+
+    private static final int SYNC_DEFAULT_SIZE = 200;
+    private static final int SYNC_MAX_SIZE = 500;
+
+    @Override
+    public List<UserSyncVO> syncUsers(LocalDateTime since, Long lastId, Integer size) {
+        int limit = (size == null || size <= 0) ? SYNC_DEFAULT_SIZE : Math.min(size, SYNC_MAX_SIZE);
+        long cursor = lastId == null ? 0L : lastId;
+        LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<User>()
+                .select(User::getId, User::getUsername, User::getAvatar, User::getBio,
+                        User::getCreateTime, User::getUpdateTime);
+        if (since == null) {
+            // 全表扫：雪花 ID 单调，游标无并列
+            wrapper.gt(User::getId, cursor).orderByAsc(User::getId);
+        } else {
+            // 水位线扫：update_time 只到秒，必须带 id 兜住同一秒的多行
+            wrapper.and(q -> q.gt(User::getUpdateTime, since)
+                            .or(o -> o.eq(User::getUpdateTime, since).gt(User::getId, cursor)))
+                    .orderByAsc(User::getUpdateTime)
+                    .orderByAsc(User::getId);
+        }
+        return userMapper.selectPage(new Page<>(1, limit, false), wrapper).getRecords().stream()
+                .map(user -> UserSyncVO.builder()
+                        .userId(user.getId())
+                        .username(user.getUsername())
+                        .avatar(user.getAvatar())
+                        .bio(user.getBio())
+                        .createTime(user.getCreateTime())
+                        .updateTime(user.getUpdateTime())
                         .build())
                 .toList();
     }
@@ -402,7 +438,9 @@ public class UserServiceImpl implements UserService {
         sendFollowedEvent(followerId, followeeId);
     }
 
-    /** 发失败只记日志：写已生效，抛出去会变成「接口 500 但关注其实成功了」 */
+    /**
+     * 发失败只记日志：写已生效，抛出去会变成「接口 500 但关注其实成功了」
+     */
     private void sendFollowedEvent(Long followerId, Long followeeId) {
         try {
             eventPublisher.send(new UserFollowedEvent(UserFollowedPayload.builder()

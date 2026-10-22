@@ -10,8 +10,11 @@ import com.wisdomhub.user.domain.dto.RegisterDTO;
 import com.wisdomhub.user.domain.vo.LoginVO;
 import com.wisdomhub.user.domain.vo.UserBriefVO;
 import com.wisdomhub.user.domain.vo.UserProfileVO;
+import com.wisdomhub.user.domain.vo.UserSyncVO;
 import jakarta.validation.constraints.NotNull;
 import org.springframework.web.multipart.MultipartFile;
+
+import java.time.LocalDateTime;
 
 public interface UserService {
 
@@ -52,4 +55,7 @@ public interface UserService {
      * 查不到的 ID 直接不返回（用户被删），调用方自己兜底。
      */
     List<UserBriefVO> listBrief(List<Long> userIds);
+
+    /** 供 user_index 对账的增量分页；since 为空按 id 全表扫，否则走 (update_time, id) 复合游标 */
+    List<UserSyncVO> syncUsers(LocalDateTime since, Long lastId, Integer size);
 }

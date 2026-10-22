@@ -91,6 +91,10 @@ public class EsIndexService {
         delete(TAG_INDEX, "标签", tagId);
     }
 
+    public void deleteUser(Long userId) {
+        delete(USER_INDEX, "用户", userId);
+    }
+
     /**
      * 标签改名 / 改分组后修 article_index 里的残留。
      */
@@ -133,6 +137,10 @@ public class EsIndexService {
         return mget(TAG_INDEX, tagIds, TagIndexDoc.class);
     }
 
+    public Map<Long, UserIndexDoc> mgetUsers(List<Long> userIds) {
+        return mget(USER_INDEX, userIds, UserIndexDoc.class);
+    }
+
     /** 按 ID 字段升序扫一页文档 ID，供全量孤儿检测；afterId 为上一页最后一个 ID */
     public List<Long> scanArticleIds(String afterId, int size) {
         return scanIds(ARTICLE_INDEX, "articleId", afterId, size);
@@ -144,6 +152,10 @@ public class EsIndexService {
 
     public List<Long> scanTagIds(String afterId, int size) {
         return scanIds(TAG_INDEX, "tagId", afterId, size);
+    }
+
+    public List<Long> scanUserIds(String afterId, int size) {
+        return scanIds(USER_INDEX, "userId", afterId, size);
     }
 
     private <T> T get(String indexName, Long id, Class<T> type) {

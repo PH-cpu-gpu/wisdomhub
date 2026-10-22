@@ -18,7 +18,9 @@ CREATE TABLE user (
     fans_count INT DEFAULT 0 NOT NULL COMMENT '粉丝数',
     UNIQUE KEY uk_email (email),
     UNIQUE KEY uk_phone (phone),
-    UNIQUE KEY uk_username (username)
+    UNIQUE KEY uk_username (username),
+    -- B2.35 user_index 增量对账按 (update_time, id) 复合游标扫
+    INDEX idx_update_time_id (update_time, id)
 ) ENGINE=InnoDB COMMENT='用户';
 
 CREATE TABLE user_follow (
