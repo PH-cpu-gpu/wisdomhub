@@ -34,7 +34,7 @@
         <!-- 未读数计数（技术文档 5.7） -->
         <dependency>
             <groupId>com.wisdomhub</groupId>
-            <artifactId>common-redis</artifactId>
+            <artifactId>common-cache</artifactId>
             <version>${project.version}</version>
         </dependency>
         <!-- 组装通知内容时取用户信息 -->

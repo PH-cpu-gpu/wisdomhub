@@ -34,7 +34,7 @@
         <!-- 会话状态与限流 -->
         <dependency>
             <groupId>com.wisdomhub</groupId>
-            <artifactId>common-redis</artifactId>
+            <artifactId>common-cache</artifactId>
             <version>${project.version}</version>
         </dependency>
         <!-- 上下文组装：并行 Feign 调 user / content / search / knowledge（技术文档 8.5） -->

@@ -34,7 +34,7 @@
         <!-- 知识节点缓存（技术文档 7.8） -->
         <dependency>
             <groupId>com.wisdomhub</groupId>
-            <artifactId>common-redis</artifactId>
+            <artifactId>common-cache</artifactId>
             <version>${project.version}</version>
         </dependency>
         <!-- 消费 article.created 与 KnowledgeExtractEvent 写入图谱 -->

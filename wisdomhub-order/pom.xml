@@ -33,7 +33,7 @@
         </dependency>
         <dependency>
             <groupId>com.wisdomhub</groupId>
-            <artifactId>common-redis</artifactId>
+            <artifactId>common-cache</artifactId>
             <version>${project.version}</version>
         </dependency>
         <!-- 下单时调 user-service 查积分、调 content-service 开通专栏权限 -->

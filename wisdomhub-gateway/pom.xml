@@ -28,7 +28,7 @@
         <!-- RequestRateLimiter 的令牌桶基于 Redis，故网关必须能访问 Redis -->
         <dependency>
             <groupId>com.wisdomhub</groupId>
-            <artifactId>common-redis</artifactId>
+            <artifactId>common-cache</artifactId>
             <version>${project.version}</version>
         </dependency>
 
