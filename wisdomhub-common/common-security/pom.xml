@@ -31,6 +31,23 @@
             <artifactId>slf4j-api</artifactId>
         </dependency>
 
+        <!-- /internal/** 验签：OncePerRequestFilter + servlet 包装 -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>jakarta.servlet</groupId>
+            <artifactId>jakarta.servlet-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <!-- Nonce 去重 -->
+        <dependency>
+            <groupId>com.wisdomhub</groupId>
+            <artifactId>common-cache</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
         <dependency>
             <groupId>io.jsonwebtoken</groupId>
             <artifactId>jjwt-api</artifactId>

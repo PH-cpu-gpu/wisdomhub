@@ -25,7 +25,7 @@
         <module>common-core</module>
         <module>common-web</module>
         <module>common-security</module>
-        <module>common-redis</module>
+        <module>common-cache</module>
         <module>common-feign</module>
         <module>common-mq</module>
         <module>common-job</module>

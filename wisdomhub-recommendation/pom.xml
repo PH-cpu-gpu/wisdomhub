@@ -34,7 +34,7 @@
         <!-- 用户兴趣画像存 Redis -->
         <dependency>
             <groupId>com.wisdomhub</groupId>
-            <artifactId>common-redis</artifactId>
+            <artifactId>common-cache</artifactId>
             <version>${project.version}</version>
         </dependency>
         <!-- 候选集通过 Feign 调 search-service，禁止直连 ES / Neo4j（技术文档 5.6） -->

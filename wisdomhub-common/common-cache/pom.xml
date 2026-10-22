@@ -10,7 +10,7 @@
         <version>1.0.0-SNAPSHOT</version>
     </parent>
 
-    <artifactId>common-redis</artifactId>
+    <artifactId>common-cache</artifactId>
     <name>common-redis</name>
     <description>Redis 模板与 key 规范（任务 B1.2）</description>
 

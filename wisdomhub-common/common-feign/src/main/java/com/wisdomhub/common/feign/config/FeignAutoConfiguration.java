@@ -4,7 +4,10 @@ import com.wisdomhub.common.feign.decoder.RunwrapDecoder;
 import com.wisdomhub.common.feign.decoder.WisdomhubErrorDecoder;
 import com.wisdomhub.common.feign.exception.FeignExceptionHandler;
 import com.wisdomhub.common.feign.interceptor.BusinessErrorUnwrapInterceptor;
+import com.wisdomhub.common.feign.interceptor.InternalSignFeignInterceptor;
 import com.wisdomhub.common.feign.interceptor.UserContextInterceptor;
+import com.wisdomhub.common.security.config.InternalSignAutoConfiguration;
+import com.wisdomhub.common.security.config.InternalSignProperties;
 import feign.RequestInterceptor;
 import feign.codec.Decoder;
 import feign.codec.ErrorDecoder;
@@ -12,8 +15,10 @@ import feign.optionals.OptionalDecoder;
 import org.springframework.beans.factory.ObjectFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.AutoConfigureAfter;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.boot.autoconfigure.http.HttpMessageConverters;
 import org.springframework.cloud.openfeign.FeignBuilderCustomizer;
@@ -24,8 +29,11 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
+import org.springframework.core.env.Environment;
+import org.springframework.util.StringUtils;
 
 @AutoConfiguration
+@AutoConfigureAfter(InternalSignAutoConfiguration.class)
 @ConditionalOnClass(RequestInterceptor.class)
 public class FeignAutoConfiguration {
 
@@ -34,6 +42,20 @@ public class FeignAutoConfiguration {
     @Order(Ordered.HIGHEST_PRECEDENCE)
     public RequestInterceptor userContextInterceptor() {
         return new UserContextInterceptor();
+    }
+
+    // /internal/** 调用自动加签名
+    @Bean
+    @ConditionalOnProperty(prefix = "wisdomhub.security.internal-sign", name = "enabled", havingValue = "true")
+    public RequestInterceptor internalSignFeignInterceptor(InternalSignProperties properties,
+                                                           Environment environment) {
+        String serviceName = StringUtils.hasText(properties.getServiceName())
+                ? properties.getServiceName()
+                : environment.getProperty("spring.application.name");
+        if (!StringUtils.hasText(serviceName)) {
+            throw new IllegalStateException("签名调用方标识缺失：请配置 wisdomhub.security.internal-sign.service-name");
+        }
+        return new InternalSignFeignInterceptor(properties, serviceName);
     }
 
     // R解包器配置
