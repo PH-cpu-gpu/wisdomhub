@@ -188,6 +188,5 @@
         <module>wisdomhub-recommendation</module>
         <module>wisdomhub-notification</module>
         <module>wisdomhub-order</module>
-        <module>wisdomhub-agent</module>
     </modules>
 </project>

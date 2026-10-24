@@ -9,5 +9,5 @@ def build_client_config(settings: Settings):
             .server_address(settings.nacos_server_addr)
             .namespace_id(settings.nacos_namespace)
             .log_level("INFO")
-            .grpc_config(GRPCConfig(grpc_timeout=5000))
+            .grpc_config(GRPCConfig(grpc_timeout=3000))
             .build())
