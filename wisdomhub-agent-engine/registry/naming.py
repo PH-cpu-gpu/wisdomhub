@@ -7,13 +7,8 @@ from app.config import Settings
 log = logging.getLogger(__name__)
 
 SERVICE_NAME = "agent-engine"
-GROUP_NAME = "AGENT"
+GROUP_NAME = "DEFAULT_GROUP"
 METADATA = {"lang": "python", "version": "1.0.0"}
-
-
-async def create_naming_client(client_config) -> NacosNamingService:
-    return await NacosNamingService.create_naming_service(client_config)
-
 
 async def register_self(naming: NacosNamingService, settings: Settings) -> None:
     ok = await naming.register_instance(RegisterInstanceParam(
