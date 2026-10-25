@@ -89,6 +89,19 @@ public class GraphQueryService {
         return related(tagId);
     }
 
+    /** 自调用不走代理，所以 ?tech= 这条入口必须自己带缓存注解 */
+    @Cacheable(cacheNames = KnowledgeCacheConstants.CACHE_TAG_PREREQUISITES,
+            key = "'tech:' + #tech + ':' + #maxDepth")
+    public PrerequisiteTreeVO prerequisitesByTechName(String tech, int maxDepth) {
+        if (tech == null || tech.isBlank()) {
+            throw new BusinessException(CommonErrorCode.BAD_REQUEST, "tech 不能为空");
+        }
+        String tagId = neo4jClient.query(FIND_TAG_ID_BY_NAME).bind(tech.trim()).to("name")
+                .fetch().all().stream().map(row -> (String) row.get("tagId")).findFirst()
+                .orElseThrow(() -> new BusinessException(CommonErrorCode.NOT_FOUND, "技术不存在: " + tech));
+        return prerequisites(tagId, maxDepth);
+    }
+
     /** 前置知识链：沿 PREREQUISITE 出边按层展开，visited 挡环 */
     @Cacheable(cacheNames = KnowledgeCacheConstants.CACHE_TAG_PREREQUISITES, key = "#tagId + ':' + #maxDepth")
     public PrerequisiteTreeVO prerequisites(String tagId, int maxDepth) {

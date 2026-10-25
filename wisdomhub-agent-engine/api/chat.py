@@ -2,11 +2,11 @@ import contextlib
 import logging
 import uuid
 from collections.abc import AsyncIterator
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.sse import EventSourceResponse, ServerSentEvent
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from agents.base import ChatContext, ChatStreamer, TurnTrace
@@ -20,7 +20,6 @@ from api.sse import (
     error_event,
     guard_events,
     meta_event,
-    sources_event,
 )
 from app.config import Settings, get_settings
 from app.response import BusinessError, ErrorCode
@@ -28,6 +27,7 @@ from db import repository
 from db.session import get_session_factory
 from db.turn import TurnContext, TurnOutcome, prepare_turn
 from models.tokenizer import TiktokenCounter
+from prompts.learning import LEARNING_PROMPT
 from security.user import current_user_id
 
 log = logging.getLogger(__name__)
@@ -41,6 +41,9 @@ MAX_MESSAGE_ID_CHARS = 64
 class ChatRequest(BaseModel):
     conversationId: str | None = None
     messageId: str | None = None
+    workflow: Literal["qa", "learning_path"] = "qa"
+    technology: str | None = None
+    knownTechnologies: list[str] = Field(default_factory=list)
     question: str
 
     @field_validator("question")
@@ -74,15 +77,62 @@ class ChatRequest(BaseModel):
             raise ValueError(f"messageId 长度不能超过 {MAX_MESSAGE_ID_CHARS} 字")
         return value
 
+    @field_validator("technology")
+    @classmethod
+    def _check_technology(cls, value: str | None) -> str | None:
+        value = value.strip() if value else ""
+        if not value:
+            return None
+        if len(value) > 50:
+            raise ValueError("技术名长度不能超过 50 字")
+        return value
+
+    @field_validator("knownTechnologies")
+    @classmethod
+    def _check_known_technologies(cls, value: list[str]) -> list[str]:
+        cleaned = [item.strip() for item in value if item and item.strip()]
+        if len(cleaned) > 20:
+            raise ValueError("已掌握技术不能超过 20 个")
+        if any(len(item) > 50 for item in cleaned):
+            raise ValueError("单个技术名长度不能超过 50 字")
+        return cleaned
+
+
+def get_chat_request(payload: ChatRequest) -> ChatRequest:
+    return payload
+
 
 def get_turn_trace() -> TurnTrace:
     return TurnTrace()
 
 
+def ensure_workflow_available(
+    request: Request,
+    payload: Annotated[ChatRequest, Depends(get_chat_request)],
+) -> None:
+    if payload.workflow == "learning_path" and not getattr(request.app.state, "java_tools", []):
+        raise BusinessError(ErrorCode.SERVICE_UNAVAILABLE, "学习路线需要检索服务")
+
+
 def get_chat_streamer(
     request: Request,
+    payload: Annotated[ChatRequest, Depends(get_chat_request)],
     trace: Annotated[TurnTrace, Depends(get_turn_trace)],
 ) -> ChatStreamer:
+    if payload.workflow == "learning_path":
+        graph = getattr(request.app.state, "learning_graph", None)
+        if graph is None:
+            raise BusinessError(ErrorCode.SERVICE_UNAVAILABLE, "学习路线工作流未初始化")
+        return WorkflowStreamer(
+            graph,
+            trace=trace,
+            prompt=LEARNING_PROMPT,
+            extra_state={
+                "technology": payload.technology or "",
+                "known": payload.knownTechnologies,
+            },
+        )
+
     graph = getattr(request.app.state, "qa_graph", None)
     if graph is None:
         raise BusinessError(ErrorCode.SERVICE_UNAVAILABLE, "AI 工作流未初始化")
@@ -90,7 +140,8 @@ def get_chat_streamer(
 
 
 async def prepare_turn_dep(
-    request: ChatRequest,
+    payload: Annotated[ChatRequest, Depends(get_chat_request)],
+    _ready: Annotated[None, Depends(ensure_workflow_available)],
     user_id: Annotated[int, Depends(current_user_id)],
     settings: Annotated[Settings, Depends(get_settings)],
     session_factory: Annotated[async_sessionmaker[AsyncSession], Depends(get_session_factory)],
@@ -98,9 +149,9 @@ async def prepare_turn_dep(
     return await prepare_turn(
         session_factory,
         user_id=user_id,
-        question=request.question,
-        conversation_id=request.conversationId,
-        message_id=request.messageId,
+        question=payload.question,
+        conversation_id=payload.conversationId,
+        message_id=payload.messageId,
         ttl_seconds=settings.message_in_progress_ttl,
     )
 
@@ -139,7 +190,7 @@ async def build_context_dep(
     "/chat",
     response_class=EventSourceResponse,
     summary="AI 技术问答（SSE）",
-    description="事件顺序：meta → delta* → sources? → done/error；data 为单行 JSON。",
+    description="事件顺序：meta → delta* → done/error；data 为单行 JSON。",
 )
 async def chat(
     prompt: Annotated[PromptContext, Depends(build_context_dep)],
@@ -156,7 +207,6 @@ async def chat(
             yield encode(error_event(ErrorCode.INTERNAL_ERROR, "会话状态异常"))
             return
         yield encode(delta_event(turn.replay.content))
-        yield encode(sources_event(list(turn.replay.sources)))
         yield encode(done_event())
         return
 

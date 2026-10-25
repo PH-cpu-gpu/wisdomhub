@@ -8,6 +8,7 @@ from api.chat import router
 from app.config import get_settings
 from app.errors import register_exception_handlers
 from db.session import create_engine, create_session_factory, ping_database
+from graphs.learning import build_learning_graph
 from graphs.qa import build_qa_graph
 from models.llm import create_chat_model
 from registry.client import build_client_config
@@ -32,6 +33,7 @@ async def lifespan(app: FastAPI):
     app.state.chat_model = None
     app.state.qa_model = None
     app.state.qa_graph = None
+    app.state.learning_graph = None
     try:
         app.state.chat_model = create_chat_model(settings)
         app.state.qa_model = create_chat_model(settings, streaming=True)
@@ -50,6 +52,10 @@ async def lifespan(app: FastAPI):
         else:
             log.info("nacos_enabled=false，跳过 Nacos 注册与内部调用客户端")
         app.state.qa_graph = build_qa_graph(app.state.qa_model, app.state.java_tools)
+        if internal_client is not None:
+            app.state.learning_graph = build_learning_graph(
+                app.state.chat_model, app.state.qa_model, internal_client
+            )
         yield
     finally:
         if internal_client is not None:

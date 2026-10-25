@@ -10,50 +10,16 @@ from tools.internal_client import InternalClient, InternalClientError
 
 log = logging.getLogger(__name__)
 
-SEARCH_SERVICE = "search-service"
 KNOWLEDGE_SERVICE = "knowledge-service"
-RECALL_PATH = "/internal/search/recall"
 RELATED_PATH = "/internal/knowledge/related"
 RELATED_BY_ID_PATH = "/internal/knowledge/tag/{tag_id}/related"
+PREREQUISITE_PATH = "/internal/knowledge/prerequisites"
 
-SEARCH_TOOL_NAME = "search_articles"
 KNOWLEDGE_TOOL_NAME = "query_knowledge_graph"
+PREREQUISITE_TOOL_NAME = "query_prerequisite_chain"
 
-DEFAULT_SEARCH_LIMIT = 5
-MAX_SEARCH_LIMIT = 10
-MAX_KEYWORD_CHARS = 100
+MAX_CHAIN_DEPTH = 5
 MAX_TECHNOLOGY_CHARS = 50
-
-
-async def search_articles(
-    client: InternalClient,
-    keyword: str,
-    limit: int = DEFAULT_SEARCH_LIMIT,
-) -> list[dict[str, Any]]:
-    """按关键词召回文章；返回 search-service 的 ArticleRecallVO，字段原样不裁剪。"""
-    keyword = keyword.strip()
-    if not keyword:
-        raise ToolException("关键词不能为空")
-    if len(keyword) > MAX_KEYWORD_CHARS:
-        raise ToolException(f"关键词不能超过 {MAX_KEYWORD_CHARS} 字")
-    try:
-        limit = max(1, min(int(limit), MAX_SEARCH_LIMIT))
-    except (TypeError, ValueError) as exc:
-        raise ToolException("limit 必须是整数") from exc
-
-    try:
-        data = await client.post(
-            SEARCH_SERVICE, RECALL_PATH, json_body={"keyword": keyword, "limit": limit}
-        )
-    except InternalClientError as exc:
-        log.warning("search_articles 失败 kind=%s status=%s code=%s",
-                    exc.kind, exc.status, exc.code)
-        raise ToolException("检索服务暂不可用，请稍后重试") from exc
-
-    if not isinstance(data, list) or any(not isinstance(item, dict) for item in data):
-        raise ToolException("检索服务返回格式异常")
-    log.info("工具 search_articles 命中 %d 篇", len(data))
-    return data
 
 
 async def query_knowledge_graph(
@@ -91,17 +57,38 @@ async def query_knowledge_graph(
     return data
 
 
+async def query_prerequisite_chain(
+    client: InternalClient, technology: str
+) -> dict[str, Any]:
+    """按技术名查前置知识链；返回 knowledge-service 的 PrerequisiteTreeVO。"""
+    name = (technology or "").strip()
+    if not name:
+        raise ToolException("技术名不能为空")
+    if len(name) > MAX_TECHNOLOGY_CHARS:
+        raise ToolException(f"技术名不能超过 {MAX_TECHNOLOGY_CHARS} 字")
+
+    try:
+        data = await client.get(
+            KNOWLEDGE_SERVICE,
+            PREREQUISITE_PATH,
+            params={"tech": name, "maxDepth": MAX_CHAIN_DEPTH},
+        )
+    except InternalClientError as exc:
+        log.warning("query_prerequisite_chain 失败 kind=%s status=%s code=%s",
+                    exc.kind, exc.status, exc.code)
+        if exc.code == 404 or exc.status == 404:
+            raise ToolException(f"知识图谱中没有找到技术「{name}」") from exc
+        raise ToolException("知识图谱服务暂不可用，请稍后重试") from exc
+
+    if not isinstance(data, dict):
+        raise ToolException("知识图谱返回格式异常")
+    log.info("工具 query_prerequisite_chain 返回 %d 层",
+             len(data.get("levels") or []))
+    return data
+
+
 def build_java_tools(client: InternalClient) -> list[BaseTool]:
     """绑定 app 级 InternalClient"""
-
-    @tool(SEARCH_TOOL_NAME)
-    async def search_articles_tool(
-        keyword: Annotated[str, Field(description="检索关键词，尽量是技术名或短语，如 Redis、Spring Boot")],
-        limit: Annotated[int, Field(description="返回条数，只允许传入 1~10，缺省则默认为 5")] = DEFAULT_SEARCH_LIMIT,
-    ) -> list[dict[str, Any]]:
-        """在 WisdomHub 文章库中按关键词检索文章，返回标题、摘要、标签、热度与 articleId。
-        回答涉及具体技术、框架或概念时先调用它；空列表表示没有相关文章。"""
-        return await search_articles(client, keyword, limit)
 
     @tool(KNOWLEDGE_TOOL_NAME)
     async def query_knowledge_graph_tool(
@@ -112,7 +99,15 @@ def build_java_tools(client: InternalClient) -> list[BaseTool]:
         out 表示本技术指向对方，in 表示对方指向本技术。技术名不在词表里会报错。"""
         return await query_knowledge_graph(client, technology=technology)
 
-    return [search_articles_tool, query_knowledge_graph_tool]
+    @tool(PREREQUISITE_TOOL_NAME)
+    async def query_prerequisite_chain_tool(
+        technology: Annotated[str, Field(description="目标技术名，必须与词表一致且大小写敏感，如 Redis、Spring Boot")],
+    ) -> dict[str, Any]:
+        """查询技术的前置知识链，按层返回：level 1 是直接前置，数字越大越基础；
+        truncated 为 true 表示还有更基础的前置没展开。技术名不在词表里会报错。"""
+        return await query_prerequisite_chain(client, technology)
+
+    return [query_knowledge_graph_tool, query_prerequisite_chain_tool]
 
 
 def get_java_tools(request: Request) -> list[BaseTool]:
