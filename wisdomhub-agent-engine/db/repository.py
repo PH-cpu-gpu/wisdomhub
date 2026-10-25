@@ -123,15 +123,27 @@ async def finish_assistant_message(
 
 
 async def list_recent_messages(
-    session: AsyncSession, *, conversation_id: UUID, user_id: int, limit: int
+    session: AsyncSession,
+    *,
+    conversation_id: UUID,
+    user_id: int,
+    limit: int,
+    exclude_message_id: str | None = None,
+    only_done: bool = False,
 ) -> list[AgentMessage]:
+    conditions = [
+        AgentMessage.conversation_id == conversation_id,
+        AgentMessage.user_id == user_id,
+    ]
+    if exclude_message_id is not None:
+        conditions.append(AgentMessage.message_id != exclude_message_id)
+    if only_done:
+        conditions.append(AgentMessage.status == "done")
+
     rows = (
         await session.scalars(
             select(AgentMessage)
-            .where(
-                AgentMessage.conversation_id == conversation_id,
-                AgentMessage.user_id == user_id,
-            )
+            .where(*conditions)
             .order_by(AgentMessage.seq.desc())
             .limit(limit)
         )
