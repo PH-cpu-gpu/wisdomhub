@@ -15,6 +15,7 @@
 #   Nacos          v3.0.3  必须为 3.0.x，对应 nacos-client 3.0.3
 #   Seata          2.5.0   必须与客户端 2.5.0 一致
 #   XXL-JOB admin  3.4.2   必须与 xxl-job-core 3.4.2 一致
+#   PostgreSQL     17      agent-engine 会话库（Python 独占）
 # =============================================================================
 
 name: wisdomhub
@@ -241,6 +242,32 @@ services:
         condition: service_healthy
     networks: [wisdomhub]
 
+  # ===========================================================================
+  # 批次五：PostgreSQL（agent-engine 独占的会话库）
+  # ===========================================================================
+
+  postgres:
+    image: postgres:17
+    container_name: wisdomhub-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: wisdomhub_agent
+      POSTGRES_USER: wisdomhub
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      # 时间统一 UTC：timestamptz 的展示与比较更直观
+      TZ: UTC
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wisdomhub -d wisdomhub_agent"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    networks: [wisdomhub]
+
 # =============================================================================
 networks:
   wisdomhub:
@@ -257,3 +284,4 @@ volumes:
   nacos-data:
   nacos-logs:
   seata-data:
+  pg-data:
