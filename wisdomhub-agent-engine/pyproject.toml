@@ -3,10 +3,13 @@ name = "wisdomhub-agent-engine"
 version = "0.1.0"
 requires-python = ">=3.13"
 dependencies = [
+    "alembic>=1.20.1",
+    "asyncpg>=0.32.0",
     "fastapi>=0.143.1",
     "langchain>=1.4.5",
     "nacos-sdk-python>=3.2.0",
     "pydantic-settings>=2.16.0",
+    "sqlalchemy[asyncio]>=2",
     "uvicorn>=0.54.0",
     "v2-theme>=5.3",
 ]
