@@ -4,15 +4,15 @@ import uuid
 from collections.abc import AsyncIterator
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from fastapi.sse import EventSourceResponse, ServerSentEvent
 from pydantic import BaseModel, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from agents.base import ChatContext, ChatStreamer
+from agents.base import ChatContext, ChatStreamer, TurnTrace
 from agents.context import ContextAssembler, PromptContext
-from agents.echo import EchoStreamer
 from agents.persistence import PersistingStreamer
+from agents.workflow import WorkflowStreamer
 from api.sse import (
     delta_event,
     done_event,
@@ -23,7 +23,7 @@ from api.sse import (
     sources_event,
 )
 from app.config import Settings, get_settings
-from app.response import ErrorCode
+from app.response import BusinessError, ErrorCode
 from db import repository
 from db.session import get_session_factory
 from db.turn import TurnContext, TurnOutcome, prepare_turn
@@ -75,9 +75,18 @@ class ChatRequest(BaseModel):
         return value
 
 
-def get_chat_streamer() -> ChatStreamer:
-    """TODO B3.18接真实工作流时替换这里。"""
-    return EchoStreamer()
+def get_turn_trace() -> TurnTrace:
+    return TurnTrace()
+
+
+def get_chat_streamer(
+    request: Request,
+    trace: Annotated[TurnTrace, Depends(get_turn_trace)],
+) -> ChatStreamer:
+    graph = getattr(request.app.state, "qa_graph", None)
+    if graph is None:
+        raise BusinessError(ErrorCode.SERVICE_UNAVAILABLE, "AI 工作流未初始化")
+    return WorkflowStreamer(graph, trace=trace)
 
 
 async def prepare_turn_dep(
@@ -135,6 +144,7 @@ async def build_context_dep(
 async def chat(
     prompt: Annotated[PromptContext, Depends(build_context_dep)],
     streamer: Annotated[ChatStreamer, Depends(get_chat_streamer)],
+    trace: Annotated[TurnTrace, Depends(get_turn_trace)],
     settings: Annotated[Settings, Depends(get_settings)],
     session_factory: Annotated[async_sessionmaker[AsyncSession], Depends(get_session_factory)],
 ) -> AsyncIterator[ServerSentEvent]:
@@ -164,7 +174,9 @@ async def chat(
         dropped_turns=prompt.dropped_turns,
         summary=prompt.summary,
     )
-    persisted = PersistingStreamer(streamer, session_factory=session_factory, turn=turn)
+    persisted = PersistingStreamer(
+        streamer, session_factory=session_factory, turn=turn, trace=trace
+    )
 
     stream = guard_events(persisted.stream(ctx), idle_timeout=settings.stream_idle_timeout)
     try:
