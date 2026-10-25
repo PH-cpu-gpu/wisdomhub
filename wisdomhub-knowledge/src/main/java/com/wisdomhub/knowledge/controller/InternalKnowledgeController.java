@@ -1,6 +1,7 @@
 package com.wisdomhub.knowledge.controller;
 
 import com.wisdomhub.common.core.result.R;
+import com.wisdomhub.knowledge.domain.vo.PrerequisiteTreeVO;
 import com.wisdomhub.knowledge.domain.vo.SeedResultVO;
 import com.wisdomhub.knowledge.domain.vo.TagRelationsVO;
 import com.wisdomhub.knowledge.service.GraphQueryService;
@@ -43,5 +44,12 @@ public class InternalKnowledgeController {
     @GetMapping("/tag/{tagId}/related")
     public R<TagRelationsVO> relatedByTagId(@NotNull @PathVariable String tagId) {
         return R.success(graphQueryService.related(tagId));
+    }
+
+    @Operation(summary = "按技术名查前置知识链")
+    @GetMapping("/prerequisites")
+    public R<PrerequisiteTreeVO> prerequisitesByTech(@RequestParam("tech") String tech,
+                                                     @RequestParam(defaultValue = "5") Integer maxDepth) {
+        return R.success(graphQueryService.prerequisitesByTechName(tech, maxDepth));
     }
 }

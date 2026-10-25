@@ -3,7 +3,6 @@ import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from enum import StrEnum
-from typing import Any
 from uuid import UUID
 
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
@@ -27,7 +26,6 @@ class TurnOutcome(StrEnum):
 @dataclass(frozen=True, slots=True)
 class ReplayAnswer:
     content: str
-    sources: tuple[dict[str, Any], ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,10 +53,7 @@ async def _resolve_existing(
 ) -> tuple[TurnOutcome, ReplayAnswer | None]:
     for _ in range(2):
         if existing.status == "done":
-            return TurnOutcome.REPLAY, ReplayAnswer(
-                content=existing.content,
-                sources=tuple(existing.sources or ()),
-            )
+            return TurnOutcome.REPLAY, ReplayAnswer(content=existing.content)
         if (
             existing.status == "in_progress"
             and existing.expires_at is not None

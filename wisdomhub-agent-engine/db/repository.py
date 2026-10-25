@@ -70,7 +70,6 @@ async def insert_user_message_if_absent(
             user_id=user_id,
             role="user",
             content=question,
-            sources=[],
             status="done",
             created_at=now,
         )
@@ -99,7 +98,6 @@ async def insert_assistant_placeholder_if_absent(
             user_id=user_id,
             role="assistant",
             content="",
-            sources=[],
             status="in_progress",
             created_at=now,
             expires_at=expires_at,
@@ -163,7 +161,6 @@ async def claim_assistant(
         .values(
             status="in_progress",
             content="",
-            sources=[],
             steps=None,
             expires_at=expires_at,
         )
@@ -177,7 +174,6 @@ async def finish_assistant_message(
     row_id: UUID,
     user_id: int,
     content: str,
-    sources: list[dict],
     status: str,
     steps: list[dict] | None = None,
 ) -> int:
@@ -188,7 +184,7 @@ async def finish_assistant_message(
             AgentMessage.user_id == user_id,
             AgentMessage.role == "assistant",
         )
-        .values(content=content, sources=sources, steps=steps, status=status, expires_at=None)
+        .values(content=content, steps=steps, status=status, expires_at=None)
     )
     return result.rowcount
 

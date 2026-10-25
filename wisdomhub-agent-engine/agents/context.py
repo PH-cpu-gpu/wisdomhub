@@ -86,7 +86,6 @@ class ContextAssembler:
                 HistoryMessage(
                     role=row.role,
                     content=row.content,
-                    sources=tuple(row.sources or ()),
                 )
             )
         return turns

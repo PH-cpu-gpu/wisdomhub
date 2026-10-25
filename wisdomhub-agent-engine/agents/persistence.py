@@ -1,13 +1,12 @@
 import contextlib
 import logging
 from collections.abc import AsyncIterator
-from typing import Any
 
 import anyio
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from agents.base import ChatContext, ChatStreamer, TurnTrace
-from api.sse import DELTA, DONE, ERROR, SOURCES, StreamEvent, error_event
+from api.sse import DELTA, DONE, ERROR, StreamEvent, error_event
 from app.response import ErrorCode
 from db import repository
 from db.turn import TurnContext
@@ -33,20 +32,16 @@ class PersistingStreamer:
 
     async def stream(self, ctx: ChatContext) -> AsyncIterator[StreamEvent]:
         parts: list[str] = []
-        sources: list[dict[str, Any]] = []
         persisted = False
         inner = self._inner.stream(ctx)
         try:
             async for event in inner:
                 if event.name == DELTA:
                     parts.append(str(event.data.get("text", "")))
-                elif event.name == SOURCES:
-                    items = event.data.get("items")
-                    sources = list(items) if isinstance(items, list) else []
 
                 if event.name == DONE:
                     try:
-                        await self._save("done", "".join(parts), sources)
+                        await self._save("done", "".join(parts))
                     except Exception:
                         log.exception("assistant 落库失败")
                         persisted = True
@@ -57,18 +52,18 @@ class PersistingStreamer:
                     return
 
                 if event.name == ERROR:
-                    await self._save_quietly("error", "".join(parts), sources)
+                    await self._save_quietly("error", "".join(parts))
                     persisted = True
                     yield event
                     return
 
                 yield event
 
-            await self._save_quietly("error", "".join(parts), sources)
+            await self._save_quietly("error", "".join(parts))
             persisted = True
         except Exception:
             log.exception("assistant 落库前 producer 异常")
-            await self._save_quietly("error", "".join(parts), sources)
+            await self._save_quietly("error", "".join(parts))
             persisted = True
             raise
         finally:
@@ -76,9 +71,9 @@ class PersistingStreamer:
                 with contextlib.suppress(Exception):
                     await inner.aclose()
                 if not persisted:
-                    await self._save_quietly("aborted", "".join(parts), sources)
+                    await self._save_quietly("aborted", "".join(parts))
 
-    async def _save(self, status: str, content: str, sources: list[dict[str, Any]]) -> None:
+    async def _save(self, status: str, content: str) -> None:
         async with self._session_factory() as session:
             async with session.begin():
                 rowcount = await repository.finish_assistant_message(
@@ -86,15 +81,14 @@ class PersistingStreamer:
                     row_id=self._turn.assistant_row_id,
                     user_id=self._turn.user_id,
                     content=content,
-                    sources=sources,
                     status=status,
                     steps=list(self._trace.steps) if self._trace and self._trace.steps else None,
                 )
         if rowcount == 0:
             log.warning("assistant 行不存在或归属不符: %s", self._turn.assistant_row_id)
 
-    async def _save_quietly(self, status: str, content: str, sources: list[dict[str, Any]]) -> None:
+    async def _save_quietly(self, status: str, content: str) -> None:
         try:
-            await self._save(status, content, sources)
+            await self._save(status, content)
         except Exception:
             log.exception("assistant 状态落库失败, status=%s", status)

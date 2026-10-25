@@ -9,7 +9,6 @@ from api.sse import StreamEvent
 class HistoryMessage:
     role: str
     content: str
-    sources: tuple[dict[str, Any], ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

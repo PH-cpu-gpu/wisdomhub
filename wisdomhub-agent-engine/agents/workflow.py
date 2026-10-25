@@ -1,6 +1,5 @@
 import asyncio
 import contextlib
-import json
 import logging
 from collections.abc import AsyncIterator, Sequence
 from dataclasses import dataclass
@@ -11,22 +10,18 @@ from langchain_core.messages import (
     BaseMessage,
     HumanMessage,
     SystemMessage,
-    ToolMessage,
 )
 from langchain_core.prompts import ChatPromptTemplate
 
 from agents.base import ChatContext, TurnTrace
-from api.sse import StreamEvent, delta_event, done_event, sources_event
+from api.sse import StreamEvent, delta_event, done_event
 from graphs.qa import RECURSION_LIMIT
 from prompts.base import build_chat_prompt
 from prompts.qa import QA_SYSTEM_PROMPT
-from tools.java_api import SEARCH_TOOL_NAME
 
 log = logging.getLogger(__name__)
 
-MAX_SOURCES = 10
 FALLBACK_ANSWER = "抱歉，我暂时不能生成回答，请换个问法再试一次。"
-ARTICLE_URL_TEMPLATE = "/article/{article_id}"
 
 _PROMPT = build_chat_prompt(QA_SYSTEM_PROMPT)
 
@@ -83,42 +78,26 @@ def _extract_steps(messages: Sequence[BaseMessage]) -> list[dict[str, Any]]:
     return steps
 
 
-def extract_sources(messages: Sequence[BaseMessage]) -> list[dict[str, Any]]:
-    sources: list[dict[str, Any]] = []
-    seen: set[str] = set()
-    for message in messages:
-        if not isinstance(message, ToolMessage):
-            continue
-        if message.name != SEARCH_TOOL_NAME or getattr(message, "status", None) == "error":
-            continue
-        content = message.content
-        if not isinstance(content, str):
-            continue
-        try:
-            items = json.loads(content)
-        except (TypeError, ValueError):
-            continue
-        if not isinstance(items, list):
-            continue
-        for item in items:
-            if not isinstance(item, dict):
-                continue
-            article_id = str(item.get("articleId") or "").strip()
-            if not article_id or article_id in seen:
-                continue
-            seen.add(article_id)
-            sources.append({
-                "articleId": article_id,
-                "title": str(item.get("title") or ""),
-                "url": ARTICLE_URL_TEMPLATE.format(article_id=article_id),
-            })
-            if len(sources) >= MAX_SOURCES:
-                return sources
-    return sources
+def _state_steps(state: dict[str, Any]) -> list[dict[str, Any]]:
+    steps = state.get("steps")
+    if isinstance(steps, list):
+        return steps
+    return _extract_steps(state.get("messages", []))
+
+
+def _last_ai_text(messages: Sequence[BaseMessage]) -> str:
+    for message in reversed(messages):
+        if (
+            isinstance(message, AIMessage)
+            and isinstance(message.content, str)
+            and message.content.strip()
+        ):
+            return message.content
+    return ""
 
 
 class WorkflowStreamer:
-    """跑 QA 工作流，逐 token 转发，最后补 sources / done。"""
+    """跑工作流，逐 token 转发，最后补 done。"""
 
     def __init__(
         self,
@@ -126,10 +105,12 @@ class WorkflowStreamer:
         *,
         trace: TurnTrace | None = None,
         prompt: ChatPromptTemplate | None = None,
+        extra_state: dict[str, Any] | None = None,
     ) -> None:
         self._graph = graph
         self._trace = trace
         self._prompt = prompt or _PROMPT
+        self._extra_state = extra_state or {}
 
     async def stream(self, ctx: ChatContext) -> AsyncIterator[StreamEvent]:
         queue: asyncio.Queue[_Text | _Done | _Failed] = asyncio.Queue()
@@ -138,6 +119,7 @@ class WorkflowStreamer:
             "conversation_id": ctx.conversation_id,
             "user_id": ctx.user_id,
             "tool_rounds": 0,
+            **self._extra_state,
         }
         task = asyncio.create_task(self._produce(state, queue))
         parts: list[str] = []
@@ -149,17 +131,19 @@ class WorkflowStreamer:
                     yield delta_event(item.text)
                 elif isinstance(item, _Done):
                     if not "".join(parts).strip():
-                        parts.append(FALLBACK_ANSWER)
-                        yield delta_event(FALLBACK_ANSWER)
-                    sources = extract_sources(item.state.get("messages", []))
+                        text = _last_ai_text(item.state.get("messages", []))
+                        if text:
+                            parts.append(text)
+                            yield delta_event(text)
+                        else:
+                            parts.append(FALLBACK_ANSWER)
+                            yield delta_event(FALLBACK_ANSWER)
                     log.info(
-                        "问答完成 conversation=%s chars=%d sources=%d steps=%d",
+                        "问答完成 conversation=%s chars=%d steps=%d",
                         ctx.conversation_id,
                         len("".join(parts)),
-                        len(sources),
                         len(self._trace.steps) if self._trace else 0,
                     )
-                    yield sources_event(sources)
                     yield done_event()
                     return
                 else:
@@ -204,7 +188,7 @@ class WorkflowStreamer:
                 elif kind == "values":
                     final_state = part["data"]
                     if self._trace is not None:
-                        self._trace.steps = _extract_steps(final_state.get("messages", []))
+                        self._trace.steps = _state_steps(final_state)
             if final_state is None:
                 raise RuntimeError("工作流没有产出最终状态")
             await queue.put(_Done(final_state))

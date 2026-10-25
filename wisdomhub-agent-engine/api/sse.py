@@ -15,7 +15,6 @@ log = logging.getLogger(__name__)
 
 META = "meta"
 DELTA = "delta"
-SOURCES = "sources"
 DONE = "done"
 ERROR = "error"
 
@@ -35,10 +34,6 @@ def meta_event(conversation_id: str, message_id: str) -> StreamEvent:
 
 def delta_event(text: str) -> StreamEvent:
     return StreamEvent(DELTA, {"text": text})
-
-
-def sources_event(items: list[dict[str, Any]]) -> StreamEvent:
-    return StreamEvent(SOURCES, {"items": items})
 
 
 def done_event(finish_reason: str = "stop") -> StreamEvent:
