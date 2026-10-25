@@ -1,4 +1,5 @@
 import contextlib
+import logging
 import uuid
 from collections.abc import AsyncIterator
 from typing import Annotated
@@ -9,13 +10,18 @@ from pydantic import BaseModel, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from agents.base import ChatContext, ChatStreamer
+from agents.context import ContextAssembler, PromptContext
 from agents.echo import EchoStreamer
 from agents.persistence import PersistingStreamer
 from api.sse import encode, guard_events, meta_event
 from app.config import Settings, get_settings
+from db import repository
 from db.session import get_session_factory
 from db.turn import TurnContext, prepare_turn
+from models.tokenizer import TiktokenCounter
 from security.user import current_user_id
+
+log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/agent", tags=["agent"])
 
@@ -81,6 +87,31 @@ async def prepare_turn_dep(
     )
 
 
+async def build_context_dep(
+    turn: Annotated[TurnContext, Depends(prepare_turn_dep)],
+    settings: Annotated[Settings, Depends(get_settings)],
+    session_factory: Annotated[async_sessionmaker[AsyncSession], Depends(get_session_factory)],
+) -> PromptContext:
+    async with session_factory() as session:
+        rows = await repository.list_recent_messages(
+            session,
+            conversation_id=uuid.UUID(turn.conversation_id),
+            user_id=turn.user_id,
+            limit=max(1, settings.context_max_turns) * 2,
+            exclude_message_id=turn.message_id,
+            only_done=True,
+        )
+    prompt = await ContextAssembler(settings, TiktokenCounter()).assemble(turn, rows)
+    log.info(
+        "上下文组装 conversation=%s history=%d dropped=%d tokens=%d",
+        turn.conversation_id,
+        len(prompt.history),
+        prompt.dropped_turns,
+        prompt.history_tokens,
+    )
+    return prompt
+
+
 @router.post(
     "/chat",
     response_class=EventSourceResponse,
@@ -88,16 +119,20 @@ async def prepare_turn_dep(
     description="事件顺序：meta → delta* → sources? → done/error；data 为单行 JSON。",
 )
 async def chat(
-    turn: Annotated[TurnContext, Depends(prepare_turn_dep)],
+    prompt: Annotated[PromptContext, Depends(build_context_dep)],
     streamer: Annotated[ChatStreamer, Depends(get_chat_streamer)],
     settings: Annotated[Settings, Depends(get_settings)],
     session_factory: Annotated[async_sessionmaker[AsyncSession], Depends(get_session_factory)],
 ) -> AsyncIterator[ServerSentEvent]:
+    turn = prompt.turn
     ctx = ChatContext(
         user_id=turn.user_id,
         conversation_id=turn.conversation_id,
         message_id=turn.message_id,
         question=turn.question,
+        history=prompt.history,
+        dropped_turns=prompt.dropped_turns,
+        summary=prompt.summary,
     )
     persisted = PersistingStreamer(streamer, session_factory=session_factory, turn=turn)
 
