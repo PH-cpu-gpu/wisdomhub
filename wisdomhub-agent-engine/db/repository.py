@@ -1,7 +1,8 @@
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import select, update
+from sqlalchemy import and_, or_, select, update
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models import AgentConversation, AgentMessage
@@ -50,7 +51,7 @@ async def touch_conversation(
     )
 
 
-async def insert_user_message(
+async def insert_user_message_if_absent(
     session: AsyncSession,
     *,
     row_id: UUID,
@@ -59,9 +60,10 @@ async def insert_user_message(
     user_id: int,
     question: str,
     now: datetime,
-) -> None:
-    session.add(
-        AgentMessage(
+) -> bool:
+    stmt = (
+        pg_insert(AgentMessage)
+        .values(
             id=row_id,
             conversation_id=conversation_id,
             message_id=message_id,
@@ -72,10 +74,13 @@ async def insert_user_message(
             status="done",
             created_at=now,
         )
+        .on_conflict_do_nothing(constraint="uq_agent_message_turn")
+        .returning(AgentMessage.id)
     )
+    return await session.scalar(stmt) is not None
 
 
-async def insert_assistant_placeholder(
+async def insert_assistant_placeholder_if_absent(
     session: AsyncSession,
     *,
     row_id: UUID,
@@ -84,9 +89,10 @@ async def insert_assistant_placeholder(
     user_id: int,
     now: datetime,
     expires_at: datetime,
-) -> None:
-    session.add(
-        AgentMessage(
+) -> UUID | None:
+    stmt = (
+        pg_insert(AgentMessage)
+        .values(
             id=row_id,
             conversation_id=conversation_id,
             message_id=message_id,
@@ -98,7 +104,71 @@ async def insert_assistant_placeholder(
             created_at=now,
             expires_at=expires_at,
         )
+        .on_conflict_do_nothing(constraint="uq_agent_message_turn")
+        .returning(AgentMessage.id)
     )
+    return await session.scalar(stmt)
+
+
+async def get_user_message(
+    session: AsyncSession, *, conversation_id: UUID, message_id: str, user_id: int
+) -> AgentMessage | None:
+    return await session.scalar(
+        select(AgentMessage).where(
+            AgentMessage.conversation_id == conversation_id,
+            AgentMessage.message_id == message_id,
+            AgentMessage.user_id == user_id,
+            AgentMessage.role == "user",
+        )
+    )
+
+
+async def get_assistant_message(
+    session: AsyncSession, *, conversation_id: UUID, message_id: str, user_id: int
+) -> AgentMessage | None:
+    return await session.scalar(
+        select(AgentMessage).where(
+            AgentMessage.conversation_id == conversation_id,
+            AgentMessage.message_id == message_id,
+            AgentMessage.user_id == user_id,
+            AgentMessage.role == "assistant",
+        )
+    )
+
+
+async def claim_assistant(
+    session: AsyncSession,
+    *,
+    row_id: UUID,
+    conversation_id: UUID,
+    user_id: int,
+    now: datetime,
+    expires_at: datetime,
+) -> bool:
+    result = await session.execute(
+        update(AgentMessage)
+        .where(
+            AgentMessage.id == row_id,
+            AgentMessage.conversation_id == conversation_id,
+            AgentMessage.user_id == user_id,
+            AgentMessage.role == "assistant",
+            or_(
+                AgentMessage.status.in_(("aborted", "error")),
+                and_(
+                    AgentMessage.status == "in_progress",
+                    or_(AgentMessage.expires_at.is_(None), AgentMessage.expires_at < now),
+                ),
+            ),
+        )
+        .values(
+            status="in_progress",
+            content="",
+            sources=[],
+            steps=None,
+            expires_at=expires_at,
+        )
+    )
+    return result.rowcount == 1
 
 
 async def finish_assistant_message(
