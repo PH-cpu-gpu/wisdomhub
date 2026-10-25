@@ -32,11 +32,15 @@ async def lifespan(app: FastAPI):
     app.state.java_tools = []
     app.state.chat_model = None
     app.state.qa_model = None
+    app.state.analysis_model = None
     app.state.qa_graph = None
     app.state.learning_graph = None
     try:
         app.state.chat_model = create_chat_model(settings)
         app.state.qa_model = create_chat_model(settings, streaming=True)
+        app.state.analysis_model = create_chat_model(
+            settings, timeout=settings.analysis_timeout
+        )
         await ping_database(engine)
         app.state.session_factory = create_session_factory(engine)
         if settings.nacos_enabled:

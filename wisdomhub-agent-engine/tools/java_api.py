@@ -10,6 +10,9 @@ from tools.internal_client import InternalClient, InternalClientError
 
 log = logging.getLogger(__name__)
 
+CONTENT_SERVICE = "content-service"
+ARTICLE_PATH = "/internal/content/article/{article_id}"
+
 KNOWLEDGE_SERVICE = "knowledge-service"
 RELATED_PATH = "/internal/knowledge/related"
 RELATED_BY_ID_PATH = "/internal/knowledge/tag/{tag_id}/related"
@@ -20,6 +23,17 @@ PREREQUISITE_TOOL_NAME = "query_prerequisite_chain"
 
 MAX_CHAIN_DEPTH = 5
 MAX_TECHNOLOGY_CHARS = 50
+
+
+async def get_article_snapshot(
+    client: InternalClient, article_id: str
+) -> dict[str, Any]:
+    """文章完整快照：元数据 + 标签 + markdown 正文。"""
+    path = ARTICLE_PATH.format(article_id=quote(str(article_id), safe=""))
+    data = await client.get(CONTENT_SERVICE, path)
+    if not isinstance(data, dict):
+        raise ValueError("文章快照格式异常")
+    return data
 
 
 async def query_knowledge_graph(
