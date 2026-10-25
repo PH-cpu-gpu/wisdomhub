@@ -1,3 +1,4 @@
+from langgraph.errors import GraphRecursionError
 from openai import OpenAIError
 
 from app.response import ErrorCode
@@ -9,4 +10,6 @@ def friendly_error(exc: Exception) -> tuple[ErrorCode, str] | None:
         return ErrorCode.SERVICE_UNAVAILABLE, "检索服务暂不可用"
     if isinstance(exc, OpenAIError):
         return ErrorCode.SERVICE_UNAVAILABLE, "AI 服务暂不可用"
+    if isinstance(exc, GraphRecursionError):
+        return ErrorCode.SERVICE_UNAVAILABLE, "AI 服务响应异常"
     return None

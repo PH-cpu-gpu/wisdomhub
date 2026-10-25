@@ -179,6 +179,7 @@ async def finish_assistant_message(
     content: str,
     sources: list[dict],
     status: str,
+    steps: list[dict] | None = None,
 ) -> int:
     result = await session.execute(
         update(AgentMessage)
@@ -187,7 +188,7 @@ async def finish_assistant_message(
             AgentMessage.user_id == user_id,
             AgentMessage.role == "assistant",
         )
-        .values(content=content, sources=sources, status=status, expires_at=None)
+        .values(content=content, sources=sources, steps=steps, status=status, expires_at=None)
     )
     return result.rowcount
 

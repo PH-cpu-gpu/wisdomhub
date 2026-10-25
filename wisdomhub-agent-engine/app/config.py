@@ -13,8 +13,8 @@ class Settings(BaseSettings):
     nacos_namespace: str = "wisdomhub"
     nacos_register_ip: str = "127.0.0.1"
     app_port: int = 8000
-    # SSE 两个 chunk 之间的空闲上限（秒）
-    stream_idle_timeout: float = 30.0
+    # SSE 空闲兜底（秒），必须大于 chat_timeout；LLM 自己的读超时先触发
+    stream_idle_timeout: float = 90.0
     # 会话库；缺失直接启动失败
     database_url: str
     # assistant 处于 in_progress 的接管时限（秒）

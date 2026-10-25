@@ -8,11 +8,13 @@ from api.chat import router
 from app.config import get_settings
 from app.errors import register_exception_handlers
 from db.session import create_engine, create_session_factory, ping_database
+from graphs.qa import build_qa_graph
 from models.llm import create_chat_model
 from registry.client import build_client_config
 from registry.naming import SERVICE_NAME, deregister_self, register_self
 from security.internal_sign import InternalSigner, load_internal_sign_secret
 from tools.internal_client import create_internal_client
+from tools.java_api import build_java_tools
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
@@ -26,9 +28,13 @@ async def lifespan(app: FastAPI):
     naming_client = None
     internal_client = None
     app.state.internal_client = None
+    app.state.java_tools = []
     app.state.chat_model = None
+    app.state.qa_model = None
+    app.state.qa_graph = None
     try:
         app.state.chat_model = create_chat_model(settings)
+        app.state.qa_model = create_chat_model(settings, streaming=True)
         await ping_database(engine)
         app.state.session_factory = create_session_factory(engine)
         if settings.nacos_enabled:
@@ -40,8 +46,10 @@ async def lifespan(app: FastAPI):
             signer = InternalSigner(secret, service_name=SERVICE_NAME)
             internal_client = create_internal_client(settings, naming_client, signer)
             app.state.internal_client = internal_client
+            app.state.java_tools = build_java_tools(internal_client)
         else:
             log.info("nacos_enabled=false，跳过 Nacos 注册与内部调用客户端")
+        app.state.qa_graph = build_qa_graph(app.state.qa_model, app.state.java_tools)
         yield
     finally:
         if internal_client is not None:

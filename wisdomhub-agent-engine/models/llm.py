@@ -4,7 +4,7 @@ from langchain_openai import ChatOpenAI
 from app.config import Settings
 
 
-def create_chat_model(settings: Settings) -> ChatOpenAI:
+def create_chat_model(settings: Settings, *, streaming: bool = False) -> ChatOpenAI:
     return ChatOpenAI(
         model=settings.chat_model,
         base_url=settings.chat_base_url,
@@ -12,6 +12,7 @@ def create_chat_model(settings: Settings) -> ChatOpenAI:
         temperature=settings.chat_temperature,
         timeout=settings.chat_timeout,
         max_retries=0,
+        streaming=streaming,
     )
 
 
