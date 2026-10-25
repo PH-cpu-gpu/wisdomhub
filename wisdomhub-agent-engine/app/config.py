@@ -35,6 +35,9 @@ class Settings(BaseSettings):
     chat_api_key: str
     chat_temperature: float = 0.3
     chat_timeout: float = 60.0
+    # 文章分析：长任务 LLM 超时与正文截断
+    analysis_timeout: float = 600.0
+    analysis_max_article_tokens: int = 24000
 
     # 测试使用
     # false 用于本地旁路测试：跳过 Nacos 注册
