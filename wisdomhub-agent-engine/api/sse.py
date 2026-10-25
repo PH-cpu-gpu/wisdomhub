@@ -8,6 +8,7 @@ from typing import Any
 
 from fastapi.sse import ServerSentEvent
 
+from app.degradation import friendly_error
 from app.response import ErrorCode
 
 log = logging.getLogger(__name__)
@@ -71,9 +72,15 @@ async def guard_events(
                 log.warning("AI 流空闲超时（%ss）", idle_timeout)
                 yield error_event(ErrorCode.SERVICE_UNAVAILABLE, "AI 服务响应超时")
                 return
-            except Exception:
-                log.exception("AI 流生成失败")
-                yield error_event(ErrorCode.INTERNAL_ERROR, "AI 服务内部异常")
+            except Exception as exc:
+                friendly = friendly_error(exc)
+                if friendly is not None:
+                    code, message = friendly
+                    log.warning("AI 流降级 type=%s: %s", type(exc).__name__, exc)
+                    yield error_event(code, message)
+                else:
+                    log.exception("AI 流生成失败")
+                    yield error_event(ErrorCode.INTERNAL_ERROR, "AI 服务内部异常")
                 return
             yield event
             if event.terminal:

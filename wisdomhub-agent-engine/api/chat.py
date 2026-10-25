@@ -13,11 +13,20 @@ from agents.base import ChatContext, ChatStreamer
 from agents.context import ContextAssembler, PromptContext
 from agents.echo import EchoStreamer
 from agents.persistence import PersistingStreamer
-from api.sse import encode, guard_events, meta_event
+from api.sse import (
+    delta_event,
+    done_event,
+    encode,
+    error_event,
+    guard_events,
+    meta_event,
+    sources_event,
+)
 from app.config import Settings, get_settings
+from app.response import ErrorCode
 from db import repository
 from db.session import get_session_factory
-from db.turn import TurnContext, prepare_turn
+from db.turn import TurnContext, TurnOutcome, prepare_turn
 from models.tokenizer import TiktokenCounter
 from security.user import current_user_id
 
@@ -92,6 +101,11 @@ async def build_context_dep(
     settings: Annotated[Settings, Depends(get_settings)],
     session_factory: Annotated[async_sessionmaker[AsyncSession], Depends(get_session_factory)],
 ) -> PromptContext:
+    if turn.outcome is not TurnOutcome.NEW:
+        return PromptContext(
+            turn=turn, history=(), dropped_turns=0, summary=None, history_tokens=0
+        )
+
     async with session_factory() as session:
         rows = await repository.list_recent_messages(
             session,
@@ -125,6 +139,22 @@ async def chat(
     session_factory: Annotated[async_sessionmaker[AsyncSession], Depends(get_session_factory)],
 ) -> AsyncIterator[ServerSentEvent]:
     turn = prompt.turn
+
+    if turn.outcome is TurnOutcome.REPLAY:
+        yield encode(meta_event(turn.conversation_id, turn.message_id))
+        if turn.replay is None:
+            yield encode(error_event(ErrorCode.INTERNAL_ERROR, "会话状态异常"))
+            return
+        yield encode(delta_event(turn.replay.content))
+        yield encode(sources_event(list(turn.replay.sources)))
+        yield encode(done_event())
+        return
+
+    if turn.outcome is TurnOutcome.IN_PROGRESS:
+        yield encode(meta_event(turn.conversation_id, turn.message_id))
+        yield encode(error_event(ErrorCode.CONFLICT, "该消息正在生成中，请稍后重试"))
+        return
+
     ctx = ChatContext(
         user_id=turn.user_id,
         conversation_id=turn.conversation_id,
