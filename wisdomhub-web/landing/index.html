@@ -12,7 +12,7 @@
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%230B0B0E'/%3E%3Ctext x='32' y='44' font-family='monospace' font-size='30' font-weight='700' fill='%23C9FF2E' text-anchor='middle'%3E64%3C/text%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;800&family=Noto+Serif+SC:wght@900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;800&family=Noto+Sans+SC:wght@400;500;600&family=Noto+Serif+SC:wght@600;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
   <noscript><style>.reveal{opacity:1;transform:none}</style></noscript>
 </head>
@@ -32,15 +32,17 @@
       <a href="#ai">AI 助手</a>
     </nav>
     <div class="nav__actions">
-      <a class="nav__login" href="#" data-soon>登录</a>
-      <a class="nav__cta" href="#start">内测预览 <span aria-hidden="true">↗</span></a>
+      <!-- TODO: 前端页面生成后替换为实际路由 -->
+      <a class="nav__login" href="/login">登录</a>
+      <a class="nav__cta" href="/register">开始使用 <span aria-hidden="true">↗</span></a>
+      <button class="nav__menu" type="button" aria-label="打开菜单" aria-haspopup="dialog" aria-controls="mobileMenu" aria-expanded="false">
+        <span></span><span></span>
+      </button>
     </div>
   </header>
 
   <aside class="rail" aria-hidden="true">
-    <span>WISDOMHUB — KNOWLEDGE IS A NETWORK</span>
-    <i></i>
-    <span>EST. 2026</span>
+    <span>WISDOMHUB — KNOWLEDGE IS A NETWORK — EST. 2026</span>
   </aside>
 
   <main id="main">
@@ -50,9 +52,9 @@
 
       <div class="hero__inner">
         <div class="hero__meta">
-          <span>[ SEED / 64 ]</span>
+          <span>[ KNOWLEDGE / NETWORK ]</span>
           <span class="hero__meta-mid">内容 · 搜索 · 图谱 · 推荐 · AI</span>
-          <span class="hero__meta-right">2026 · 内测预览</span>
+          <span class="hero__meta-right">2026 · 面向开发者</span>
         </div>
 
         <h1 class="hero__title">
@@ -67,15 +69,14 @@
         </p>
 
         <div class="hero__cta">
-          <a class="btn btn--primary" href="#start">开始建立知识网络 <span class="btn__arrow" aria-hidden="true">→</span></a>
+          <a class="btn btn--primary" href="/register">开始建立知识网络 <span class="btn__arrow" aria-hidden="true">→</span></a>
           <a class="btn btn--text" href="#why">看看它如何工作</a>
-          <span class="hero__badge">内测中</span>
         </div>
 
         <div class="seed-wrap">
-          <div class="seed" id="seed" role="img" aria-label="由一串 64 位随机字符串生成的 8×8 字符网格。重复出现的字符之间被连成线，像一张小型知识图谱。">
+          <div class="seed" id="seed" role="img" aria-label="WisdomHub 知识矩阵示意：8×8 的 64 个节点，重复节点之间以连线表示关系。">
             <div class="seed__bar">
-              <span>SEED_64</span>
+              <span>KNOWLEDGE MATRIX</span>
               <span>8 × 8</span>
             </div>
             <div class="seed__stage" id="seedStage">
@@ -83,16 +84,12 @@
               <svg class="seed__edges" id="seedEdges" aria-hidden="true"></svg>
             </div>
             <div class="seed__foot">
-              <span>64 CELLS</span>
-              <span>29 UPPER</span>
-              <span>24 LOWER</span>
-              <span>11 DIGITS</span>
+              <span>64 NODES</span>
+              <span>11 EDGES</span>
+              <span>5 CLUSTERS</span>
+              <span>4 RELATIONS</span>
             </div>
           </div>
-          <p class="seed__note">
-            重复出现 3 次以上的字符被连成线：<b>M ×4</b>，<b>q / S / L / g ×3</b>。
-            重复，就是关系。
-          </p>
         </div>
       </div>
 
@@ -169,11 +166,29 @@
           </div>
           <h3 class="fcard__title">文章 · 问答 · 专栏</h3>
           <p class="fcard__desc">Markdown 写作、草稿、技术标签、专栏与评论。点赞、收藏、关注——技术社区该有的，一个不少。</p>
-          <div class="viz viz--article" aria-hidden="true">
-            <div class="viz__tags"><span>Spring</span><span>Redis</span><span>分布式</span></div>
-            <div class="viz__title-line"></div>
-            <div class="viz__line w-80"></div>
-            <div class="viz__line w-60"></div>
+          <div class="viz viz--articles" aria-hidden="true">
+            <div class="viz__caption"><span>LATEST ARTICLES</span><span>3 ARTICLES · 35 CONNECTIONS</span></div>
+            <div class="article-row">
+              <div class="article-row__body">
+                <h4>Spring Bean 的生命周期，一次讲透</h4>
+                <p>林墨 · 8 分钟</p>
+              </div>
+              <span class="article-row__links">12 条连接</span>
+            </div>
+            <div class="article-row">
+              <div class="article-row__body">
+                <h4>Redis 跳表：为什么不是红黑树？</h4>
+                <p>周屿 · 6 分钟</p>
+              </div>
+              <span class="article-row__links">9 条连接</span>
+            </div>
+            <div class="article-row">
+              <div class="article-row__body">
+                <h4>MySQL MVCC 的版本链与 Read View</h4>
+                <p>陈野 · 11 分钟</p>
+              </div>
+              <span class="article-row__links">14 条连接</span>
+            </div>
           </div>
         </article>
 
@@ -185,8 +200,16 @@
           <h3 class="fcard__title">全文搜索</h3>
           <p class="fcard__desc">Elasticsearch + IK 中文分词。关键词高亮，按相关性、热度、时间筛选。</p>
           <div class="viz viz--search" aria-hidden="true">
+            <div class="viz__popular"><span>热门</span><b>Spring Cloud</b><b>Redis 跳表</b><b>MVCC</b></div>
             <div class="viz__searchbar"><span>spring <mark>bean</mark> 生命周期</span><kbd>/</kbd></div>
             <div class="viz__chips"><span class="is-on">相关性</span><span>热度</span><span>时间</span></div>
+            <p class="viz__count">1,284 条结果 · 0.12s</p>
+            <div class="search-result">
+              <span>01</span><b>Spring Bean 生命周期</b><em>12 连接</em>
+            </div>
+            <div class="search-result">
+              <span>02</span><b>Spring 容器启动流程</b><em>8 连接</em>
+            </div>
           </div>
         </article>
 
@@ -198,13 +221,59 @@
           <h3 class="fcard__title">知识图谱</h3>
           <p class="fcard__desc">Neo4j 维护技术与技术、文章与技术之间的关系，把零散的概念织成体系。</p>
           <div class="viz viz--graph" aria-hidden="true">
-            <svg viewBox="0 0 180 100">
-              <line x1="90" y1="50" x2="34" y2="24"/><line x1="90" y1="50" x2="150" y2="28"/>
-              <line x1="90" y1="50" x2="42" y2="82"/><line x1="90" y1="50" x2="146" y2="80"/>
-              <circle cx="90" cy="50" r="7" class="viz__node viz__node--hot"/>
-              <circle cx="34" cy="24" r="4.5"/><circle cx="150" cy="28" r="4.5"/>
-              <circle cx="42" cy="82" r="4.5"/><circle cx="146" cy="80" r="4.5"/>
+            <div class="viz__caption"><span>LIVE SLICE</span><span>8 NODES</span></div>
+            <svg class="mini-graph" viewBox="0 0 340 200">
+              <g class="mini-edges">
+                <path class="mini-edge mini-edge--acid" d="M 62 51 L 42 82"/>
+                <path class="mini-edge mini-edge--bone" d="M 112 50 L 138 68"/>
+                <path class="mini-edge mini-edge--bone" d="M 189 74 L 257 66"/>
+                <path class="mini-edge mini-edge--bone" d="M 100 51 L 155 121"/>
+                <path class="mini-edge mini-edge--verm" d="M 80 154 Q 110 148 142 137"/>
+                <path class="mini-edge mini-edge--verm" d="M 241 152 Q 220 146 194 140"/>
+                <path class="mini-edge mini-edge--about" d="M 225 33 Q 205 80 180 121"/>
+                <path class="mini-path" d="M 100 51 L 160 120 L 241 148"/>
+              </g>
+              <g class="mini-nodes">
+                <g class="mini-node mini-node--article" transform="translate(235,22)">
+                  <rect x="-48" y="-11" width="96" height="22" rx="11"/>
+                  <text>Redis 文章</text>
+                </g>
+                <g class="mini-node mini-node--hub" transform="translate(85,40)">
+                  <rect x="-38" y="-11" width="76" height="22" rx="11"/>
+                  <text>Spring Boot</text>
+                </g>
+                <g class="mini-node" transform="translate(30,92)">
+                  <rect x="-26" y="-10" width="52" height="20" rx="10"/>
+                  <text>Spring</text>
+                </g>
+                <g class="mini-node" transform="translate(160,78)">
+                  <rect x="-29" y="-10" width="58" height="20" rx="10"/>
+                  <text>MyBatis</text>
+                </g>
+                <g class="mini-node" transform="translate(284,64)">
+                  <rect x="-27" y="-10" width="54" height="20" rx="10"/>
+                  <text>MySQL</text>
+                </g>
+                <g class="mini-node mini-node--hot" transform="translate(168,132)">
+                  <rect x="-26" y="-11" width="52" height="22" rx="11"/>
+                  <text>Redis</text>
+                </g>
+                <g class="mini-node" transform="translate(62,156)">
+                  <rect x="-22" y="-10" width="44" height="20" rx="10"/>
+                  <text>缓存</text>
+                </g>
+                <g class="mini-node" transform="translate(276,154)">
+                  <rect x="-35" y="-10" width="70" height="20" rx="10"/>
+                  <text>分布式锁</text>
+                </g>
+              </g>
             </svg>
+            <ul class="mini-legend">
+              <li><i class="mini-ln mini-ln--acid"></i>BASED_ON</li>
+              <li><i class="mini-ln mini-ln--bone"></i>USES</li>
+              <li><i class="mini-ln mini-ln--verm"></i>PREREQUISITE</li>
+              <li><i class="mini-ln mini-ln--about"></i>ABOUT</li>
+            </ul>
           </div>
         </article>
 
@@ -215,10 +284,13 @@
           </div>
           <h3 class="fcard__title">个性推荐</h3>
           <p class="fcard__desc">浏览、点赞、收藏、关注共同构成兴趣画像。推荐相关内容，而不是热搜。</p>
-          <div class="viz viz--bars" aria-hidden="true">
-            <div class="viz__bar" style="--w: 88%"><span></span></div>
-            <div class="viz__bar" style="--w: 64%"><span></span></div>
-            <div class="viz__bar" style="--w: 41%"><span></span></div>
+          <div class="viz viz--recs" aria-hidden="true">
+            <div class="viz__caption"><span>INTEREST MATCH</span><span>42 SIGNALS</span></div>
+            <p class="viz__note">因为你收藏了 12 篇 Spring 文章，并连续 3 天阅读 Redis。</p>
+            <div class="rec"><span>Spring</span><div class="rec__track"><i style="--w: 92%"></i></div><em>92%</em></div>
+            <div class="rec"><span>Redis</span><div class="rec__track"><i style="--w: 76%"></i></div><em>76%</em></div>
+            <div class="rec"><span>MySQL</span><div class="rec__track"><i style="--w: 58%"></i></div><em>58%</em></div>
+            <div class="rec"><span>Kafka</span><div class="rec__track"><i style="--w: 41%"></i></div><em>41%</em></div>
           </div>
         </article>
 
@@ -229,21 +301,38 @@
           </div>
           <h3 class="fcard__title">学习路线</h3>
           <p class="fcard__desc">选一个目标技术，沿 PREREQUISITE 展开前置链，生成分阶段的学习路线。</p>
-          <div class="viz viz--steps" aria-hidden="true">
-            <span class="is-done">Java</span><i></i><span class="is-done">Spring</span><i></i><span class="is-now">Boot</span><i></i><span>Cloud</span>
+          <div class="viz viz--route" aria-hidden="true">
+            <div class="viz__caption"><span>6 WEEK PATH</span><span>4 STAGES</span></div>
+            <p class="viz__note">目标：Spring Cloud · 每周 6 小时 · 从 Java 基础开始。</p>
+            <div class="route-list">
+              <div class="route-row"><span>01</span><b>Java 基础</b><em>1 WEEK</em></div>
+              <div class="route-row"><span>02</span><b>Spring Core</b><em>2 WEEKS</em></div>
+              <div class="route-row is-now"><span>03</span><b>Spring Boot</b><em>2 WEEKS</em></div>
+              <div class="route-row"><span>04</span><b>Spring Cloud</b><em>1 WEEK</em></div>
+            </div>
           </div>
         </article>
 
         <article class="fcard fcard--ai reveal">
-          <div class="fcard__top">
-            <span class="fcard__no">06</span>
-            <span class="fcard__tag">AI</span>
+          <div class="fcard__main">
+            <div class="fcard__top">
+              <span class="fcard__no">06</span>
+              <span class="fcard__tag">AI</span>
+            </div>
+            <h3 class="fcard__title">AI 技术助手</h3>
+            <p class="fcard__desc">回答技术问题、分析文章、抽取知识点。独立 Python Agent 服务，流式输出。</p>
           </div>
-          <h3 class="fcard__title">AI 技术助手</h3>
-          <p class="fcard__desc">回答技术问题、分析文章、抽取知识点。独立 Python Agent 服务，流式输出。</p>
-          <div class="viz viz--terminal" aria-hidden="true">
-            <div><span class="viz__prompt">›</span> 解释一下 MVCC</div>
-            <div class="viz__out">快照读 · 版本链 · Read View<span class="viz__caret"></span></div>
+          <div class="viz viz--trace" aria-hidden="true">
+            <div class="trace__prompt"><span>›</span> Redis 为什么使用跳表？</div>
+            <div class="trace__steps">
+              <div class="trace__step"><span>01</span><b>理解问题</b><em>INTENT</em></div>
+              <i></i>
+              <div class="trace__step"><span>02</span><b>检索知识</b><em>3 ARTICLES</em></div>
+              <i></i>
+              <div class="trace__step"><span>03</span><b>组织回答</b><em>STREAM</em></div>
+            </div>
+            <p class="trace__answer">跳表用多层索引把查找从 O(n) 降到期望 O(log n)……</p>
+            <p class="trace__links">→ 关联节点：Redis / 缓存 / 分布式锁 <span>3</span></p>
           </div>
         </article>
       </div>
@@ -267,12 +356,6 @@
             <li><i class="ln ln--verm"></i>PREREQUISITE</li>
             <li><i class="ln ln--acid ln--dash"></i>ABOUT</li>
           </ul>
-
-          <p class="graph__seedlog">
-            <span>SEED LOG</span>
-            在页面顶部那串随机字符里，M 出现了 4 次，q、S、L、g 各出现 3 次。
-            我们把重复连成线，得到第一张图。知识图谱，也是这么长出来的。
-          </p>
         </div>
 
         <div class="graph__stage reveal">
@@ -290,7 +373,7 @@
             </defs>
 
             <g class="kg__edges">
-              <path class="gedge gedge--acid" data-a="article" data-b="redis" d="M 545 100 C 500 220, 470 300, 425 382" marker-end="url(#m-acid)" stroke-dasharray="3 7"/>
+              <path class="gedge gedge--acid" data-a="article" data-b="redis" d="M 545 130 C 505 220, 470 300, 425 382" marker-end="url(#m-acid)" stroke-dasharray="3 7"/>
               <path class="gedge gedge--bone" data-a="boot" data-b="spring" d="M 268 170 L 152 220" marker-end="url(#m-bone)"/>
               <path class="gedge gedge--bone" data-a="boot" data-b="mybatis" d="M 402 170 L 512 248" marker-end="url(#m-bone)"/>
               <path class="gedge gedge--bone" data-a="mybatis" data-b="mysql" d="M 580 282 L 635 358" marker-end="url(#m-bone)"/>
@@ -300,12 +383,12 @@
             </g>
 
             <g class="kg__labels">
-              <text class="gedge-label gedge-label--acid" data-a="article" data-b="redis" x="500" y="230">ABOUT</text>
+              <text class="gedge-label gedge-label--acid" data-a="article" data-b="redis" x="442" y="330">ABOUT</text>
               <text class="gedge-label" data-a="boot" data-b="spring" x="148" y="200">BASED_ON</text>
               <text class="gedge-label" data-a="boot" data-b="mybatis" x="474" y="200">USES</text>
               <text class="gedge-label" data-a="mybatis" data-b="mysql" x="622" y="322">USES</text>
               <text class="gedge-label" data-a="boot" data-b="redis" x="326" y="290">USES</text>
-              <text class="gedge-label gedge-label--verm" data-a="cache" data-b="redis" x="270" y="386">PREREQUISITE</text>
+              <text class="gedge-label gedge-label--verm" data-a="cache" data-b="redis" x="250" y="380">PREREQUISITE</text>
               <text class="gedge-label gedge-label--verm" data-a="lock" data-b="redis" x="240" y="470">PREREQUISITE</text>
             </g>
 
@@ -353,6 +436,63 @@
             </g>
           </svg>
 
+          <div class="kg-mini-mobile" aria-hidden="true">
+            <div class="viz__caption"><span>NETWORK VIEW</span><span>8 NODES</span></div>
+            <svg class="mini-graph" viewBox="0 0 340 200">
+              <g class="mini-edges">
+                <path class="mini-edge mini-edge--acid" d="M 62 51 L 42 82"/>
+                <path class="mini-edge mini-edge--bone" d="M 112 50 L 138 68"/>
+                <path class="mini-edge mini-edge--bone" d="M 189 74 L 257 66"/>
+                <path class="mini-edge mini-edge--bone" d="M 100 51 L 155 121"/>
+                <path class="mini-edge mini-edge--verm" d="M 80 154 Q 110 148 142 137"/>
+                <path class="mini-edge mini-edge--verm" d="M 241 152 Q 220 146 194 140"/>
+                <path class="mini-edge mini-edge--about" d="M 225 33 Q 205 80 180 121"/>
+                <path class="mini-path" d="M 100 51 L 160 120 L 241 148"/>
+              </g>
+              <g class="mini-nodes">
+                <g class="mini-node mini-node--article" transform="translate(235,22)">
+                  <rect x="-48" y="-11" width="96" height="22" rx="11"/>
+                  <text>Redis 文章</text>
+                </g>
+                <g class="mini-node mini-node--hub" transform="translate(85,40)">
+                  <rect x="-38" y="-11" width="76" height="22" rx="11"/>
+                  <text>Spring Boot</text>
+                </g>
+                <g class="mini-node" transform="translate(30,92)">
+                  <rect x="-26" y="-10" width="52" height="20" rx="10"/>
+                  <text>Spring</text>
+                </g>
+                <g class="mini-node" transform="translate(160,78)">
+                  <rect x="-29" y="-10" width="58" height="20" rx="10"/>
+                  <text>MyBatis</text>
+                </g>
+                <g class="mini-node" transform="translate(284,64)">
+                  <rect x="-27" y="-10" width="54" height="20" rx="10"/>
+                  <text>MySQL</text>
+                </g>
+                <g class="mini-node mini-node--hot" transform="translate(168,132)">
+                  <rect x="-26" y="-11" width="52" height="22" rx="11"/>
+                  <text>Redis</text>
+                </g>
+                <g class="mini-node" transform="translate(62,156)">
+                  <rect x="-22" y="-10" width="44" height="20" rx="10"/>
+                  <text>缓存</text>
+                </g>
+                <g class="mini-node" transform="translate(276,154)">
+                  <rect x="-35" y="-10" width="70" height="20" rx="10"/>
+                  <text>分布式锁</text>
+                </g>
+              </g>
+            </svg>
+            <ul class="mini-legend">
+              <li><i class="mini-ln mini-ln--acid"></i>BASED_ON</li>
+              <li><i class="mini-ln mini-ln--bone"></i>USES</li>
+              <li><i class="mini-ln mini-ln--verm"></i>PREREQUISITE</li>
+              <li><i class="mini-ln mini-ln--about"></i>ABOUT</li>
+            </ul>
+          </div>
+
+          <p class="kg-mobile__label">RELATION MAP / 5 EDGES</p>
           <div class="kg-mobile" role="list" aria-label="知识图谱关系列表">
             <div class="kgm" role="listitem">
               <span class="kgm__node kgm__node--article">Redis 为什么使用跳表？</span>
@@ -388,10 +528,13 @@
       </div>
 
       <div class="graph__stats">
-        <div><b>2</b><span>类节点</span></div>
-        <div><b>4</b><span>类关系</span></div>
-        <div><b>Neo4j</b><span>图数据库</span></div>
-        <div><b>AI</b><span>自动抽取实体</span></div>
+        <p class="graph__stats-label">NETWORK SCALE / 知识网络规模</p>
+        <div class="graph__stats-row">
+          <div><b>64</b><span>知识节点</span></div>
+          <div><b>11</b><span>关系边</span></div>
+          <div><b>5</b><span>主题簇</span></div>
+          <div><b>4</b><span>关系类型</span></div>
+        </div>
       </div>
     </section>
 
@@ -452,7 +595,7 @@
         </defs>
         <circle cx="80" cy="80" r="72" class="stamp__ring"/>
         <text class="stamp__arc">
-          <textPath href="#stampPath">IN BETA · WISDOMHUB · 2026 · KNOWLEDGE IS A NETWORK · </textPath>
+          <textPath href="#stampPath">WISDOMHUB · KNOWLEDGE IS A NETWORK · 2026 · WISDOMHUB · 2026 · </textPath>
         </text>
         <text x="80" y="90" text-anchor="middle" class="stamp__mid">64</text>
       </svg>
@@ -460,15 +603,16 @@
       <p class="eyebrow"><span>05</span> 开始 / START</p>
       <h2 class="cta__title">知识，<br>从<span class="cta__mark">连接</span>开始。</h2>
       <p class="cta__lede">
-        WisdomHub 正在内测。把你的第一篇文章，接进一张会生长的图。
+        把你的第一篇文章，接进一张会生长的图。
       </p>
       <div class="cta__actions">
-        <a class="btn btn--ink" href="#" data-soon>申请内测 <span class="btn__arrow" aria-hidden="true">→</span></a>
+        <a class="btn btn--ink" href="/register">进入 WisdomHub <span class="btn__arrow" aria-hidden="true">→</span></a>
         <a class="btn btn--text btn--text-dark" href="#features">先看看它能做什么</a>
       </div>
-      <p class="cta__note">内测入口尚未开放 · 本页为产品预览</p>
-      <div class="cta__fingerprint" aria-hidden="true">
-        <span>SEED</span> LHXSKg2Lx6oY39gpAMv0OXoqTqqSM7ZpZifjg1SE5WuDsNYB7OkMLdaeQ3bB0tnM
+      <div class="cta__foot" aria-hidden="true">
+        <span>WISDOMHUB</span>
+        <span>内容 · 搜索 · 知识 · 推荐 · AI · 学习</span>
+        <span>KNOWLEDGE IS A NETWORK</span>
       </div>
     </section>
   </main>
@@ -501,22 +645,13 @@
       </div>
 
       <div class="footer__col">
-        <h3>状态</h3>
-        <span><i class="dot" aria-hidden="true"></i> 内测准备中</span>
-        <span>内容与图谱已就绪</span>
-        <span>AI 助手已就绪</span>
+        <h3>开始</h3>
+        <a href="/register">创建账号</a>
+        <a href="/login">登录</a>
+        <a href="#graph">探索知识图谱</a>
+        <a href="#ai">试用 AI 助手</a>
       </div>
     </div>
-
-    <details class="footer__seed">
-      <summary>关于这串字符 <span aria-hidden="true">＋</span></summary>
-      <p>
-        页面上的 64 个字符来自一次真实的随机生成：
-        <code>LHXSKg2Lx6oY39gpAMv0OXoqTqqSM7ZpZifjg1SE5WuDsNYB7OkMLdaeQ3bB0tnM</code>。
-        8×8 的网格、11 个数字、4 次 M——我们把它当作种子，连出了第一张图。
-        它看起来是噪声，但重复出现的地方，结构就出现了。
-      </p>
-    </details>
 
     <div class="footer__bottom">
       <span>© 2026 WisdomHub</span>
@@ -525,7 +660,32 @@
     </div>
   </footer>
 
-  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <dialog class="menu" id="mobileMenu" aria-label="导航菜单">
+    <div class="menu__top">
+      <a class="brand brand--menu" href="#top">
+        <span class="brand__mark" aria-hidden="true">64</span>
+        <span class="brand__name">Wisdom<b>Hub</b></span>
+      </a>
+      <button class="menu__close" type="button">关闭 <span aria-hidden="true">✕</span></button>
+    </div>
+
+    <p class="menu__eyebrow">NAVIGATION / 目录</p>
+
+    <nav class="menu__nav" aria-label="移动端导航">
+      <a href="#why" data-menu-link><span>01</span><b>为什么</b><em>WHY</em></a>
+      <a href="#features" data-menu-link><span>02</span><b>能力</b><em>CAPABILITIES</em></a>
+      <a href="#graph" data-menu-link><span>03</span><b>图谱</b><em>GRAPH</em></a>
+      <a href="#ai" data-menu-link><span>04</span><b>AI 助手</b><em>AGENT</em></a>
+    </nav>
+
+    <div class="menu__foot">
+      <div>
+        <a href="/login">登录</a>
+        <a href="/register">开始使用 →</a>
+      </div>
+      <span>KNOWLEDGE IS A NETWORK</span>
+    </div>
+  </dialog>
 
   <script src="main.js"></script>
 </body>
