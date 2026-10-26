@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WisdomHub — 把散落的知识，连成一张图</title>
+  <meta name="description" content="WisdomHub 是面向开发者的技术知识社区。文章、问答、全文搜索、知识图谱、个性推荐与 AI 助手，共用同一张知识网络。">
+  <meta name="theme-color" content="#F2EDDF">
+  <meta property="og:title" content="WisdomHub — 把散落的知识，连成一张图">
+  <meta property="og:description" content="面向开发者的技术知识社区：内容、搜索、图谱、推荐与 AI 助手。">
+  <meta property="og:type" content="website">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%230B0B0E'/%3E%3Ctext x='32' y='44' font-family='monospace' font-size='30' font-weight='700' fill='%23C9FF2E' text-anchor='middle'%3E64%3C/text%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;800&family=Noto+Serif+SC:wght@900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <noscript><style>.reveal{opacity:1;transform:none}</style></noscript>
+</head>
+<body>
+  <a class="skip" href="#main">跳到主要内容</a>
+  <div class="grain" aria-hidden="true"></div>
+
+  <header class="nav" id="nav">
+    <a class="brand" href="#top" aria-label="WisdomHub 首页">
+      <span class="brand__mark" aria-hidden="true">64</span>
+      <span class="brand__name">Wisdom<b>Hub</b></span>
+    </a>
+    <nav class="nav__links" aria-label="主导航">
+      <a href="#why">为什么</a>
+      <a href="#features">能力</a>
+      <a href="#graph">图谱</a>
+      <a href="#ai">AI 助手</a>
+    </nav>
+    <div class="nav__actions">
+      <a class="nav__login" href="#" data-soon>登录</a>
+      <a class="nav__cta" href="#start">内测预览 <span aria-hidden="true">↗</span></a>
+    </div>
+  </header>
+
+  <aside class="rail" aria-hidden="true">
+    <span>WISDOMHUB — KNOWLEDGE IS A NETWORK</span>
+    <i></i>
+    <span>EST. 2026</span>
+  </aside>
+
+  <main id="main">
+    <!-- ───────────────────────── HERO ───────────────────────── -->
+    <section class="hero" id="top">
+      <div class="hero__ghost" aria-hidden="true">64</div>
+
+      <div class="hero__inner">
+        <div class="hero__meta">
+          <span>[ SEED / 64 ]</span>
+          <span class="hero__meta-mid">内容 · 搜索 · 图谱 · 推荐 · AI</span>
+          <span class="hero__meta-right">2026 · 内测预览</span>
+        </div>
+
+        <h1 class="hero__title">
+          <span class="line">把散落的</span>
+          <span class="line"><span class="hl">知识</span>，</span>
+          <span class="line">连成一张图。</span>
+        </h1>
+
+        <p class="hero__lede">
+          WisdomHub 是面向开发者的技术知识社区。文章、问答、全文搜索、知识图谱、个性推荐和 AI 助手，
+          共用同一张会生长的知识网络。让每一次阅读，都能接上你已知的东西。
+        </p>
+
+        <div class="hero__cta">
+          <a class="btn btn--primary" href="#start">开始建立知识网络 <span class="btn__arrow" aria-hidden="true">→</span></a>
+          <a class="btn btn--text" href="#why">看看它如何工作</a>
+          <span class="hero__badge">内测中</span>
+        </div>
+
+        <div class="seed-wrap">
+          <div class="seed" id="seed" role="img" aria-label="由一串 64 位随机字符串生成的 8×8 字符网格。重复出现的字符之间被连成线，像一张小型知识图谱。">
+            <div class="seed__bar">
+              <span>SEED_64</span>
+              <span>8 × 8</span>
+            </div>
+            <div class="seed__stage" id="seedStage">
+              <div class="seed__grid" id="seedGrid"></div>
+              <svg class="seed__edges" id="seedEdges" aria-hidden="true"></svg>
+            </div>
+            <div class="seed__foot">
+              <span>64 CELLS</span>
+              <span>29 UPPER</span>
+              <span>24 LOWER</span>
+              <span>11 DIGITS</span>
+            </div>
+          </div>
+          <p class="seed__note">
+            重复出现 3 次以上的字符被连成线：<b>M ×4</b>，<b>q / S / L / g ×3</b>。
+            重复，就是关系。
+          </p>
+        </div>
+      </div>
+
+      <div class="hero__scroll" aria-hidden="true">
+        <span>SCROLL</span>
+        <span class="hero__scroll-line"></span>
+      </div>
+    </section>
+
+    <!-- ───────────────────────── TICKER ───────────────────────── -->
+    <div class="ticker" aria-hidden="true">
+      <div class="ticker__track">
+        <span>全文搜索</span><i>✳</i><span>知识图谱</span><i>✳</i><span>智能推荐</span><i>✳</i>
+        <span>AI 助手</span><i>✳</i><span>学习路线</span><i>✳</i><span>文章 · 问答 · 专栏</span><i>✳</i>
+        <span>全文搜索</span><i>✳</i><span>知识图谱</span><i>✳</i><span>智能推荐</span><i>✳</i>
+        <span>AI 助手</span><i>✳</i><span>学习路线</span><i>✳</i><span>文章 · 问答 · 专栏</span><i>✳</i>
+      </div>
+      <div class="ticker__track ticker__track--rev">
+        <span>CONTENT</span><i>/</i><span>SEARCH</span><i>/</i><span>GRAPH</span><i>/</i>
+        <span>RECOMMEND</span><i>/</i><span>LEARNING PATH</span><i>/</i><span>AI AGENT</span><i>/</i>
+        <span>CONTENT</span><i>/</i><span>SEARCH</span><i>/</i><span>GRAPH</span><i>/</i>
+        <span>RECOMMEND</span><i>/</i><span>LEARNING PATH</span><i>/</i><span>AI AGENT</span><i>/</i>
+      </div>
+    </div>
+
+    <!-- ───────────────────────── PROBLEMS ───────────────────────── -->
+    <section class="problems section" id="why">
+      <div class="section__head">
+        <p class="eyebrow"><span>01</span> 为什么 / WHY</p>
+        <h2 class="display">收藏，<br>不等于<span class="mark-verm">学会</span>。</h2>
+        <p class="section__aside">
+          内容分散、知识点互不相连、不知道下一步该学什么——这是开发者学习里最常见的三个卡点。
+          WisdomHub 的回答不是更多的内容，而是连接。
+        </p>
+      </div>
+
+      <ol class="problem-list">
+        <li class="problem reveal">
+          <span class="problem__no">01</span>
+          <h3 class="problem__title">内容散落</h3>
+          <p class="problem__desc">文章在博客，问答在论坛，收藏夹在浏览器。它们从来没有见过彼此。</p>
+          <span class="problem__arrow" aria-hidden="true">↗</span>
+        </li>
+        <li class="problem reveal">
+          <span class="problem__no">02</span>
+          <h3 class="problem__title">关系缺席</h3>
+          <p class="problem__desc">你知道 Redis，也知道缓存。但没人告诉你，它们为什么总一起出现。</p>
+          <span class="problem__arrow" aria-hidden="true">↗</span>
+        </li>
+        <li class="problem reveal">
+          <span class="problem__no">03</span>
+          <h3 class="problem__title">方向迷失</h3>
+          <p class="problem__desc">收藏了 200 篇文章，还是不知道下一步学什么。知识没有先后，学习就没有路径。</p>
+          <span class="problem__arrow" aria-hidden="true">↗</span>
+        </li>
+      </ol>
+    </section>
+
+    <!-- ───────────────────────── FEATURES ───────────────────────── -->
+    <section class="features section" id="features">
+      <div class="section__head section__head--dark">
+        <p class="eyebrow eyebrow--acid"><span>02</span> 能力 / CAPABILITIES</p>
+        <h2 class="display display--bone">六种能力，<br>一张<span class="mark-acid">网络</span>。</h2>
+        <p class="section__aside">
+          从写下一篇文章，到被搜索、被推荐、被 AI 读懂——每个动作都在给这张网加一条边。
+        </p>
+      </div>
+
+      <div class="feature-grid">
+        <article class="fcard fcard--wide reveal">
+          <div class="fcard__top">
+            <span class="fcard__no">01</span>
+            <span class="fcard__tag">社区</span>
+          </div>
+          <h3 class="fcard__title">文章 · 问答 · 专栏</h3>
+          <p class="fcard__desc">Markdown 写作、草稿、技术标签、专栏与评论。点赞、收藏、关注——技术社区该有的，一个不少。</p>
+          <div class="viz viz--article" aria-hidden="true">
+            <div class="viz__tags"><span>Spring</span><span>Redis</span><span>分布式</span></div>
+            <div class="viz__title-line"></div>
+            <div class="viz__line w-80"></div>
+            <div class="viz__line w-60"></div>
+          </div>
+        </article>
+
+        <article class="fcard fcard--search reveal">
+          <div class="fcard__top">
+            <span class="fcard__no">02</span>
+            <span class="fcard__tag">搜索</span>
+          </div>
+          <h3 class="fcard__title">全文搜索</h3>
+          <p class="fcard__desc">Elasticsearch + IK 中文分词。关键词高亮，按相关性、热度、时间筛选。</p>
+          <div class="viz viz--search" aria-hidden="true">
+            <div class="viz__searchbar"><span>spring <mark>bean</mark> 生命周期</span><kbd>/</kbd></div>
+            <div class="viz__chips"><span class="is-on">相关性</span><span>热度</span><span>时间</span></div>
+          </div>
+        </article>
+
+        <article class="fcard fcard--graph reveal">
+          <div class="fcard__top">
+            <span class="fcard__no">03</span>
+            <span class="fcard__tag">图谱</span>
+          </div>
+          <h3 class="fcard__title">知识图谱</h3>
+          <p class="fcard__desc">Neo4j 维护技术与技术、文章与技术之间的关系，把零散的概念织成体系。</p>
+          <div class="viz viz--graph" aria-hidden="true">
+            <svg viewBox="0 0 180 100">
+              <line x1="90" y1="50" x2="34" y2="24"/><line x1="90" y1="50" x2="150" y2="28"/>
+              <line x1="90" y1="50" x2="42" y2="82"/><line x1="90" y1="50" x2="146" y2="80"/>
+              <circle cx="90" cy="50" r="7" class="viz__node viz__node--hot"/>
+              <circle cx="34" cy="24" r="4.5"/><circle cx="150" cy="28" r="4.5"/>
+              <circle cx="42" cy="82" r="4.5"/><circle cx="146" cy="80" r="4.5"/>
+            </svg>
+          </div>
+        </article>
+
+        <article class="fcard fcard--rec reveal">
+          <div class="fcard__top">
+            <span class="fcard__no">04</span>
+            <span class="fcard__tag">推荐</span>
+          </div>
+          <h3 class="fcard__title">个性推荐</h3>
+          <p class="fcard__desc">浏览、点赞、收藏、关注共同构成兴趣画像。推荐相关内容，而不是热搜。</p>
+          <div class="viz viz--bars" aria-hidden="true">
+            <div class="viz__bar" style="--w: 88%"><span></span></div>
+            <div class="viz__bar" style="--w: 64%"><span></span></div>
+            <div class="viz__bar" style="--w: 41%"><span></span></div>
+          </div>
+        </article>
+
+        <article class="fcard fcard--route reveal">
+          <div class="fcard__top">
+            <span class="fcard__no">05</span>
+            <span class="fcard__tag">路线</span>
+          </div>
+          <h3 class="fcard__title">学习路线</h3>
+          <p class="fcard__desc">选一个目标技术，沿 PREREQUISITE 展开前置链，生成分阶段的学习路线。</p>
+          <div class="viz viz--steps" aria-hidden="true">
+            <span class="is-done">Java</span><i></i><span class="is-done">Spring</span><i></i><span class="is-now">Boot</span><i></i><span>Cloud</span>
+          </div>
+        </article>
+
+        <article class="fcard fcard--ai reveal">
+          <div class="fcard__top">
+            <span class="fcard__no">06</span>
+            <span class="fcard__tag">AI</span>
+          </div>
+          <h3 class="fcard__title">AI 技术助手</h3>
+          <p class="fcard__desc">回答技术问题、分析文章、抽取知识点。独立 Python Agent 服务，流式输出。</p>
+          <div class="viz viz--terminal" aria-hidden="true">
+            <div><span class="viz__prompt">›</span> 解释一下 MVCC</div>
+            <div class="viz__out">快照读 · 版本链 · Read View<span class="viz__caret"></span></div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <!-- ───────────────────────── GRAPH ───────────────────────── -->
+    <section class="graph section" id="graph">
+      <div class="graph__grid">
+        <div class="graph__copy">
+          <p class="eyebrow eyebrow--acid"><span>03</span> 知识图谱 / GRAPH</p>
+          <h2 class="display display--bone">每篇文章，<br>都是图上的<br>一个节点。</h2>
+          <p class="graph__lede">
+            发布文章后，AI 抽取其中的技术实体；实体解析到技术标签，文章与标签之间长出
+            <b>ABOUT</b> 边。技术之间的关系由人工维护、复核。
+            你点开的不是一篇文章，而是一个入口。
+          </p>
+
+          <ul class="graph__legend" aria-label="关系类型图例">
+            <li><i class="ln ln--acid"></i>BASED_ON</li>
+            <li><i class="ln ln--bone"></i>USES</li>
+            <li><i class="ln ln--verm"></i>PREREQUISITE</li>
+            <li><i class="ln ln--acid ln--dash"></i>ABOUT</li>
+          </ul>
+
+          <p class="graph__seedlog">
+            <span>SEED LOG</span>
+            在页面顶部那串随机字符里，M 出现了 4 次，q、S、L、g 各出现 3 次。
+            我们把重复连成线，得到第一张图。知识图谱，也是这么长出来的。
+          </p>
+        </div>
+
+        <div class="graph__stage reveal">
+          <svg class="kg" id="kg" viewBox="0 0 760 560" role="group" aria-label="知识图谱演示：Spring Boot、Spring、MyBatis、MySQL、Redis、缓存、分布式锁与一篇文章之间的四类关系。">
+            <defs>
+              <marker id="m-acid" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M0,0 L10,5 L0,10 z" fill="#C9FF2E"/>
+              </marker>
+              <marker id="m-bone" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M0,0 L10,5 L0,10 z" fill="#F2EDDF"/>
+              </marker>
+              <marker id="m-verm" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M0,0 L10,5 L0,10 z" fill="#FF3B1F"/>
+              </marker>
+            </defs>
+
+            <g class="kg__edges">
+              <path class="gedge gedge--acid" data-a="article" data-b="redis" d="M 545 100 C 500 220, 470 300, 425 382" marker-end="url(#m-acid)" stroke-dasharray="3 7"/>
+              <path class="gedge gedge--bone" data-a="boot" data-b="spring" d="M 268 170 L 152 220" marker-end="url(#m-bone)"/>
+              <path class="gedge gedge--bone" data-a="boot" data-b="mybatis" d="M 402 170 L 512 248" marker-end="url(#m-bone)"/>
+              <path class="gedge gedge--bone" data-a="mybatis" data-b="mysql" d="M 580 282 L 635 358" marker-end="url(#m-bone)"/>
+              <path class="gedge gedge--bone" data-a="boot" data-b="redis" d="M 330 178 L 378 372" marker-end="url(#m-bone)"/>
+              <path class="gedge gedge--verm" data-a="cache" data-b="redis" d="M 245 402 C 285 396, 310 396, 342 398" marker-end="url(#m-verm)" stroke-dasharray="7 5"/>
+              <path class="gedge gedge--verm" data-a="lock" data-b="redis" d="M 188 500 C 250 480, 300 440, 348 422" marker-end="url(#m-verm)" stroke-dasharray="7 5"/>
+            </g>
+
+            <g class="kg__labels">
+              <text class="gedge-label gedge-label--acid" data-a="article" data-b="redis" x="500" y="230">ABOUT</text>
+              <text class="gedge-label" data-a="boot" data-b="spring" x="148" y="200">BASED_ON</text>
+              <text class="gedge-label" data-a="boot" data-b="mybatis" x="474" y="200">USES</text>
+              <text class="gedge-label" data-a="mybatis" data-b="mysql" x="622" y="322">USES</text>
+              <text class="gedge-label" data-a="boot" data-b="redis" x="326" y="290">USES</text>
+              <text class="gedge-label gedge-label--verm" data-a="cache" data-b="redis" x="270" y="386">PREREQUISITE</text>
+              <text class="gedge-label gedge-label--verm" data-a="lock" data-b="redis" x="240" y="470">PREREQUISITE</text>
+            </g>
+
+            <g class="kg__nodes">
+              <g class="gnode gnode--article" data-id="article" tabindex="0">
+                <rect x="450" y="64" width="230" height="56" rx="8"/>
+                <text x="565" y="88" text-anchor="middle" class="gnode__kind">ARTICLE</text>
+                <text x="565" y="108" text-anchor="middle">Redis 为什么使用跳表？</text>
+              </g>
+
+              <g class="gnode gnode--hub" data-id="boot" tabindex="0">
+                <rect x="240" y="126" width="180" height="52" rx="26"/>
+                <text x="330" y="157" text-anchor="middle">Spring Boot</text>
+              </g>
+
+              <g class="gnode" data-id="spring" tabindex="0">
+                <rect x="94" y="222" width="116" height="46" rx="23"/>
+                <text x="152" y="250" text-anchor="middle">Spring</text>
+              </g>
+
+              <g class="gnode" data-id="mybatis" tabindex="0">
+                <rect x="506" y="232" width="128" height="46" rx="23"/>
+                <text x="570" y="260" text-anchor="middle">MyBatis</text>
+              </g>
+
+              <g class="gnode" data-id="mysql" tabindex="0">
+                <rect x="606" y="360" width="120" height="46" rx="23"/>
+                <text x="666" y="388" text-anchor="middle">MySQL</text>
+              </g>
+
+              <g class="gnode gnode--hot" data-id="redis" tabindex="0">
+                <rect x="342" y="372" width="116" height="46" rx="23"/>
+                <text x="400" y="400" text-anchor="middle">Redis</text>
+              </g>
+
+              <g class="gnode" data-id="cache" tabindex="0">
+                <rect x="146" y="380" width="100" height="46" rx="23"/>
+                <text x="196" y="408" text-anchor="middle">缓存</text>
+              </g>
+
+              <g class="gnode" data-id="lock" tabindex="0">
+                <rect x="88" y="478" width="140" height="46" rx="23"/>
+                <text x="158" y="506" text-anchor="middle">分布式锁</text>
+              </g>
+            </g>
+          </svg>
+
+          <div class="kg-mobile" role="list" aria-label="知识图谱关系列表">
+            <div class="kgm" role="listitem">
+              <span class="kgm__node kgm__node--article">Redis 为什么使用跳表？</span>
+              <span class="kgm__rel kgm__rel--acid">— ABOUT →</span>
+              <span class="kgm__node kgm__node--hot">Redis</span>
+            </div>
+            <div class="kgm" role="listitem">
+              <span class="kgm__node">Spring Boot</span>
+              <span class="kgm__rel">— BASED_ON →</span>
+              <span class="kgm__node">Spring</span>
+            </div>
+            <div class="kgm" role="listitem">
+              <span class="kgm__node">Spring Boot</span>
+              <span class="kgm__rel">— USES →</span>
+              <span class="kgm__node">MyBatis</span>
+              <span class="kgm__rel">— USES →</span>
+              <span class="kgm__node">MySQL</span>
+            </div>
+            <div class="kgm" role="listitem">
+              <span class="kgm__node">缓存</span>
+              <span class="kgm__rel kgm__rel--verm">— PREREQUISITE →</span>
+              <span class="kgm__node kgm__node--hot">Redis</span>
+            </div>
+            <div class="kgm" role="listitem">
+              <span class="kgm__node">分布式锁</span>
+              <span class="kgm__rel kgm__rel--verm">— PREREQUISITE →</span>
+              <span class="kgm__node kgm__node--hot">Redis</span>
+            </div>
+          </div>
+
+          <p class="graph__hint">悬停或聚焦节点，查看它的关系</p>
+        </div>
+      </div>
+
+      <div class="graph__stats">
+        <div><b>2</b><span>类节点</span></div>
+        <div><b>4</b><span>类关系</span></div>
+        <div><b>Neo4j</b><span>图数据库</span></div>
+        <div><b>AI</b><span>自动抽取实体</span></div>
+      </div>
+    </section>
+
+    <!-- ───────────────────────── AI ───────────────────────── -->
+    <section class="ai section" id="ai">
+      <div class="ai__grid">
+        <div class="ai__copy">
+          <p class="eyebrow"><span>04</span> AI 助手 / AGENT</p>
+          <h2 class="display">不只回答，<br>还会<span class="mark-acid">整理</span>。</h2>
+          <p class="ai__lede">
+            AI 技术助手、学习路线规划、文章分析、知识抽取——四个能力，一个独立的 Python Agent。
+            对话是入口，沉淀下来的结构才是资产。
+          </p>
+
+          <ul class="ai__list">
+            <li><span>01</span><div><b>流式问答</b>用多轮对话拆开一个技术问题，答案边生成边呈现。</div></li>
+            <li><span>02</span><div><b>学习规划</b>沿知识图谱的前置链，把目标拆成分阶段路线。</div></li>
+            <li><span>03</span><div><b>文章分析</b>发布或改稿后自动分析主题、实体与知识点，接回图谱。</div></li>
+          </ul>
+        </div>
+
+        <div class="ai__demo reveal">
+          <div class="term__tabs" role="group" aria-label="选择 AI 演示场景">
+            <button type="button" class="term-tab is-active" data-demo="qa" aria-pressed="true">技术问答</button>
+            <button type="button" class="term-tab" data-demo="path" aria-pressed="false">学习路线</button>
+            <button type="button" class="term-tab" data-demo="analyze" aria-pressed="false">文章分析</button>
+          </div>
+
+          <div class="term">
+            <div class="term__bar">
+              <span class="term__dots" aria-hidden="true"><i></i><i></i><i></i></span>
+              <span class="term__name">wisdomhub-agent</span>
+              <span class="term__mode">STREAM</span>
+            </div>
+            <div class="term__body">
+              <div class="term__promptline">
+                <span class="term__caret" aria-hidden="true">&gt;</span>
+                <span id="termPrompt">Redis 为什么使用跳表？</span>
+              </div>
+              <pre class="term__out" id="termOut"></pre>
+              <div class="term__foot" id="termFoot">
+                <span class="is-on">参考 3 篇文章 · 2 个问答</span>
+                <span class="term__cursor" aria-hidden="true"></span>
+              </div>
+            </div>
+          </div>
+
+          <p class="term__note">演示内容 · 实际回答由 LangGraph Agent 流式生成</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ───────────────────────── CTA ───────────────────────── -->
+    <section class="cta section" id="start">
+      <svg class="stamp" viewBox="0 0 160 160" aria-hidden="true">
+        <defs>
+          <path id="stampPath" d="M80,80 m-58,0 a58,58 0 1,1 116,0 a58,58 0 1,1 -116,0"/>
+        </defs>
+        <circle cx="80" cy="80" r="72" class="stamp__ring"/>
+        <text class="stamp__arc">
+          <textPath href="#stampPath">IN BETA · WISDOMHUB · 2026 · KNOWLEDGE IS A NETWORK · </textPath>
+        </text>
+        <text x="80" y="90" text-anchor="middle" class="stamp__mid">64</text>
+      </svg>
+
+      <p class="eyebrow"><span>05</span> 开始 / START</p>
+      <h2 class="cta__title">知识，<br>从<span class="cta__mark">连接</span>开始。</h2>
+      <p class="cta__lede">
+        WisdomHub 正在内测。把你的第一篇文章，接进一张会生长的图。
+      </p>
+      <div class="cta__actions">
+        <a class="btn btn--ink" href="#" data-soon>申请内测 <span class="btn__arrow" aria-hidden="true">→</span></a>
+        <a class="btn btn--text btn--text-dark" href="#features">先看看它能做什么</a>
+      </div>
+      <p class="cta__note">内测入口尚未开放 · 本页为产品预览</p>
+      <div class="cta__fingerprint" aria-hidden="true">
+        <span>SEED</span> LHXSKg2Lx6oY39gpAMv0OXoqTqqSM7ZpZifjg1SE5WuDsNYB7OkMLdaeQ3bB0tnM
+      </div>
+    </section>
+  </main>
+
+  <!-- ───────────────────────── FOOTER ───────────────────────── -->
+  <footer class="footer">
+    <div class="footer__top">
+      <div class="footer__brand">
+        <a class="brand brand--footer" href="#top">
+          <span class="brand__mark" aria-hidden="true">64</span>
+          <span class="brand__name">Wisdom<b>Hub</b></span>
+        </a>
+        <p>面向开发者的智能技术知识社区与知识图谱平台。</p>
+      </div>
+
+      <nav class="footer__col" aria-label="页面导航">
+        <h3>页面</h3>
+        <a href="#why">为什么</a>
+        <a href="#features">能力</a>
+        <a href="#graph">知识图谱</a>
+        <a href="#ai">AI 助手</a>
+      </nav>
+
+      <div class="footer__col">
+        <h3>技术底座</h3>
+        <span>Spring Cloud Alibaba</span>
+        <span>Neo4j · Elasticsearch</span>
+        <span>RabbitMQ · Redis</span>
+        <span>LangChain · LangGraph</span>
+      </div>
+
+      <div class="footer__col">
+        <h3>状态</h3>
+        <span><i class="dot" aria-hidden="true"></i> 内测准备中</span>
+        <span>内容与图谱已就绪</span>
+        <span>AI 助手已就绪</span>
+      </div>
+    </div>
+
+    <details class="footer__seed">
+      <summary>关于这串字符 <span aria-hidden="true">＋</span></summary>
+      <p>
+        页面上的 64 个字符来自一次真实的随机生成：
+        <code>LHXSKg2Lx6oY39gpAMv0OXoqTqqSM7ZpZifjg1SE5WuDsNYB7OkMLdaeQ3bB0tnM</code>。
+        8×8 的网格、11 个数字、4 次 M——我们把它当作种子，连出了第一张图。
+        它看起来是噪声，但重复出现的地方，结构就出现了。
+      </p>
+    </details>
+
+    <div class="footer__bottom">
+      <span>© 2026 WisdomHub</span>
+      <span>内容 · 搜索 · 知识 · 推荐 · AI · 学习</span>
+      <span>BUILT WITH CURIOSITY</span>
+    </div>
+  </footer>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="main.js"></script>
+</body>
+</html>
