@@ -8,8 +8,8 @@ import lombok.NoArgsConstructor;
 import lombok.ToString;
 
 /**
- * 文章覆盖发布（改内容 / 换标签）。与 created 分开是为了让只在 created 动作的消费者
- * （AI 分析、图谱抽取）不被打扰 —— 改一次文章不该重新做一次 LLM 分析
+ * 文章覆盖发布（改内容 / 换标签 / 将来的下架）。AI 分析也消费它，按 payload.updateTime
+ * 做版本幂等：同一版本不重复调 LLM，search 对账重投的 updated 因此不会触发重分析
  */
 @Data
 @NoArgsConstructor

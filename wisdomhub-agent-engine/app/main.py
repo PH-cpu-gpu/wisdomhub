@@ -1,16 +1,21 @@
+import asyncio
+import contextlib
 import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from v2.nacos import NacosConfigService, NacosNamingService
 
+from api.analysis import router as analysis_router
 from api.chat import router
-from app.config import get_settings
+from app.config import Settings, get_settings
 from app.errors import register_exception_handlers
 from db.session import create_engine, create_session_factory, ping_database
 from graphs.learning import build_learning_graph
 from graphs.qa import build_qa_graph
 from models.llm import create_chat_model
+from mq.analysis_consumer import AnalysisConsumer
+from mq.config import resolve_rabbitmq_url
 from registry.client import build_client_config
 from registry.naming import SERVICE_NAME, deregister_self, register_self
 from security.internal_sign import InternalSigner, load_internal_sign_secret
@@ -19,6 +24,22 @@ from tools.java_api import build_java_tools
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
+
+
+async def _run_consumer(consumer: AnalysisConsumer, settings: Settings) -> None:
+    while True:
+        try:
+            await consumer.run()
+            return
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            log.warning(
+                "文章分析消费者启动失败，%ss 后重试",
+                settings.rabbitmq_reconnect_interval,
+                exc_info=True,
+            )
+            await asyncio.sleep(settings.rabbitmq_reconnect_interval)
 
 
 @asynccontextmanager
@@ -35,6 +56,8 @@ async def lifespan(app: FastAPI):
     app.state.analysis_model = None
     app.state.qa_graph = None
     app.state.learning_graph = None
+    app.state.analysis_consumer = None
+    app.state.analysis_task = None
     try:
         app.state.chat_model = create_chat_model(settings)
         app.state.qa_model = create_chat_model(settings, streaming=True)
@@ -60,8 +83,38 @@ async def lifespan(app: FastAPI):
             app.state.learning_graph = build_learning_graph(
                 app.state.chat_model, app.state.qa_model, internal_client
             )
+
+        if settings.rabbitmq_enabled and internal_client is not None:
+            rabbitmq_url = await resolve_rabbitmq_url(settings, config_client)
+            if rabbitmq_url:
+                consumer = AnalysisConsumer(
+                    settings=settings,
+                    url=rabbitmq_url,
+                    client=internal_client,
+                    llm=app.state.analysis_model,
+                    session_factory=app.state.session_factory,
+                )
+                app.state.analysis_consumer = consumer
+                app.state.analysis_task = asyncio.create_task(
+                    _run_consumer(consumer, settings)
+                )
+            else:
+                log.info("RabbitMQ 未配置，跳过文章分析消费者")
+        else:
+            log.info("文章分析消费者未启用（rabbitmq_enabled=false 或无内部客户端）")
         yield
     finally:
+        consumer = app.state.analysis_consumer
+        task = app.state.analysis_task
+        if consumer is not None:
+            try:
+                await consumer.stop()
+            except Exception:
+                log.warning("文章分析消费者停止失败", exc_info=True)
+        if task is not None:
+            task.cancel()
+            with contextlib.suppress(asyncio.CancelledError, Exception):
+                await task
         if internal_client is not None:
             try:
                 await internal_client.aclose()
@@ -88,3 +141,4 @@ register_exception_handlers(app)
 
 # 配置路由
 app.include_router(router)
+app.include_router(analysis_router)
