@@ -38,6 +38,12 @@ class Settings(BaseSettings):
     # 文章分析：长任务 LLM 超时与正文截断
     analysis_timeout: float = 600.0
     analysis_max_article_tokens: int = 24000
+    # 文章分析 MQ
+    rabbitmq_enabled: bool = True
+    rabbitmq_url: str | None = None
+    rabbitmq_reconnect_interval: float = 5.0
+    analysis_retry_times: int = 2
+    article_analysis_ttl: int = 1800
 
     # 测试使用
     # false 用于本地旁路测试：跳过 Nacos 注册
