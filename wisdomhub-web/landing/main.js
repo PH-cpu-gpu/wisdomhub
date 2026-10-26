@@ -13,6 +13,46 @@ const onScroll = () => nav.classList.toggle("is-scrolled", window.scrollY > 16);
 onScroll();
 window.addEventListener("scroll", onScroll, { passive: true });
 
+/* ── mobile menu ─────────────────────────────────────────── */
+
+const menu = document.getElementById("mobileMenu");
+const menuButton = document.querySelector(".nav__menu");
+const menuClose = document.querySelector(".menu__close");
+
+function closeMenu() {
+  if (!menu || !menu.open) return;
+  if (typeof menu.close === "function") menu.close();
+  else menu.removeAttribute("open");
+  document.body.classList.remove("menu-open");
+  menuButton?.setAttribute("aria-expanded", "false");
+}
+
+if (menu && menuButton) {
+  menuButton.addEventListener("click", () => {
+    if (menu.open) {
+      closeMenu();
+      return;
+    }
+    if (typeof menu.showModal === "function") menu.showModal();
+    else menu.setAttribute("open", "");
+    menuButton.setAttribute("aria-expanded", "true");
+    document.body.classList.add("menu-open");
+    menuClose?.focus({ preventScroll: true });
+  });
+
+  menuClose?.addEventListener("click", closeMenu);
+  menu.addEventListener("close", () => {
+    document.body.classList.remove("menu-open");
+    menuButton.setAttribute("aria-expanded", "false");
+  });
+  menu.querySelectorAll("a").forEach((link) => {
+    link.addEventListener("click", closeMenu);
+  });
+  window.addEventListener("resize", () => {
+    if (window.innerWidth > 900) closeMenu();
+  }, { passive: true });
+}
+
 /* ── seed grid ───────────────────────────────────────────── */
 
 const grid = document.getElementById("seedGrid");
@@ -22,7 +62,7 @@ const edgeSvg = document.getElementById("seedEdges");
 const count = new Map();
 for (const ch of SEED) count.set(ch, (count.get(ch) || 0) + 1);
 
-const cells = [...SEED].map((ch, i) => {
+const cells = [...SEED].map((ch) => {
   const cell = document.createElement("span");
   cell.className = "cell";
   if (/[0-9]/.test(ch)) cell.classList.add("cell--digit");
@@ -31,9 +71,7 @@ const cells = [...SEED].map((ch, i) => {
   if ((count.get(ch) || 0) >= 3) cell.classList.add("cell--repeat");
   if (ch === "M") cell.classList.add("cell--m");
   cell.dataset.char = ch;
-  cell.dataset.index = String(i);
   cell.textContent = ch;
-  cell.title = `${ch} · cell ${i + 1}`;
   return cell;
 });
 grid.append(...cells);
@@ -191,6 +229,12 @@ if ("IntersectionObserver" in window && !reduceMotion) {
   revealItems.forEach((el) => el.classList.add("is-in"));
 }
 
+window.setTimeout(() => {
+  document.querySelectorAll(".reveal:not(.is-in)").forEach((el) => {
+    el.classList.add("is-in");
+  });
+}, 2000);
+
 /* ── AI demo ─────────────────────────────────────────────── */
 
 const DEMOS = {
@@ -237,11 +281,13 @@ const termFoot = document.getElementById("termFoot");
 const footText = termFoot.querySelector(".is-on");
 let typingToken = 0;
 let demoChosen = false;
+let demoStarted = false;
 
 function typeDemo(key) {
   const demo = DEMOS[key];
   if (!demo) return;
 
+  demoStarted = true;
   const token = ++typingToken;
   termPrompt.textContent = demo.prompt;
   termOut.textContent = "";
@@ -286,7 +332,7 @@ if ("IntersectionObserver" in window) {
   const demoObserver = new IntersectionObserver(
     (entries) => {
       if (entries[0].isIntersecting) {
-        if (!demoChosen) typeDemo("qa");
+        if (!demoChosen && !demoStarted) typeDemo("qa");
         demoObserver.disconnect();
       }
     },
@@ -297,31 +343,6 @@ if ("IntersectionObserver" in window) {
   typeDemo("qa");
 }
 
-/* ── placeholder CTA ─────────────────────────────────────── */
-
-const toast = document.getElementById("toast");
-let toastTimer = 0;
-
-function showToast(message) {
-  toast.textContent = message;
-  toast.classList.add("is-on");
-  window.clearTimeout(toastTimer);
-  toastTimer = window.setTimeout(() => toast.classList.remove("is-on"), 3200);
-}
-
-for (const el of document.querySelectorAll("[data-soon]")) {
-  el.addEventListener("click", (event) => {
-    event.preventDefault();
-    showToast("内测入口尚未开放 · 敬请期待");
-  });
-}
-
-/* ── footer details marker ───────────────────────────────── */
-
-const seedDetails = document.querySelector(".footer__seed");
-if (seedDetails) {
-  const sign = seedDetails.querySelector("summary span");
-  seedDetails.addEventListener("toggle", () => {
-    sign.textContent = seedDetails.open ? "−" : "＋";
-  });
-}
+window.setTimeout(() => {
+  if (!demoStarted) typeDemo("qa");
+}, 2200);
