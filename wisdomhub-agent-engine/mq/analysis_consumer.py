@@ -88,6 +88,19 @@ class AnalysisConsumer:
             with contextlib.suppress(Exception):
                 await connection.close()
             self._connection = None
+            self._job = None
+
+    @property
+    def job(self) -> AnalysisJob | None:
+        return self._job
+
+    async def trigger(self, article_id: str) -> bool:
+        """读接口懒触发入口；消费者未就绪时返回 False。"""
+        job = self._job
+        if job is None:
+            log.warning("文章分析消费者未就绪，跳过懒触发 article=%s", article_id)
+            return False
+        return await job.run_lazy(article_id)
 
     async def stop(self) -> None:
         self._stop_event.set()

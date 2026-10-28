@@ -14,8 +14,23 @@ from agents.analysis import (
 from app.config import Settings
 from db import analysis_repository
 from tools.internal_client import InternalClient
+from tools.java_api import get_article_snapshot
 
 log = logging.getLogger(__name__)
+
+PUBLISHED_STATE = 2
+
+
+def _parse_updated_at(value: Any) -> datetime | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
 
 
 class AnalysisJob:
@@ -36,7 +51,38 @@ class AnalysisJob:
         self._llm = llm
         self._publisher = publisher
 
-    async def run(self, article_id: str, *, source_updated_at: datetime) -> bool:
+    async def run_lazy(
+        self, article_id: str, *, snapshot: dict[str, Any] | None = None
+    ) -> bool:
+        """读接口懒触发：先取快照拿 updateTime 作为版本，再走正常 claim / 分析流程。"""
+        if snapshot is None:
+            try:
+                snapshot = await get_article_snapshot(self._client, article_id)
+            except Exception:
+                log.warning("懒触发取文章快照失败 article=%s", article_id, exc_info=True)
+                return False
+
+        state = snapshot.get("state")
+        if str(state) != str(PUBLISHED_STATE):
+            log.info("懒触发跳过非发布态文章 article=%s state=%s", article_id, state)
+            return False
+
+        source_updated_at = _parse_updated_at(snapshot.get("updateTime"))
+        if source_updated_at is None:
+            log.warning("懒触发缺少可解析的 updateTime article=%s", article_id)
+            return False
+
+        return await self.run(
+            article_id, source_updated_at=source_updated_at, snapshot=snapshot
+        )
+
+    async def run(
+        self,
+        article_id: str,
+        *,
+        source_updated_at: datetime,
+        snapshot: dict[str, Any] | None = None,
+    ) -> bool:
         now = datetime.now(UTC)
         async with self._session_factory() as session:
             async with session.begin():
@@ -79,7 +125,11 @@ class AnalysisJob:
             try:
                 if analysis is None:
                     analysis = await analyze_article(
-                        self._client, self._llm, article_id, settings=self._settings
+                        self._client,
+                        self._llm,
+                        article_id,
+                        settings=self._settings,
+                        snapshot=snapshot,
                     )
                 if not await self._finish(article_id, analysis, source_updated_at):
                     log.info("文章已改稿，丢弃过期分析结果 article=%s", article_id)
