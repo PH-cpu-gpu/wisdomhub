@@ -131,10 +131,12 @@ async def analyze_article(
     *,
     settings: Settings,
     counter: TokenCounter | None = None,
+    snapshot: dict[str, Any] | None = None,
 ) -> ArticleAnalysis:
     """取文章快照 → LLM 提炼主题/技术实体/知识点；不查关联技术或相关文章。"""
     try:
-        snapshot = await get_article_snapshot(client, article_id)
+        if snapshot is None:
+            snapshot = await get_article_snapshot(client, article_id)
     except InternalClientError as exc:
         if exc.code == 404 or exc.status == 404:
             raise ArticleNotFound(f"文章不存在: {article_id}") from exc
