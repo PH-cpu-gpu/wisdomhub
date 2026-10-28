@@ -1,0 +1,48 @@
+{
+  "name": "wisdomhub-web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.15.0",
+  "engines": {
+    "node": ">=20.19.0",
+    "pnpm": ">=10"
+  },
+  "scripts": {
+    "dev": "vite",
+    "dev:mock": "vite --mode mock --port 5174",
+    "build": "vue-tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "vue-tsc --noEmit",
+    "lint": "eslint . --max-warnings=0",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "dependencies": {
+    "@stomp/stompjs": "^7.5.0",
+    "axios": "^1.20.0",
+    "dayjs": "^1.11.23",
+    "dompurify": "^3.4.17",
+    "echarts": "^5.6.0",
+    "eventsource-parser": "^3.1.1",
+    "highlight.js": "^11.12.0",
+    "markdown-it": "^14.3.3",
+    "pinia": "^3.0.4",
+    "vue": "^3.5.44",
+    "vue-router": "^4.6.4"
+  },
+  "devDependencies": {
+    "@types/markdown-it": "^14.2.0",
+    "@types/node": "^22.20.5",
+    "@vitejs/plugin-vue": "^6.0.10",
+    "@vue/eslint-config-prettier": "^10.2.0",
+    "@vue/eslint-config-typescript": "^14.9.0",
+    "eslint": "^9.39.5",
+    "eslint-plugin-vue": "^10.11.1",
+    "prettier": "^3.9.10",
+    "typescript": "~5.9.3",
+    "vite": "^7.3.7",
+    "vue-tsc": "^3.3.13"
+  }
+}
