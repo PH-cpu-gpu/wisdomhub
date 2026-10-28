@@ -54,3 +54,15 @@ logs/
 /技术文档.md
 /项目实现任务表.md
 /前端页面开发计划表.md
+
+### 部署产物（docker save 的镜像包常见数百 MB）###
+*.tar.gz
+*.tgz
+docker-compose.override.yml
+
+### 运行期垃圾 ###
+.pytest_cache/
+*.log
+hs_err_pid*
+*.hprof
+.DS_Store

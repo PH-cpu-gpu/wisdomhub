@@ -1,0 +1,378 @@
+# =============================================================================
+# 生产覆盖层：2 核 4GB 单机 Linux
+#
+#   起默认档   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#   加扩展服务 docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile ext up -d
+#   全量       docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile ext --profile stage3 up -d
+#
+# 要求 Docker Compose >= 2.24（覆盖 ports 用了 !override）
+#
+# 三档（容器上限合计，宿主机自身另算约 350 MiB）：
+#   默认    中间件核心 2368 + 5 个 Java 服务 1600 = 3968 MiB
+#           注意：这是上限合计，实测常驻约 3.1 GiB。上限之和略超物理内存是有意的，
+#           目的是让每个容器都有余量，靠内核回收 + zram 吸收瞬时尖峰。
+#   ext     recommendation-service                                + 320 MiB
+#   stage3  neo4j/seata/xxl-job/postgres + knowledge/order/agent  + 1984 MiB
+#
+# 上限是天花板不是占用：默认档实际常驻约 2.9~3.1 GB，其余留给 page cache。
+#
+# 前提：
+#   前端 dist 放宿主机，nginx 在宿主机反代 127.0.0.1:9090，不进容器（见 wisdomhub-web/deploy/）
+#   镜像在开发机构建好再传上去（docker save/load 或私有 registry），服务器不跑 mvn/pnpm
+#
+# 容量口径：容器上限 ≥ -Xmx + 208（MaxMetaspace 128 + code cache 32 + 栈/堆外 48）
+# =============================================================================
+
+x-java-env: &java-env
+  TZ: Asia/Shanghai
+  # 覆盖 application-local.yml 里的 127.0.0.1；profile 仍用 local，因为 spring.config.import 在那里
+  SPRING_CLOUD_NACOS_SERVER_ADDR: nacos:8848
+  # 覆盖 Nacos wisdomhub-env.yaml 里的 discovery.ip: 127.0.0.1（容器间注册回环地址等于不可达）
+  SPRING_CLOUD_NACOS_DISCOVERY_IP: ""
+  SPRING_CLOUD_INETUTILS_PREFERRED_NETWORKS: "172."
+  XXL_JOB_ADMIN_ADDRESSES: http://xxl-job-admin:8080
+  JAVA_TOOL_OPTIONS: >-
+    -XX:+UseSerialGC -XX:ActiveProcessorCount=1 -XX:TieredStopAtLevel=1
+    -Xms112m -Xmx112m -XX:MaxMetaspaceSize=128m
+    -XX:InitialCodeCacheSize=16m -XX:ReservedCodeCacheSize=32m
+    -XX:MaxDirectMemorySize=32m -Xss512k -XX:-UsePerfData
+    -XX:SharedArchiveFile=/tmp/app.jsa -XX:+AutoCreateSharedArchive
+    -XX:+ExitOnOutOfMemoryError
+
+services:
+
+  # ===========================================================================
+  # 中间件：全部只监听回环，外部只能经宿主机 nginx 进来
+  # ===========================================================================
+
+  mysql:
+    # 实测 131 MiB（buffer pool 96M + performance_schema 已关）
+    mem_limit: 288m
+    ports: !override
+      - "127.0.0.1:3306:3306"
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_as_cs
+      # 省 100~150 MB。若启动报 unknown variable performance_schema，删掉这一行
+      - --performance_schema=OFF
+      - --innodb-buffer-pool-size=96M
+      - --innodb-buffer-pool-instances=1
+      - --innodb-log-buffer-size=8M
+      - --max-connections=50
+      - --table-open-cache=200
+      - --tmp-table-size=16M
+      - --max-heap-table-size=16M
+      - --thread-cache-size=8
+      - --skip-name-resolve
+
+  redis:
+    mem_limit: 48m
+    ports: !override
+      - "127.0.0.1:6379:6379"
+    # noeviction 而不是 lru：JWT 黑名单 key 被淘汰等于注销失效，宁可写失败也不静默丢
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "24mb", "--maxmemory-policy", "noeviction"]
+
+  mongodb:
+    # 缓存下限被 mongod 硬性卡在 0.25GB（传 0.125 直接 BadValue 起不来），
+    # 上限必须能容纳「缓存长满 + 引擎开销约 80」
+    mem_limit: 384m
+    ports: !override
+      - "127.0.0.1:27017:27017"
+    # WiredTiger 默认按宿主机内存的一半算缓存，必须显式压住；0.25 是 mongod 允许的最小值
+    command: ["mongod", "--wiredTigerCacheSizeGB", "0.25"]
+
+  elasticsearch:
+    # 实测稳态 anon 560 MiB（3 分钟后仍在爬）：堆 192 + 非堆 194（metaspace 149）
+    # + 线程栈（ES 自己设 -Xss1m，线程上百个）。几乎全不可回收，页缓存只占几十 MB
+    mem_limit: 720m
+    ports: !override
+      - "127.0.0.1:9200:9200"
+    environment:
+      ES_JAVA_OPTS: "-Xms192m -Xmx192m -XX:+UseG1GC"
+      # ML 与监控采集在空闲时也要占 150 MB 以上，本项目不用
+      xpack.ml.enabled: "false"
+      xpack.monitoring.collection.enabled: "false"
+      bootstrap.memory_lock: "false"
+      # 默认不设上限，字段基数一高就撑爆堆
+      indices.fielddata.cache.size: "10%"
+
+  rabbitmq:
+    # 实测 89 MiB（management 插件在，scheduler 已压到 1）
+    mem_limit: 160m
+    ports: !override
+      - "127.0.0.1:5672:5672"
+      - "127.0.0.1:15672:15672"
+      - "127.0.0.1:61613:61613"
+    environment:
+      # Erlang 默认按核数开 scheduler，2 核会开 2+2，空转也吃 CPU 和内存
+      RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: "+S 1:1 +sbwt none +sbwtdcpu none +sbwtdio none"
+
+  nacos:
+    # 实测稳态 620 MiB 且仍在缓慢爬升：堆只占 192，其余全是 metaspace/code cache/Derby。
+    # standalone 模式只吃 JVM_XMS/XMX/XMN，JVM_MS/MMS 不生效；JVM_XSS 没有入口，
+    # -Xss512k 实测只省 10 MiB（栈惰性提交），压不动，只能给够
+    mem_limit: 768m
+    ports: !override
+      - "127.0.0.1:8848:8848"
+      - "127.0.0.1:9848:9848"
+      - "127.0.0.1:8849:8080"
+    environment:
+      JVM_XMS: 192m
+      JVM_XMX: 192m
+      JVM_XMN: 96m
+      JVM_MS: 96m
+      JVM_MMS: 128m
+
+  # ===========================================================================
+  # 默认档业务服务
+  # ===========================================================================
+
+  gateway:
+    image: ${REGISTRY:-wisdomhub}/gateway:${TAG:-latest}
+    build:
+      context: ./wisdomhub-gateway
+      dockerfile: ../docker/java/Dockerfile
+      args:
+        JAR_FILE: target/wisdomhub-gateway-1.0.0-SNAPSHOT.jar
+    mem_limit: 320m
+    restart: unless-stopped
+    environment:
+      <<: *java-env
+      # Netty 走堆外，网关的 direct memory 要比业务服务大
+      JAVA_TOOL_OPTIONS: >-
+        -XX:+UseSerialGC -XX:ActiveProcessorCount=1 -XX:TieredStopAtLevel=1
+        -Xms112m -Xmx112m -XX:MaxMetaspaceSize=128m
+        -XX:InitialCodeCacheSize=16m -XX:ReservedCodeCacheSize=32m
+        -XX:MaxDirectMemorySize=96m -Xss512k -XX:-UsePerfData
+        -XX:SharedArchiveFile=/tmp/app.jsa -XX:+AutoCreateSharedArchive
+        -XX:+ExitOnOutOfMemoryError
+    ports:
+      - "127.0.0.1:9090:9090"
+    depends_on:
+      nacos:
+        condition: service_started
+    networks: [wisdomhub]
+
+  user:
+    image: ${REGISTRY:-wisdomhub}/user-service:${TAG:-latest}
+    build:
+      context: ./wisdomhub-user
+      dockerfile: ../docker/java/Dockerfile
+      args:
+        JAR_FILE: target/wisdomhub-user-1.0.0-SNAPSHOT.jar
+    mem_limit: 320m
+    restart: unless-stopped
+    environment:
+      <<: *java-env
+    depends_on:
+      mysql:
+        condition: service_healthy
+      nacos:
+        condition: service_started
+    networks: [wisdomhub]
+
+  content:
+    image: ${REGISTRY:-wisdomhub}/content-service:${TAG:-latest}
+    build:
+      context: ./wisdomhub-content
+      dockerfile: ../docker/java/Dockerfile
+      args:
+        JAR_FILE: target/wisdomhub-content-1.0.0-SNAPSHOT.jar
+    mem_limit: 320m
+    restart: unless-stopped
+    environment:
+      <<: *java-env
+      # content 只引了 seata starter，没有 @GlobalTransactional；默认档不起 Seata，关掉免得连不上刷日志
+      SEATA_ENABLED: "false"
+      JAVA_TOOL_OPTIONS: >-
+        -XX:+UseSerialGC -XX:ActiveProcessorCount=1 -XX:TieredStopAtLevel=1
+        -Xms128m -Xmx128m -XX:MaxMetaspaceSize=128m
+        -XX:InitialCodeCacheSize=16m -XX:ReservedCodeCacheSize=32m
+        -XX:MaxDirectMemorySize=32m -Xss512k -XX:-UsePerfData
+        -XX:SharedArchiveFile=/tmp/app.jsa -XX:+AutoCreateSharedArchive
+        -XX:+ExitOnOutOfMemoryError
+    depends_on:
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+      nacos:
+        condition: service_started
+    networks: [wisdomhub]
+
+  notification:
+    image: ${REGISTRY:-wisdomhub}/notification-service:${TAG:-latest}
+    build:
+      context: ./wisdomhub-notification
+      dockerfile: ../docker/java/Dockerfile
+      args:
+        JAR_FILE: target/wisdomhub-notification-1.0.0-SNAPSHOT.jar
+    mem_limit: 320m
+    restart: unless-stopped
+    environment:
+      <<: *java-env
+    depends_on:
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+      nacos:
+        condition: service_started
+    networks: [wisdomhub]
+
+  search:
+    image: ${REGISTRY:-wisdomhub}/search-service:${TAG:-latest}
+    build:
+      context: ./wisdomhub-search
+      dockerfile: ../docker/java/Dockerfile
+      args:
+        JAR_FILE: target/wisdomhub-search-1.0.0-SNAPSHOT.jar
+    mem_limit: 320m
+    restart: unless-stopped
+    environment:
+      <<: *java-env
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+      nacos:
+        condition: service_started
+    networks: [wisdomhub]
+
+  # ===========================================================================
+  # 扩展档
+  # ===========================================================================
+
+  recommendation:
+    profiles: ["ext"]
+    image: ${REGISTRY:-wisdomhub}/recommendation-service:${TAG:-latest}
+    build:
+      context: ./wisdomhub-recommendation
+      dockerfile: ../docker/java/Dockerfile
+      args:
+        JAR_FILE: target/wisdomhub-recommendation-1.0.0-SNAPSHOT.jar
+    mem_limit: 320m
+    restart: unless-stopped
+    environment:
+      <<: *java-env
+    depends_on:
+      nacos:
+        condition: service_started
+    networks: [wisdomhub]
+
+  # ===========================================================================
+  # 重量级档（与默认档同时起会超内存，按需切）
+  # ===========================================================================
+
+  neo4j:
+    profiles: ["stage3"]
+    # 堆 128 + pagecache 96 + 堆外约 100
+    mem_limit: 384m
+    ports: !override
+      - "127.0.0.1:7474:7474"
+      - "127.0.0.1:7687:7687"
+    environment:
+      NEO4J_server_memory_heap_initial__size: 128m
+      NEO4J_server_memory_heap_max__size: 128m
+      NEO4J_server_memory_pagecache_size: 96m
+
+  seata:
+    profiles: ["stage3"]
+    mem_limit: 224m
+    ports: !override
+      - "127.0.0.1:8091:8091"
+    environment:
+      JAVA_TOOL_OPTIONS: >-
+        -XX:+UseSerialGC -XX:ActiveProcessorCount=1 -XX:TieredStopAtLevel=1
+        -Xms96m -Xmx96m -XX:MaxMetaspaceSize=96m -XX:ReservedCodeCacheSize=32m
+        -XX:+ExitOnOutOfMemoryError
+
+  xxl-job-admin:
+    profiles: ["stage3"]
+    mem_limit: 256m
+    ports: !override
+      - "127.0.0.1:8080:8080"
+    environment:
+      JAVA_TOOL_OPTIONS: >-
+        -XX:+UseSerialGC -XX:ActiveProcessorCount=1 -XX:TieredStopAtLevel=1
+        -Xms112m -Xmx112m -XX:MaxMetaspaceSize=96m -XX:ReservedCodeCacheSize=32m
+        -XX:+ExitOnOutOfMemoryError
+
+  postgres:
+    profiles: ["stage3"]
+    mem_limit: 96m
+    ports: !override
+      - "127.0.0.1:5432:5432"
+    command: ["postgres", "-c", "shared_buffers=32MB", "-c", "max_connections=20"]
+
+  knowledge:
+    profiles: ["stage3"]
+    image: ${REGISTRY:-wisdomhub}/knowledge-service:${TAG:-latest}
+    build:
+      context: ./wisdomhub-knowledge
+      dockerfile: ../docker/java/Dockerfile
+      args:
+        JAR_FILE: target/wisdomhub-knowledge-1.0.0-SNAPSHOT.jar
+    mem_limit: 320m
+    restart: unless-stopped
+    environment:
+      <<: *java-env
+    depends_on:
+      mysql:
+        condition: service_healthy
+      neo4j:
+        condition: service_started
+      nacos:
+        condition: service_started
+    networks: [wisdomhub]
+
+  order:
+    profiles: ["stage3"]
+    image: ${REGISTRY:-wisdomhub}/order-service:${TAG:-latest}
+    build:
+      context: ./wisdomhub-order
+      dockerfile: ../docker/java/Dockerfile
+      args:
+        JAR_FILE: target/wisdomhub-order-1.0.0-SNAPSHOT.jar
+    mem_limit: 320m
+    restart: unless-stopped
+    environment:
+      <<: *java-env
+      SEATA_ENABLED: "true"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      seata:
+        condition: service_started
+      nacos:
+        condition: service_started
+    networks: [wisdomhub]
+
+  agent-engine:
+    profiles: ["stage3"]
+    image: ${REGISTRY:-wisdomhub}/agent-engine:${TAG:-latest}
+    build:
+      context: ./wisdomhub-agent-engine
+      dockerfile: ../docker/agent-engine/Dockerfile
+    mem_limit: 384m
+    restart: unless-stopped
+    environment:
+      TZ: UTC
+      APP_PORT: "8000"
+      NACOS_SERVER_ADDR: nacos:8848
+      NACOS_NAMESPACE: wisdomhub
+      # 留空 → entrypoint 取容器 eth0 的地址再注册
+      NACOS_REGISTER_IP: ""
+      DATABASE_URL: postgresql+asyncpg://wisdomhub:${POSTGRES_PASSWORD}@postgres:5432/wisdomhub_agent
+      CHAT_MODEL: ${CHAT_MODEL:-}
+      CHAT_BASE_URL: ${CHAT_BASE_URL:-}
+      CHAT_API_KEY: ${CHAT_API_KEY:-}
+      # glibc arena 默认按核数开，Python 进程能省 30~60 MB
+      MALLOC_ARENA_MAX: "2"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nacos:
+        condition: service_started
+    networks: [wisdomhub]

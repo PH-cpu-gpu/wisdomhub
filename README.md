@@ -124,6 +124,36 @@ pnpm dev                  # 默认 http://localhost:5173
 
 `pnpm dev:mock` 可启用 mock 数据（端口 5174），无需后端即可预览页面。
 
+## 生产部署（2 核 4GB 单机）
+
+全量装不进 4GB：中间件实测常驻约 1.6GB（上限 2368MB），每个 Spring Boot 服务约 250MB。
+[`docker-compose.prod.yml`](docker-compose.prod.yml) 是覆盖层，把服务分成三档，默认档只起核心链路。
+
+**完整步骤见 [`docker/DEPLOY.md`](docker/DEPLOY.md)**，下面是速览：
+
+```bash
+# 1. 宿主机：zram + 兜底 swap + 内核参数 + Docker 日志轮转
+sudo bash docker/host-init.sh
+
+# 2. 开发机打包（服务器上不跑 mvn / pnpm）
+./mvnw clean package -DskipTests
+
+# 3. 开发机构建镜像，docker save | ssh <host> docker load 传过去
+docker compose -f docker-compose.yml -f docker-compose.prod.yml build
+
+# 4. 服务器启动
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile ext up -d      # + 推荐
+docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile stage3 up -d   # + 图谱/订单/Agent
+```
+
+- Nacos 的 `wisdomhub-env.yaml` 要换成容器地址，模板见
+  [`docker/nacos/wisdomhub-env.prod.yaml.example`](docker/nacos/wisdomhub-env.prod.yaml.example)。
+- 前端 `dist/` 与 `landing/` 放宿主机，宿主机 nginx 反代 `127.0.0.1:9090`，
+  配置见 [`wisdomhub-web/deploy/`](wisdomhub-web/deploy/)。
+- 中间件端口全部只绑 `127.0.0.1`，公网只开 nginx 的 80/443。
+- 需要 Docker Compose >= 2.24（覆盖层用 `!override` 重写端口绑定）。
+
 ## 开发提示
 
 - 提交前请确认 `.env`、`*.key`、构建产物没有被加入版本库；它们均已在 `.gitignore` 中忽略。

@@ -4,3 +4,12 @@
 # Shell 脚本会被挂载进 Linux 容器执行。若在 Windows 上被检出成 CRLF，
 # 容器内会报 "bad interpreter: No such file or directory"，且报错完全看不出是换行符问题。
 *.sh text eol=lf
+
+# 这个文件挂进 RabbitMQ 容器后按 Erlang term 解析，CRLF 的分号后换行会解析失败，
+# 表现是插件一个都没启用（包括 stomp），notification 的 WebSocket 直接连不上。
+docker/rabbitmq/enabled_plugins text eol=lf
+
+# Docker 按行解析这两个文件。CRLF 会让 .dockerignore 每条规则都带上 \r 从而什么都匹配不到
+# （.venv 照样打进构建上下文），Dockerfile 的 ENV 续行也会断在反斜杠后面。
+Dockerfile* text eol=lf
+.dockerignore text eol=lf

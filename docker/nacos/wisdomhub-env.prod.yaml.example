@@ -1,0 +1,50 @@
+# =============================================================================
+# 生产用 wisdomhub-env.yaml（容器化部署）
+#
+# 这不是新的 DataId：把本文件内容发布到 Nacos 的 wisdomhub-env.yaml，覆盖原值。
+# 放在 config/ 之外，避免被 import.sh 的 "*.example" 当成新配置导入。
+#
+# 与原模板的三处差异：
+#   1. infra.* 全部换成 compose 服务名（容器内 localhost 指向容器自己）
+#   2. 删掉 spring.cloud.nacos.discovery.ip —— 那是为 Windows 上的 Radmin 网卡加的，
+#      容器里注册回环地址会让网关调不通。compose 里另外用
+#      SPRING_CLOUD_NACOS_DISCOVERY_IP="" 兜底，两份都处理过更稳。
+#   3. xxl-job 地址改容器名
+#
+# 导入前把 change-me 换成实际值。
+# =============================================================================
+
+xxl:
+  job:
+    admin-addresses: http://xxl-job-admin:8080
+    access-token: change-me
+
+# 环境相关的值全部集中在这里。上线只改这一个文件。
+infra:
+  mysql-host: mysql
+  mysql-port: 3306
+  mysql-user: root
+  mysql-password: change-me
+  mysql-params: connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true
+
+  redis-host: redis
+  redis-port: 6379
+
+  mongo-host: mongodb
+  mongo-port: 27017
+  mongo-user: wisdomhub
+  mongo-password: change-me
+
+  es-host: elasticsearch
+  es-port: 9200
+
+  neo4j-host: neo4j
+  neo4j-port: 7687
+  neo4j-user: neo4j
+  neo4j-password: change-me
+
+  rabbitmq-host: rabbitmq
+  rabbitmq-port: 5672
+  rabbitmq-vhost: /
+  rabbitmq-username: wisdomhub
+  rabbitmq-password: change-me

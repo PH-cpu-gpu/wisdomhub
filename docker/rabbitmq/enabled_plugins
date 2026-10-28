@@ -1,1 +1,2 @@
-[rabbitmq_management,rabbitmq_prometheus,rabbitmq_stomp].
+% prometheus 插件没接监控，白占 15~20MB，4G 机器上不值得
+[rabbitmq_management,rabbitmq_stomp].
