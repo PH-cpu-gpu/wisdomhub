@@ -1,0 +1,71 @@
+# =============================================================================
+# Nacos 配置模板（已脱敏）
+# DataId   : wisdomhub-common.yaml
+# Group    : DEFAULT_GROUP
+# Namespace: wisdomhub
+#
+# 导入前请把 change-me / your-xxx 占位符替换为实际值。
+# 导入方式见 docker/nacos/README.md
+# =============================================================================
+logging:
+  level:
+    com.wisdomhub: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS,UTC} %-5level [${spring.application.name:-}] [%thread] %logger{36} : %msg%n"
+wisdomhub:
+  config-source: nacos
+  security:
+    internal-sign:
+      enabled: true
+      secret: change-me-to-a-random-64-hex
+      service-name: ${spring.application.name}
+      allowed-services:
+        - content-service
+        - knowledge-service
+        - notification-service
+        - order-service
+        - recommendation-service
+        - search-service
+        - user-service
+        - agent-engine
+      timestamp-window-seconds: 300
+      nonce-ttl-seconds: 300
+spring:
+  jackson:
+    deserialization:
+      adjust-dates-to-context-time-zone: false
+  cloud:
+    openfeign:
+      client:
+        config:
+          default:
+            connectTimeout: 1000
+            readTimeout: 3000
+            loggerLevel: basic
+  rabbitmq:
+    host: ${infra.rabbitmq-host}
+    port: ${infra.rabbitmq-port}
+    virtual-host: ${infra.rabbitmq-vhost}
+    username: ${infra.rabbitmq-username}
+    password: ${infra.rabbitmq-password}
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    template:
+      mandatory: true
+      retry:
+        enabled: true
+        max-attempts: 3
+        initial-interval: 200ms
+        multiplier: 2
+        max-interval: 1s
+    listener:
+      simple:
+        # 消费者失败策略：手动 ACK，重试 3 次后 reject
+        acknowledge-mode: manual
+        default-requeue-rejected: false
+        retry:
+          enabled: true
+          max-attempts: 3
+          initial-interval: 200ms
+          multiplier: 2
+          max-interval: 1s

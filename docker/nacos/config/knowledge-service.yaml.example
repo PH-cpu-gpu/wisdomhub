@@ -1,0 +1,29 @@
+# =============================================================================
+# Nacos 配置模板（已脱敏）
+# DataId   : knowledge-service.yaml
+# Group    : DEFAULT_GROUP
+# Namespace: wisdomhub
+#
+# 导入前请把 change-me / your-xxx 占位符替换为实际值。
+# 导入方式见 docker/nacos/README.md
+# =============================================================================
+spring:
+  neo4j:
+    uri: bolt://${infra.neo4j-host}:${infra.neo4j-port}
+    authentication:
+      username: ${infra.neo4j-user}
+      password: ${infra.neo4j-password}
+  data:
+    redis:
+      host: ${infra.redis-host}
+      port: ${infra.redis-port}
+springdoc:
+  api-docs:
+    path: /api/knowledge/v3/api-docs
+xxl:
+  job:
+    executor:
+      appname: wisdomhub-knowledge-executor
+      port: 9996
+      log-path: ./logs/xxl-job
+      log-retention-days: 30

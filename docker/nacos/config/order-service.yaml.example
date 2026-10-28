@@ -1,0 +1,35 @@
+# =============================================================================
+# Nacos 配置模板（已脱敏）
+# DataId   : order-service.yaml
+# Group    : DEFAULT_GROUP
+# Namespace: wisdomhub
+#
+# 导入前请把 change-me / your-xxx 占位符替换为实际值。
+# 导入方式见 docker/nacos/README.md
+# =============================================================================
+spring:
+  datasource:
+    url: jdbc:mysql://${infra.mysql-host}:${infra.mysql-port}/wisdomhub_order?characterEncoding=utf8&${infra.mysql-params}
+    username: ${infra.mysql-user}
+    password: ${infra.mysql-password}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  data:
+    redis:
+      host: ${infra.redis-host}
+      port: ${infra.redis-port}
+springdoc:
+  api-docs:
+    path: /api/order/v3/api-docs
+
+# Seata 2.5.0 用 file registry 直连 TC，不注册进 Nacos
+seata:
+  enabled: true
+  application-id: order-service
+  tx-service-group: default_tx_group
+  service:
+    vgroup-mapping:
+      default_tx_group: default
+    grouplist:
+      default: 127.0.0.1:8091
+  registry:
+    type: file

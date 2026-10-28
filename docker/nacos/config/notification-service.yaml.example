@@ -1,0 +1,49 @@
+# =============================================================================
+# Nacos 配置模板（已脱敏）
+# DataId   : notification-service.yaml
+# Group    : DEFAULT_GROUP
+# Namespace: wisdomhub
+#
+# 导入前请把 change-me / your-xxx 占位符替换为实际值。
+# 导入方式见 docker/nacos/README.md
+# =============================================================================
+spring:
+  datasource:
+    url: jdbc:mysql://${infra.mysql-host}:${infra.mysql-port}/wisdomhub_notification?characterEncoding=utf8&${infra.mysql-params}
+    username: ${infra.mysql-user}
+    password: ${infra.mysql-password}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  data:
+    redis:
+      host: ${infra.redis-host}
+      port: ${infra.redis-port}
+springdoc:
+  api-docs:
+    path: /api/notification/v3/api-docs
+jwt:
+  public-key: MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAuMuu4vMYEexAGxsrnUt6pDNbKnl0Ouzu0E/qvA+wToMXc1SLrVy48YpauXzmq8aTNEfddCaleqJdvesHlY1I6W9U0BpyGLVLw5chGnCHNzXoum4HNdDzWC0/PYluOY6uGjhovPhm6pxzih5dGopOBvOXUfQ/m1i28D0s/tSQfqE31XcCIxwRzMr5APB8Bv/UMlRsXj/7QuaeEbH30DEalAH/1SC9+MiWmgKpeWgYxySbAAgZEE18ykxN4hcJcacovTVsH+7QFq6bfKz1yiDORxxmBUvL6iPlGBsV/YlyDphd7VONbw5SVOTyDfjp5JxeRPzDbxPE0xVxSsEk4iY9VwIDAQAB
+
+xxl:
+  job:
+    executor:
+      appname: wisdomhub-notification-executor
+      port: 9995
+      log-path: ./logs/xxl-job
+      log-retention-days: 30
+
+wisdomhub:
+  mq:
+    dlq-replay:
+      enabled: true
+      queues:
+        - search.article.q
+        - search.question.q
+        - search.user.q
+        - search.tag.q
+        - knowledge.extract.q
+        - knowledge.article.q
+        - notification.event.q
+        - recommendation.behavior.q
+        - user.browse-history.q
+      batch-size: 100
+      max-replays: 3

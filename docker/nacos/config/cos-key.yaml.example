@@ -1,0 +1,15 @@
+# =============================================================================
+# Nacos 配置模板（已脱敏）
+# DataId   : cos-key.yaml
+# Group    : DEFAULT_GROUP
+# Namespace: wisdomhub
+#
+# 导入前请把 change-me / your-xxx 占位符替换为实际值。
+# 导入方式见 docker/nacos/README.md
+# =============================================================================
+cos:
+  secret-id: change-me
+  secret-key: change-me
+  region: ap-shanghai
+  bucket-name: your-bucket-name-APPID
+  domain: https://your-bucket-name-APPID.cos.ap-shanghai.myqcloud.com
