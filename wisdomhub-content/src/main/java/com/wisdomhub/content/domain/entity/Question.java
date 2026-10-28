@@ -15,7 +15,7 @@ import java.time.LocalDateTime;
 
 /**
  * 问题。正文留在 MySQL（TEXT），不写 MongoDB —— 问答是几十到几百字，
- * 不为它开一次跨存储查询（技术文档 7.6）。
+ * 不为它开一次跨存储查询。
  * 逻辑删除，过滤靠手写 .eq(deleted, NOT_DELETED)（项目不用 @TableLogic）
  */
 @Data

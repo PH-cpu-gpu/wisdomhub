@@ -12,7 +12,7 @@
 
     <artifactId>wisdomhub-gateway</artifactId>
     <name>wisdomhub-gateway</name>
-    <description>统一入口：路由 / JWT 鉴权 / 限流 / 跨域 / 拒绝公网 /internal/**（技术文档 5.1、7.4）</description>
+    <description>统一入口：路由 / JWT 鉴权 / 限流 / 跨域 / 拒绝公网 /internal/**</description>
 
     <dependencies>
         <dependency>

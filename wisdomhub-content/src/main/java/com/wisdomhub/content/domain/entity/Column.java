@@ -14,7 +14,7 @@ import java.io.Serializable;
 import java.time.LocalDateTime;
 
 /**
- * 专栏。表名是 MySQL 保留字，`@TableName` 的反引号会原样拼进 SQL，一处注解就够（技术文档 7.6）；
+ * 专栏。表名是 MySQL 保留字，`@TableName` 的反引号会原样拼进 SQL，一处注解就够；
  * 手写 SQL 里出现 `FROM column` 也要自己补。表名不改：column_article / column_purchase 都以它为前缀。
  * 逻辑删除，过滤靠手写 .eq(deleted, NOT_DELETED)（项目不用 @TableLogic）。
  * article_count 是快照列，只由归入/移出原子 UPDATE，不 bump update_time（同 B1.26 口径）

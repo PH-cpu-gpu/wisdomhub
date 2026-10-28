@@ -12,7 +12,7 @@
 
     <artifactId>wisdomhub-order</artifactId>
     <name>wisdomhub-order</name>
-    <description>订单、支付流水、付费专栏（技术文档 5.8、7.16）</description>
+    <description>订单、支付流水、付费专栏</description>
 
     <dependencies>
         <dependency>
@@ -72,7 +72,7 @@
         </dependency>
 
         <!--
-          跨服务事务：order 写订单/流水 ↔ content 写 column_purchase（技术文档 7.16）。
+          跨服务事务：order 写订单/流水 ↔ content 写 column_purchase。
           Spring Cloud Alibaba 的 Seata starter 会传递引入 druid、dubbo-filter-seata、
           commons-lang:2.6 等历史遗留依赖，属已知现象，只有本模块与 content-service 受影响。
           详见任务 B2.24。

@@ -12,7 +12,7 @@
 
     <artifactId>wisdomhub-user</artifactId>
     <name>wisdomhub-user</name>
-    <description>用户、认证授权、角色权限、关注、学习记录（技术文档 5.2）</description>
+    <description>用户、认证授权、角色权限、关注、学习记录</description>
 
     <dependencies>
         <dependency>

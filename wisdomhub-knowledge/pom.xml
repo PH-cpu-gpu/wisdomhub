@@ -12,7 +12,7 @@
 
     <artifactId>wisdomhub-knowledge</artifactId>
     <name>wisdomhub-knowledge</name>
-    <description>技术知识图谱，Neo4j 唯一写入方（技术文档 5.5、7.13）</description>
+    <description>技术知识图谱，Neo4j 唯一写入方</description>
 
     <dependencies>
         <dependency>
@@ -31,7 +31,7 @@
             <artifactId>common-security</artifactId>
             <version>${project.version}</version>
         </dependency>
-        <!-- 知识节点缓存（技术文档 7.8） -->
+        <!-- 知识节点缓存 -->
         <dependency>
             <groupId>com.wisdomhub</groupId>
             <artifactId>common-cache</artifactId>

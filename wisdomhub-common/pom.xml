@@ -13,7 +13,7 @@
     <artifactId>wisdomhub-common</artifactId>
     <packaging>pom</packaging>
     <name>wisdomhub-common</name>
-    <description>公共能力模块聚合器（技术文档 第 17 章）</description>
+    <description>公共能力模块聚合器</description>
     <dependencies>
         <dependency>
             <groupId>cn.hutool</groupId>

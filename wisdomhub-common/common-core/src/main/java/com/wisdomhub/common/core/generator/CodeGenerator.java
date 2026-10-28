@@ -34,7 +34,7 @@ public final class CodeGenerator {
     private static final List<String> TABLES = List.of("user_follow");
 
     private static final String DATABASE = "wisdomhub_user";
-    /** 时区参数按技术文档 17.2：与会话时区一起钉死成 UTC。 */
+    /** 时区参数与会话时区一起钉死成 UTC。 */
     private static final String URL = "jdbc:mysql://127.0.0.1:3306/" + DATABASE
             + "?characterEncoding=utf8&connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true";
     private static final String USERNAME = "root";

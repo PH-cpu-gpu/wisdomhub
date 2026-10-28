@@ -44,7 +44,7 @@ seata:
   #   1) 先验证 nacos-client 3.0.3 能否连 Nacos 2.x 服务端，再降级 Nacos
   #   2) 自行构建 nacos-api-legacy-adapter
   #   3) 改用 Seata 原生 NamingServer
-  # 详见 技术文档.md 第 6 章「已知版本冲突」。
+  # 版本冲突的取舍见上方三条备选路径。
   # ===========================================================================
   registry:
     type: file
