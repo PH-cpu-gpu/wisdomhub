@@ -17,7 +17,6 @@ import org.springframework.web.server.ResponseStatusException;
  * <p>body 与各业务服务的 GlobalExceptionHandler 保持同一种形状（{@code {code,message,data}}），
  * 但 HTTP 状态码如实返回：网关是系统的边界，404 / 503 必须能在监控与浏览器网络面板里看见，
  * 不能抹成 200。代价是前端对网关自身的错误要走 axios 的 err 分支读 {@code err.response.data}。
- * （取舍见技术文档 B1.30。）
  *
  * <p>本类放在网关模块而不是 common-core：它只服务于网关，且依赖 WebFlux 的
  * {@link ResponseStatusException}，放进公共模块会把 WebFlux 语义传染给 Servlet 服务。

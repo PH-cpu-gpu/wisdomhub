@@ -31,7 +31,7 @@
             <artifactId>common-security</artifactId>
             <version>${project.version}</version>
         </dependency>
-        <!-- 未读数计数（技术文档 5.7） -->
+        <!-- 未读数计数 -->
         <dependency>
             <groupId>com.wisdomhub</groupId>
             <artifactId>common-cache</artifactId>
@@ -77,7 +77,7 @@
             <artifactId>reactor-netty-http</artifactId>
         </dependency>
 
-        <!-- 通知需持久化与已读状态（技术文档 5.7） -->
+        <!-- 通知需持久化与已读状态 -->
         <dependency>
             <groupId>com.baomidou</groupId>
             <artifactId>mybatis-plus-spring-boot3-starter</artifactId>

@@ -15,7 +15,7 @@ import java.time.LocalDateTime;
 
 /**
  * 文章点赞。关系表 → 物理删除，无 deleted：软删的行照样占着 uk_user_article，
- * 「点赞 → 取消 → 再点赞」第三次 INSERT 必撞唯一索引（技术文档 7.6）。
+ * 「点赞 → 取消 → 再点赞」第三次 INSERT 必撞唯一索引。
  * 表也只有 create_time，实体别多出 update_time，否则 MP 的自动填充会拼出不存在的列
  */
 @Data

@@ -68,7 +68,7 @@
               下面只列上述 BOM 都未覆盖的第三方。
             -->
 
-            <!-- ORM：技术文档 7.7 -->
+            <!-- ORM：MyBatis-Plus -->
             <dependency>
                 <groupId>com.baomidou</groupId>
                 <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
@@ -114,7 +114,7 @@
                 <version>${springdoc.version}</version>
             </dependency>
 
-            <!-- JWT：技术文档 7.17。三个 artifact 版本必须一致，故一并纳入管理 -->
+            <!-- JWT：三个 artifact 版本必须一致，故一并纳入管理 -->
             <dependency>
                 <groupId>io.jsonwebtoken</groupId>
                 <artifactId>jjwt-api</artifactId>
@@ -133,7 +133,7 @@
                 <scope>runtime</scope>
             </dependency>
 
-            <!-- 定时任务：技术文档 7.15 -->
+            <!-- 定时任务：XXL-JOB -->
             <dependency>
                 <groupId>com.xuxueli</groupId>
                 <artifactId>xxl-job-core</artifactId>

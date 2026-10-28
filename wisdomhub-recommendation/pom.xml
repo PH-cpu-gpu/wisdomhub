@@ -12,7 +12,7 @@
 
     <artifactId>wisdomhub-recommendation</artifactId>
     <name>wisdomhub-recommendation</name>
-    <description>首页推荐、相关文章、热门、兴趣画像（技术文档 5.6）</description>
+    <description>首页推荐、相关文章、热门、兴趣画像</description>
 
     <dependencies>
         <dependency>
@@ -37,7 +37,7 @@
             <artifactId>common-cache</artifactId>
             <version>${project.version}</version>
         </dependency>
-        <!-- 候选集通过 Feign 调 search-service，禁止直连 ES / Neo4j（技术文档 5.6） -->
+        <!-- 候选集通过 Feign 调 search-service，禁止直连 ES / Neo4j -->
         <dependency>
             <groupId>com.wisdomhub</groupId>
             <artifactId>common-feign</artifactId>

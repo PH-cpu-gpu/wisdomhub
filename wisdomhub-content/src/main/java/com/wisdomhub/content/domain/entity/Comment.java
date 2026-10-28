@@ -14,7 +14,7 @@ import java.io.Serializable;
 import java.time.LocalDateTime;
 
 /**
- * 评论。实体表 → 逻辑删除，过滤靠手写 .eq(deleted, NOT_DELETED)（项目不用 @TableLogic，见技术文档 7.6）。
+ * 评论。实体表 → 逻辑删除，过滤靠手写 .eq(deleted, NOT_DELETED)（项目不用 @TableLogic）。
  * parentId 非空时恒指向一级评论（写路径归一化保证），所以最多两层。
  */
 @Data

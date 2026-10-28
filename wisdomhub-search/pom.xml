@@ -12,7 +12,7 @@
 
     <artifactId>wisdomhub-search</artifactId>
     <name>wisdomhub-search</name>
-    <description>全文检索、分词、高亮、搜索建议、推荐召回（技术文档 5.4、7.11）</description>
+    <description>全文检索、分词、高亮、搜索建议、推荐召回</description>
 
     <dependencies>
         <dependency>
@@ -63,7 +63,7 @@
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
 
-        <!-- 唯一直接连接 Elasticsearch 的服务（技术文档 7.11） -->
+        <!-- 唯一直接连接 Elasticsearch 的服务 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-elasticsearch</artifactId>

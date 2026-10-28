@@ -5,7 +5,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
-/** 提问。没有 tagIds —— 问题不绑标签（2026-10-09 定，见技术文档 18 问答领域） */
+/** 提问。没有 tagIds —— 问题不绑标签（2026-10-09 定） */
 @Data
 public class QuestionCreateDTO {
 
