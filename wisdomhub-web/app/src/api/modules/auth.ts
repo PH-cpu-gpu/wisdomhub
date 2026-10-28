@@ -23,16 +23,17 @@ export function logout(payload: LogoutPayload, options: RequestOptions = {}): Pr
   return post<void>('/api/auth/logout', payload, options)
 }
 
-export function sendEmailCode(email: string, options: RequestOptions = {}): Promise<void> {
-  return post<void>('/api/auth/code/email', undefined, {
+/** 短信/邮件通道未接入，后端会把验证码放在 data 里返回；接入后为 null */
+export function sendEmailCode(email: string, options: RequestOptions = {}): Promise<string | null> {
+  return post<string | null>('/api/auth/code/email', undefined, {
     ...options,
     params: { email },
     skipAuth: true,
   })
 }
 
-export function sendPhoneCode(phone: string, options: RequestOptions = {}): Promise<void> {
-  return post<void>('/api/auth/code/phone', undefined, {
+export function sendPhoneCode(phone: string, options: RequestOptions = {}): Promise<string | null> {
+  return post<string | null>('/api/auth/code/phone', undefined, {
     ...options,
     params: { phone },
     skipAuth: true,

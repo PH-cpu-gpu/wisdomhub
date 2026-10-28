@@ -73,19 +73,17 @@ public class UserServiceImpl implements UserService {
      * 根据手机号获取验证码
      */
     @Override
-    public void sendCodeByPhone(String phone) {
-        String key = RedisKeyConstants.CODE_BY_PHONE_KEY + phone;
-        createCode(key);
+    public String sendCodeByPhone(String phone) {
+        return createCode(RedisKeyConstants.CODE_BY_PHONE_KEY + phone);
     }
 
     /**
      * 根据邮箱获取验证码
      */
     @Override
-    public void sendCodeByEmail(String email) {
+    public String sendCodeByEmail(String email) {
         String lowerEmail = email.toLowerCase(Locale.ROOT);
-        String key = RedisKeyConstants.CODE_BY_EMAIL_KEY + lowerEmail;
-        createCode(key);
+        return createCode(RedisKeyConstants.CODE_BY_EMAIL_KEY + lowerEmail);
     }
 
     /**
@@ -523,9 +521,9 @@ public class UserServiceImpl implements UserService {
     }
 
     /**
-     * 根据key创建验证码
+     * 根据key创建验证码, 返回明文供接口下发
      */
-    private void createCode(String key) {
+    private String createCode(String key) {
         int code = ThreadLocalRandom.current().nextInt(100000, 1000000);
         // 这里使用setIfAbsent, 保证原子性
         Boolean created = stringRedisTemplate.opsForValue().setIfAbsent(key, String.valueOf(code), RedisTtl.CAPTCHA);
@@ -539,8 +537,9 @@ public class UserServiceImpl implements UserService {
             throw new BusinessException(CommonErrorCode.TOO_MANY_REQUESTS);
         }
 
-        // TODO 引入短信服务
+        // TODO 接入短信/邮件服务后, 这里不再把验证码返回给前端
         log.info("生成验证码为: {}", code);
+        return String.valueOf(code);
     }
 
     /**

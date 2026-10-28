@@ -678,7 +678,8 @@ export async function handleMockRequest(
   }
 
   if (method === 'post' && path.startsWith('/api/auth/code/')) {
-    return response(config, null)
+    // 与后端 mock 实现保持一致: 验证码直接放在 data 里返回
+    return response(config, '123456')
   }
 
   if (method === 'get' && path === '/api/content/tag') {

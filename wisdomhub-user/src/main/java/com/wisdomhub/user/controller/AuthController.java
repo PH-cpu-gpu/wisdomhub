@@ -50,24 +50,22 @@ public class AuthController {
         return R.success();
     }
 
-    // 这里先模拟验证码的实现, 先将验证码记录在日志
+    // 模拟实现: 验证码随响应返回给前端展示, 接入短信后改为不返回
     @Operation(summary = "通过手机号获取验证码")
     @PostMapping("/code/phone")
-    public R<Void> sendCodeByPhone(@NotBlank(message = "手机号不能为空")
-                                   @Pattern(regexp = "^1[3-9]\\d{9}$", message = "手机号格式不正确")
-                                   @RequestParam String phone) {
-        userService.sendCodeByPhone(phone);
-        return R.success();
+    public R<String> sendCodeByPhone(@NotBlank(message = "手机号不能为空")
+                                     @Pattern(regexp = "^1[3-9]\\d{9}$", message = "手机号格式不正确")
+                                     @RequestParam String phone) {
+        return R.success(userService.sendCodeByPhone(phone));
     }
 
 
-    // 这里先模拟验证码的实现, 先将验证码记录在日志
+    // 模拟实现: 验证码随响应返回给前端展示, 接入邮件后改为不返回
     @Operation(summary = "通过邮箱获取验证码")
     @PostMapping("/code/email")
-    public R<Void> sendCodeByEmail(@NotBlank(message = "邮箱号不能为空")
-                                   @Pattern(regexp = "^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$", message = "邮箱号格式不正确")
-                                   @RequestParam String email) {
-        userService.sendCodeByEmail(email);
-        return R.success();
+    public R<String> sendCodeByEmail(@NotBlank(message = "邮箱号不能为空")
+                                     @Pattern(regexp = "^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$", message = "邮箱号格式不正确")
+                                     @RequestParam String email) {
+        return R.success(userService.sendCodeByEmail(email));
     }
 }

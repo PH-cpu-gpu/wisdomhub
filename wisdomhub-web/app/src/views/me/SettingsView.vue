@@ -53,6 +53,7 @@ const emailSending = ref(false)
 const emailSubmitting = ref(false)
 const emailCountdown = ref(0)
 const emailCodeSent = ref(false)
+const mockEmailCode = ref('')
 const boundEmail = ref('')
 let emailTimer: number | null = null
 
@@ -84,6 +85,7 @@ watch(bio, () => {
 watch(email, () => {
   emailError.value = ''
   emailFormError.value = ''
+  mockEmailCode.value = ''
 })
 
 watch(emailCode, () => {
@@ -244,16 +246,24 @@ async function sendEmailCode(): Promise<void> {
   }
 
   emailSending.value = true
+  mockEmailCode.value = ''
 
   try {
-    await requestEmailCode(email.value.trim(), { skipErrorToast: true })
+    const sent = await requestEmailCode(email.value.trim(), { skipErrorToast: true })
+    mockEmailCode.value = sent ?? ''
     startEmailCountdown()
-    toast.info('验证码已发送，请查看 user-service 日志')
+    toast.info(mockEmailCode.value ? '验证码已生成，已显示在下方' : '验证码已发送')
   } catch (error) {
     emailFormError.value = isApiError(error) ? error.message : '验证码发送失败，请稍后重试。'
   } finally {
     emailSending.value = false
   }
+}
+
+function fillEmailCode(): void {
+  if (!mockEmailCode.value) return
+  emailCode.value = mockEmailCode.value
+  focus('settings-email-code')
 }
 
 async function bindUserEmail(): Promise<void> {
@@ -276,6 +286,7 @@ async function bindUserEmail(): Promise<void> {
     auth.updateHasEmail(true)
     boundEmail.value = value
     emailCode.value = ''
+    mockEmailCode.value = ''
     toast.success('邮箱已绑定')
   } catch (error) {
     emailFormError.value = isApiError(error) ? error.message : '邮箱绑定失败，请稍后重试。'
@@ -482,9 +493,14 @@ useSeo({
                   {{ emailButtonText }}
                 </WhButton>
               </div>
-              <p class="settings-hint">
-                验证码为模拟实现，请到 <code>user-service</code> 日志查看。
-              </p>
+              <p class="settings-hint">邮件通道尚未接入，验证码为模拟实现。</p>
+              <div v-if="mockEmailCode" class="settings-code-notice" role="status" aria-live="polite">
+                <span>模拟验证码</span>
+                <code>{{ mockEmailCode }}</code>
+                <WhButton type="button" size="sm" variant="ghost" @click="fillEmailCode">
+                  填入
+                </WhButton>
+              </div>
             </div>
 
             <div v-if="emailFormError" class="settings-error" role="alert">
@@ -654,6 +670,31 @@ useSeo({
 .settings-hint code {
   color: var(--ink);
   font-family: var(--mono);
+}
+
+.settings-code-notice {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-left: 3px solid var(--ink);
+  background: var(--acid);
+  color: var(--ink);
+}
+
+.settings-code-notice span {
+  font-family: var(--mono);
+  font-size: var(--text-2xs);
+  letter-spacing: var(--tracking-wider);
+  text-transform: uppercase;
+}
+
+.settings-code-notice code {
+  margin-right: auto;
+  font-family: var(--mono);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.16em;
 }
 
 .settings-inline-error {

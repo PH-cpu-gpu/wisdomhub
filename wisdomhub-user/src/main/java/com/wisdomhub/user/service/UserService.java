@@ -18,9 +18,9 @@ import java.time.LocalDateTime;
 
 public interface UserService {
 
-    void sendCodeByPhone(String phone);
+    String sendCodeByPhone(String phone);
 
-    void sendCodeByEmail(String email);
+    String sendCodeByEmail(String email);
 
     LoginVO register(RegisterDTO registerDTO);
 

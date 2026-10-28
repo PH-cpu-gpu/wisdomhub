@@ -47,6 +47,7 @@ const submitting = ref(false)
 const sendingCode = ref(false)
 const countdown = ref(0)
 const codeSent = ref(false)
+const mockCode = ref('')
 const errorBanner = ref<HTMLElement | null>(null)
 
 let countdownTimer: number | null = null
@@ -95,6 +96,7 @@ function resetVerification(): void {
   codeError.value = ''
   countdown.value = 0
   codeSent.value = false
+  mockCode.value = ''
   stopCountdown()
 }
 
@@ -112,6 +114,7 @@ watch(mode, () => {
 watch(account, () => {
   accountError.value = ''
   formError.value = ''
+  mockCode.value = ''
 })
 
 watch(code, () => {
@@ -170,14 +173,17 @@ async function sendCode(): Promise<void> {
   }
 
   sendingCode.value = true
+  mockCode.value = ''
 
   try {
     const value = account.value.trim()
-    if (isEmail.value) await sendEmailCode(value, { skipErrorToast: true })
-    else await sendPhoneCode(value, { skipErrorToast: true })
+    const sent = isEmail.value
+      ? await sendEmailCode(value, { skipErrorToast: true })
+      : await sendPhoneCode(value, { skipErrorToast: true })
 
+    mockCode.value = sent ?? ''
     startCountdown()
-    toast.info('验证码已发送，请查看 user-service 日志')
+    toast.info(mockCode.value ? '验证码已生成，已显示在下方' : '验证码已发送')
   } catch (error) {
     formError.value = isApiError(error) ? error.message : '验证码发送失败，请稍后重试'
     await nextTick()
@@ -185,6 +191,12 @@ async function sendCode(): Promise<void> {
   } finally {
     sendingCode.value = false
   }
+}
+
+function fillCode(): void {
+  if (!mockCode.value) return
+  code.value = mockCode.value
+  document.getElementById('register-code')?.focus()
 }
 
 async function submit(): Promise<void> {
@@ -317,7 +329,14 @@ useSeo({
                   {{ codeButtonText }}
                 </WhButton>
               </div>
-              <p class="auth-hint">验证码为模拟实现，请到 <code>user-service</code> 日志查看。</p>
+              <p class="auth-hint">短信 / 邮件通道尚未接入，验证码为模拟实现。</p>
+              <div v-if="mockCode" class="auth-code-notice" role="status" aria-live="polite">
+                <span class="auth-code-notice__label">模拟验证码</span>
+                <code class="auth-code-notice__value">{{ mockCode }}</code>
+                <WhButton type="button" size="sm" variant="ghost" @click="fillCode">
+                  填入
+                </WhButton>
+              </div>
             </div>
 
             <div class="auth-field">
