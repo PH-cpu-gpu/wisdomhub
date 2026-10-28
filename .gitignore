@@ -49,3 +49,8 @@ docker/elasticsearch/plugins/
 
 ### XXL-JOB 执行器运行时日志（按 xxl.job.executor.log-path 落在仓库根下）###
 logs/
+
+### 项目内部文档（仅本地保留，不入库）###
+/技术文档.md
+/项目实现任务表.md
+/前端页面开发计划表.md
