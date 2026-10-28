@@ -1,0 +1,32 @@
+# =============================================================================
+# Nacos 配置模板（已脱敏）
+# DataId   : search-service.yaml
+# Group    : DEFAULT_GROUP
+# Namespace: wisdomhub
+#
+# 导入前请把 change-me / your-xxx 占位符替换为实际值。
+# 导入方式见 docker/nacos/README.md
+# =============================================================================
+spring:
+  elasticsearch:
+    uris: http://${infra.es-host}:${infra.es-port}
+  data:
+    redis:
+      host: ${infra.redis-host}
+      port: ${infra.redis-port}
+springdoc:
+  api-docs:
+    path: /api/search/v3/api-docs
+xxl:
+  job:
+    executor:
+      appname: wisdomhub-search-executor
+      port: 9997
+      log-path: ./logs/xxl-job
+      log-retention-days: 30
+
+wisdomhub:
+  reconcile:
+    lookback-minutes: 30
+    page-size: 500
+    es-scan-size: 1000

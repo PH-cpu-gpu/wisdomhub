@@ -1,0 +1,51 @@
+# =============================================================================
+# Nacos 配置模板（已脱敏）
+# DataId   : wisdomhub-env.yaml
+# Group    : DEFAULT_GROUP
+# Namespace: wisdomhub
+#
+# 导入前请把 change-me / your-xxx 占位符替换为实际值。
+# 导入方式见 docker/nacos/README.md
+# =============================================================================
+spring:
+  cloud:
+    nacos:
+      discovery:
+        ip: 127.0.0.1
+xxl:
+  job:
+    admin-addresses: http://127.0.0.1:8080
+    # docker-compose 的 xxl-job-admin 未显式配置 token，本地默认为 default_token
+    access-token: change-me
+# ============================================================
+# 环境相关的值全部集中在这里。上线时只需改这一个文件。
+# 其余 9 个服务配置通过 ${infra.*} 引用，不含任何硬编码地址。
+# ============================================================
+infra:
+  mysql-host: localhost
+  mysql-port: 3306
+  mysql-user: root
+  mysql-password: change-me
+  mysql-params: connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true
+
+  redis-host: localhost
+  redis-port: 6379
+
+  mongo-host: localhost
+  mongo-port: 27017
+  mongo-user: wisdomhub
+  mongo-password: change-me
+
+  es-host: localhost
+  es-port: 9200
+
+  neo4j-host: localhost
+  neo4j-port: 7687
+  neo4j-user: neo4j
+  neo4j-password: change-me
+
+  rabbitmq-host: localhost
+  rabbitmq-port: 5672
+  rabbitmq-vhost: /
+  rabbitmq-username: wisdomhub
+  rabbitmq-password: change-me

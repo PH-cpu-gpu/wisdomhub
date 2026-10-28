@@ -1,0 +1,27 @@
+# =============================================================================
+# Nacos 配置模板（已脱敏）
+# DataId   : recommendation-service.yaml
+# Group    : DEFAULT_GROUP
+# Namespace: wisdomhub
+#
+# 导入前请把 change-me / your-xxx 占位符替换为实际值。
+# 导入方式见 docker/nacos/README.md
+# =============================================================================
+spring:
+  data:
+    redis:
+      host: ${infra.redis-host}
+      port: ${infra.redis-port}
+springdoc:
+  api-docs:
+    path: /api/recommendation/v3/api-docs
+wisdomhub:
+  cache:
+    redis-ttl:
+      home: 3m
+      related: 10m
+      hot: 10m
+    caffeine-ttl:
+      home: 1m
+      related: 3m
+      hot: 5m

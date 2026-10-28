@@ -79,12 +79,21 @@ bash docker/elasticsearch/install-ik.sh 8.18.8
 
 ### 3. 配置 Nacos
 
-各业务服务的配置统一由 Nacos 管理（命名空间 `wisdomhub`）。首次运行前需要在该命名空间
-下创建以下 DataId，内容按本地环境自行填写：
+各业务服务的配置统一由 Nacos 管理（命名空间 `wisdomhub`），12 个配置的脱敏模板见
+[`docker/nacos/config/`](docker/nacos/config/)。先把模板中的占位符替换为实际值，再执行导入脚本：
 
-- `wisdomhub-env.yaml`：中间件地址、数据库账号密码等环境相关配置
-- `wisdomhub-common.yaml`：公共配置（RabbitMQ、JWT、Seata 等）
-- `<service>-service.yaml`：各服务的私有配置，如 `user-service.yaml`、`content-service.yaml`
+```powershell
+$env:NACOS_PASSWORD = '你的 Nacos 密码'
+pwsh -File docker/nacos/import.ps1
+```
+
+```bash
+export NACOS_PASSWORD='你的 Nacos 密码'
+bash docker/nacos/import.sh
+```
+
+模板中的 `change-me` / `your-xxx` 均为占位符，必须替换后才能启动服务；详细说明见
+[`docker/nacos/README.md`](docker/nacos/README.md)。
 
 ### 4. 启动后端
 

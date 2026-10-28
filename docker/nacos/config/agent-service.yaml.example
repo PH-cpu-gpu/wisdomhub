@@ -1,0 +1,19 @@
+# =============================================================================
+# Nacos 配置模板（已脱敏）
+# DataId   : agent-service.yaml
+# Group    : DEFAULT_GROUP
+# Namespace: wisdomhub
+#
+# 导入前请把 change-me / your-xxx 占位符替换为实际值。
+# 导入方式见 docker/nacos/README.md
+# =============================================================================
+spring:
+  data:
+    redis:
+      host: ${infra.redis-host}
+      port: ${infra.redis-port}
+    mongodb:
+      uri: mongodb://${infra.mongo-user}:${infra.mongo-password}@${infra.mongo-host}:${infra.mongo-port}/wisdomhub_agent?authSource=admin
+springdoc:
+  api-docs:
+    path: /api/agent/v3/api-docs

@@ -1,0 +1,199 @@
+# =============================================================================
+# Nacos 配置模板（已脱敏）
+# DataId   : gateway-service.yaml
+# Group    : DEFAULT_GROUP
+# Namespace: wisdomhub
+#
+# 导入前请把 change-me / your-xxx 占位符替换为实际值。
+# 导入方式见 docker/nacos/README.md
+# =============================================================================
+spring:
+  data:
+    redis:
+      host: ${infra.redis-host}
+      port: ${infra.redis-port}
+  cloud:
+    gateway:
+      redis-rate-limiter:
+        replenish-rate: 10        # 稳态 QPS = 每秒补的令牌
+        burst-capacity: 20        # 桶容量 = 允许的瞬时突发
+        requested-tokens: 1       # 每个请求消耗几个令牌
+      discovery:
+        locator:
+          enabled: false          # 显式路由，不按服务名自动生成
+      routes:
+        - id: user-auth
+          uri: lb://user-service
+          predicates:
+            - Path=/api/auth/**
+          filters:
+            - name: RequestRateLimiter
+              args:
+                key-resolver: "#{@userOrIpKeyResolver}"
+                redis-rate-limiter.replenish-rate: 2
+                redis-rate-limiter.burst-capacity: 5
+        - id: user
+          uri: lb://user-service
+          predicates:
+            - Path=/api/user/**
+          filters:
+            - name: RequestRateLimiter
+              args:
+                key-resolver: "#{@userOrIpKeyResolver}"
+                redis-rate-limiter.replenish-rate: 10
+                redis-rate-limiter.burst-capacity: 20
+        - id: content
+          uri: lb://content-service
+          predicates:
+            - Path=/api/content/**
+          filters:
+            - name: RequestRateLimiter
+              args:
+                key-resolver: "#{@userOrIpKeyResolver}"
+                redis-rate-limiter.replenish-rate: 20
+                redis-rate-limiter.burst-capacity: 40
+        - id: search
+          uri: lb://search-service
+          predicates:
+            - Path=/api/search/**
+          filters:
+            - name: RequestRateLimiter
+              args:
+                key-resolver: "#{@userOrIpKeyResolver}"
+                redis-rate-limiter.replenish-rate: 5
+                redis-rate-limiter.burst-capacity: 10
+        - id: knowledge
+          uri: lb://knowledge-service
+          predicates:
+            - Path=/api/knowledge/**
+          filters:
+            - name: RequestRateLimiter
+              args:
+                key-resolver: "#{@userOrIpKeyResolver}"
+                redis-rate-limiter.replenish-rate: 5
+                redis-rate-limiter.burst-capacity: 10
+        - id: recommendation
+          uri: lb://recommendation-service
+          predicates:
+            - Path=/api/recommendation/**
+          filters:
+            - name: RequestRateLimiter
+              args:
+                key-resolver: "#{@userOrIpKeyResolver}"
+                redis-rate-limiter.replenish-rate: 5
+                redis-rate-limiter.burst-capacity: 10
+        - id: notification-ws
+          uri: lb:ws://notification-service
+          order: -1
+          predicates:
+            - Path=/api/notification/ws
+          filters:
+            - name: RequestRateLimiter
+              args:
+                key-resolver: "#{@userOrIpKeyResolver}"
+                redis-rate-limiter.replenish-rate: 10
+                redis-rate-limiter.burst-capacity: 20
+        - id: notification
+          uri: lb://notification-service
+          predicates:
+            - Path=/api/notification/**
+          filters:
+            - name: RequestRateLimiter
+              args:
+                key-resolver: "#{@userOrIpKeyResolver}"
+                redis-rate-limiter.replenish-rate: 10
+                redis-rate-limiter.burst-capacity: 20
+        - id: order
+          uri: lb://order-service
+          predicates:
+            - Path=/api/order/**
+          filters:
+            - name: RequestRateLimiter
+              args:
+                key-resolver: "#{@userOrIpKeyResolver}"
+                redis-rate-limiter.replenish-rate: 3
+                redis-rate-limiter.burst-capacity: 5
+        - id: agent
+          uri: lb://agent-engine
+          predicates:
+            - Path=/api/agent/**
+          filters:
+            - name: RequestRateLimiter
+              args:
+                key-resolver: "#{@userOrIpKeyResolver}"
+                redis-rate-limiter.replenish-rate: 1
+                redis-rate-limiter.burst-capacity: 2
+      globalcors:
+        add-to-simple-url-handler-mapping: true
+        cors-configurations:
+          '[/**]':
+            allowedOriginPatterns:
+              - http://localhost:5173
+              - http://127.0.0.1:5173
+            allowedMethods: "*"
+            allowedHeaders: "*"
+            allowCredentials: true
+            maxAge: 3600
+springdoc:
+  swagger-ui:
+    disable-swagger-default-url: true
+    urls:
+      - name: user-service
+        url: /api/user/v3/api-docs
+      - name: content-service
+        url: /api/content/v3/api-docs
+      - name: search-service
+        url: /api/search/v3/api-docs
+      - name: knowledge-service
+        url: /api/knowledge/v3/api-docs
+      - name: recommendation-service
+        url: /api/recommendation/v3/api-docs
+      - name: notification-service
+        url: /api/notification/v3/api-docs
+      - name: order-service
+        url: /api/order/v3/api-docs
+      - name: agent-engine
+        url: /api/agent/v3/api-docs
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,gateway
+    gateway:
+      access: unrestricted
+url:
+  no-auth-paths:
+    - /api/auth/register
+    - /api/auth/login
+    - /api/auth/refresh
+    - /api/auth/code
+    - /api/notification/ws
+    - /api/user/profile/
+    # Swagger：页面 + 静态资源 + 网关自己的 swagger-config
+    - /swagger-ui
+    - /webjars
+    - /v3/api-docs
+    # 各服务经网关暴露的 OpenAPI JSON
+    - /api/user/v3/api-docs
+    - /api/content/v3/api-docs
+    - /api/search/v3/api-docs
+    - /api/knowledge/v3/api-docs
+    - /api/recommendation/v3/api-docs
+    - /api/notification/v3/api-docs
+    - /api/order/v3/api-docs
+    - /api/agent/v3/api-docs
+  optional-auth-paths:
+    # 搜索是公开读路径：游客可搜，带合法 token 则透传 X-User-Id（B2.4）
+    - /api/search
+    - /api/content/column
+    - /api/content/article/
+    - /api/content/article
+    - /api/content/tag
+    - /api/content/comment
+    - /api/content/question
+    - /api/content/answer
+    - /api/recommendation
+    - /api/agent/analysis
+jwt:
+  public-key: MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAuMuu4vMYEexAGxsrnUt6pDNbKnl0Ouzu0E/qvA+wToMXc1SLrVy48YpauXzmq8aTNEfddCaleqJdvesHlY1I6W9U0BpyGLVLw5chGnCHNzXoum4HNdDzWC0/PYluOY6uGjhovPhm6pxzih5dGopOBvOXUfQ/m1i28D0s/tSQfqE31XcCIxwRzMr5APB8Bv/UMlRsXj/7QuaeEbH30DEalAH/1SC9+MiWmgKpeWgYxySbAAgZEE18ykxN4hcJcacovTVsH+7QFq6bfKz1yiDORxxmBUvL6iPlGBsV/YlyDphd7VONbw5SVOTyDfjp5JxeRPzDbxPE0xVxSsEk4iY9VwIDAQAB
