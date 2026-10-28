@@ -1,0 +1,202 @@
+/* ============================================================
+   Utilities: layout primitives + small text helpers
+   Breakpoints: sm 640 / md 960 / lg 1280
+   ============================================================ */
+
+.wh-container {
+  width: 100%;
+  max-width: var(--max);
+  margin-inline: auto;
+  padding-inline: var(--pad);
+}
+
+.wh-container--narrow {
+  max-width: var(--max-narrow);
+}
+
+.wh-container--reading {
+  max-width: calc(var(--max-reading) + var(--pad) * 2);
+}
+
+/* ---------- flex / grid primitives ---------- */
+
+.wh-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.wh-stack--sm {
+  gap: var(--space-2);
+}
+
+.wh-stack--lg {
+  gap: var(--space-8);
+}
+
+.wh-cluster {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.wh-cluster--between {
+  justify-content: space-between;
+}
+
+.wh-grid {
+  display: grid;
+  gap: var(--gap);
+}
+
+.wh-min-0 {
+  min-width: 0;
+}
+
+.wh-full {
+  width: 100%;
+}
+
+/* ---------- text ---------- */
+
+.wh-serif {
+  font-family: var(--serif);
+}
+
+.wh-sans {
+  font-family: var(--sans);
+}
+
+.wh-mono {
+  font-family: var(--mono);
+}
+
+.wh-num {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.wh-text-muted {
+  color: var(--text-muted);
+}
+
+.wh-text-danger {
+  color: var(--danger);
+}
+
+.wh-text-accent {
+  color: var(--verm-deep);
+}
+
+.wh-text-link {
+  color: var(--link);
+}
+
+.wh-truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wh-clamp-2,
+.wh-clamp-3 {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+}
+
+.wh-clamp-2 {
+  -webkit-line-clamp: 2;
+}
+
+.wh-clamp-3 {
+  -webkit-line-clamp: 3;
+}
+
+/* ---------- actions ---------- */
+
+.wh-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 var(--space-5);
+  border: 1px solid var(--ink);
+  background: var(--ink);
+  color: var(--acid);
+  font-family: var(--mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
+  transition:
+    background var(--dur) var(--ease),
+    color var(--dur) var(--ease);
+}
+
+.wh-action:hover {
+  background: var(--acid);
+  color: var(--ink);
+}
+
+.wh-action--ghost {
+  background: transparent;
+  color: var(--ink);
+}
+
+.wh-action--ghost:hover {
+  background: var(--ink);
+  color: var(--acid);
+}
+
+/* ---------- misc ---------- */
+
+.wh-divider {
+  width: 100%;
+  height: 1px;
+  border: 0;
+  background: var(--line);
+}
+
+.wh-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.wh-skip-link {
+  position: fixed;
+  top: -100px;
+  left: var(--space-5);
+  z-index: var(--z-toast);
+  padding: var(--space-3) var(--space-4);
+  background: var(--ink);
+  color: var(--acid);
+  font-family: var(--mono);
+  font-size: var(--text-xs);
+  text-decoration: none;
+  transition: top var(--dur) var(--ease);
+}
+
+.wh-skip-link:focus {
+  top: var(--space-4);
+}
+
+/* ---------- responsive helpers ---------- */
+
+@media (max-width: 639px) {
+  .wh-hide-mobile {
+    display: none !important;
+  }
+}
+
+@media (min-width: 640px) {
+  .wh-hide-desktop {
+    display: none !important;
+  }
+}
