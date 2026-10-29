@@ -6,14 +6,21 @@ from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, SystemMessage
 from langchain_core.tools import ToolException
 from langgraph.graph import END, START, StateGraph
-from pydantic import BaseModel, Field
 
 from graphs.base import AgentState
-from models.structured import invoke_structured
 from tools.internal_client import InternalClient
-from tools.java_api import PREREQUISITE_TOOL_NAME, query_prerequisite_chain
+from tools.java_api import (
+    PREREQUISITE_TOOL_NAME,
+    KnowledgeServiceUnavailable,
+    TechnologyNotFound,
+    query_prerequisite_chain,
+)
 
 log = logging.getLogger(__name__)
+
+_NOT_FOUND_SUFFIX = "请从标签库选择已收录的技术后重试。"
+_UNAVAILABLE_REPLY = "知识图谱服务暂时不可用，请稍后重试。"
+_MISSING_TECHNOLOGY_REPLY = "请先指定要学习的技术。"
 
 
 class LearningState(AgentState):
@@ -22,14 +29,8 @@ class LearningState(AgentState):
     known: list[str]
     route: dict[str, Any]
     steps: list[dict[str, Any]]
+    fetch_status: str
     fetch_error: str
-
-
-class LearningIntent(BaseModel):
-    technology: str = Field(default="", description="用户想学的目标技术名")
-    known_technologies: list[str] = Field(
-        default_factory=list, description="用户明确说已经掌握的技术"
-    )
 
 
 def _build_route(
@@ -65,66 +66,55 @@ def _build_route(
     }
 
 
-def build_learning_graph(
-    intent_llm: BaseChatModel,
-    answer_llm: BaseChatModel,
-    client: InternalClient,
-):
-    async def intent(state: LearningState) -> dict[str, Any]:
-        technology = (state.get("technology") or "").strip()
-        known = [name.strip() for name in (state.get("known") or []) if name and name.strip()]
-        if technology:
-            return {"technology": technology, "known": known}
-
-        try:
-            result = await invoke_structured(intent_llm, LearningIntent, state["messages"])
-        except Exception:
-            log.warning("学习意图识别失败", exc_info=True)
-            return {
-                "technology": "",
-                "known": known,
-                "fetch_error": "未能识别出您想学的技术，请在页面上选择技术或说明技术名。",
-            }
-        return {
-            "technology": (result.technology or "").strip(),
-            "known": known or [
-                name.strip() for name in result.known_technologies if name and name.strip()
-            ],
-        }
-
+def build_learning_graph(answer_llm: BaseChatModel, client: InternalClient):
     async def fetch(state: LearningState) -> dict[str, Any]:
         technology = (state.get("technology") or "").strip()
         if not technology:
-            return {
-                "fetch_error": state.get("fetch_error") or "未能识别出您想学的技术，请在页面上选择技术或说明技术名。",
-                "route": {},
-                "steps": [],
-            }
+            return {"fetch_status": "invalid", "route": {}, "steps": []}
 
         steps: list[dict[str, Any]] = [
             {"tool": PREREQUISITE_TOOL_NAME, "args": {"technology": technology}}
         ]
         try:
             tree = await query_prerequisite_chain(client, technology)
-        except ToolException as exc:
+        except TechnologyNotFound as exc:
             return {
-                "fetch_error": str(exc),
+                "fetch_status": "not_found",
                 "route": {},
                 "steps": steps,
+                "fetch_error": str(exc),
+            }
+        except KnowledgeServiceUnavailable as exc:
+            return {
+                "fetch_status": "unavailable",
+                "route": {},
+                "steps": steps,
+                "fetch_error": str(exc),
+            }
+        except ToolException as exc:
+            log.warning("前置链查询失败: %s", exc)
+            return {
+                "fetch_status": "unavailable",
+                "route": {},
+                "steps": steps,
+                "fetch_error": str(exc),
             }
 
         known_names = [name.strip() for name in (state.get("known") or []) if name.strip()]
         known_keys = {name.casefold() for name in known_names}
         route = _build_route(tree, known_names, known_keys)
-        return {"route": route, "steps": steps}
+        return {"fetch_status": "ok", "route": route, "steps": steps}
 
     async def agent(state: LearningState) -> dict[str, Any]:
-        if state.get("fetch_error"):
-            return {
-                "messages": [AIMessage(
-                    content=f"{state['fetch_error']}\n\n请稍后重试或尝试换一个技术名。"
-                )]
-            }
+        status = state.get("fetch_status") or "ok"
+
+        if status == "not_found":
+            detail = state.get("fetch_error") or "知识图谱中没有找到该技术"
+            return {"messages": [AIMessage(f"{detail}。\n\n{_NOT_FOUND_SUFFIX}")]}
+        if status == "unavailable":
+            return {"messages": [AIMessage(_UNAVAILABLE_REPLY)]}
+        if status == "invalid":
+            return {"messages": [AIMessage(_MISSING_TECHNOLOGY_REPLY)]}
 
         data = json.dumps(state.get("route") or {}, ensure_ascii=False)
         hint = (
@@ -142,11 +132,9 @@ def build_learning_graph(
         return {"messages": [response]}
 
     builder = StateGraph(LearningState)
-    builder.add_node("intent", intent)
     builder.add_node("fetch", fetch)
     builder.add_node("agent", agent)
-    builder.add_edge(START, "intent")
-    builder.add_edge("intent", "fetch")
+    builder.add_edge(START, "fetch")
     builder.add_edge("fetch", "agent")
     builder.add_edge("agent", END)
     return builder.compile()

@@ -188,9 +188,12 @@ const routeTarget = computed(() => activeSession.value?.routeTarget ?? '')
 const workflowLabel = computed(() => (workflow.value === 'qa' ? '技术问答' : '学习路线'))
 const isStreaming = computed(() => streaming.value !== null)
 const canSend = computed(() => draft.value.trim().length > 0 && !isStreaming.value)
-const canGenerateRoute = computed(
-  () => targetTechnology.value.trim().length > 0 && !isStreaming.value,
-)
+/** 目标技术必须精确命中标签库，图谱外的技术不生成路线。 */
+const matchedTarget = computed(() => {
+  const name = targetTechnology.value.trim().toLowerCase()
+  return name ? dict.tags.find((tag) => tag.name.toLowerCase() === name) : undefined
+})
+const canGenerateRoute = computed(() => matchedTarget.value !== undefined && !isStreaming.value)
 
 /** 目标技术候选：按输入过滤标签库；不限制 8 个，输入为空时给出前 12 个。 */
 const targetOptions = computed(() => {
@@ -632,17 +635,20 @@ function submit(): void {
 
 function generateRoute(): void {
   if (isStreaming.value) return
-  const target = targetTechnology.value.trim()
-  if (!target) {
-    toast.info('请先填写目标技术')
+  const matched = matchedTarget.value
+  if (!matched) {
+    toast.info(
+      targetTechnology.value.trim() ? '请从标签库中选择目标技术' : '请先选择目标技术',
+    )
     return
   }
 
   const session = activeSession.value
   if (!session) return
 
-  const question = `请为我规划 ${target} 的学习路线`
-  void sendMessage(session, question, 'learning_path', target, [...knownTechnologies.value])
+  targetTechnology.value = matched.name
+  const question = `请为我规划 ${matched.name} 的学习路线`
+  void sendMessage(session, question, 'learning_path', matched.name, [...knownTechnologies.value])
 }
 
 async function sendMessage(
@@ -1212,7 +1218,7 @@ useSeo({
               <template v-else>
                 <h3>先定目标，再排路径</h3>
                 <p>
-                  从标签库选择目标技术，或直接输入任意技术；已掌握可以多选，也可以自己补充。
+                  目标技术需要从站内标签库选择；已掌握可以多选，也可以自己补充。
                 </p>
 
                 <form class="ai-route" @submit.prevent="generateRoute">
@@ -1225,7 +1231,7 @@ useSeo({
                           v-model="targetTechnology"
                           class="ai-route__input"
                           type="text"
-                          placeholder="例如 Redis；也可以直接输入任意技术"
+                          placeholder="搜索标签库，如 Redis"
                           autocomplete="off"
                           role="combobox"
                           aria-autocomplete="list"
@@ -1269,14 +1275,14 @@ useSeo({
                         <li v-if="!targetOptions.length" class="ai-combo__empty">
                           {{
                             dict.tagsLoading
-                              ? '标签库加载中，可直接输入技术名。'
-                              : '没有匹配的标签，直接输入即可。'
+                              ? '标签库加载中，请稍候。'
+                              : '没有匹配的标签，请换个关键词。'
                           }}
                         </li>
                       </ul>
                     </div>
                     <p class="ai-route__hint">
-                      可以从标签库选择，也可以直接输入任意技术；知识图谱未收录的技术可能无法生成路线。
+                      目标技术需从站内标签库选择；未收录的技术暂不支持生成图谱路线。
                     </p>
                   </div>
 

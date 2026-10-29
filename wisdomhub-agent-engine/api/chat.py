@@ -6,7 +6,7 @@ from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.sse import EventSourceResponse, ServerSentEvent
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from agents.base import ChatContext, ChatStreamer, TurnTrace
@@ -96,6 +96,12 @@ class ChatRequest(BaseModel):
         if any(len(item) > 50 for item in cleaned):
             raise ValueError("单个技术名长度不能超过 50 字")
         return cleaned
+
+    @model_validator(mode="after")
+    def _check_learning_technology(self) -> "ChatRequest":
+        if self.workflow == "learning_path" and not self.technology:
+            raise ValueError("学习路线必须指定 technology")
+        return self
 
 
 def get_chat_request(payload: ChatRequest) -> ChatRequest:

@@ -51,7 +51,6 @@ async def lifespan(app: FastAPI):
     internal_client = None
     app.state.internal_client = None
     app.state.java_tools = []
-    app.state.chat_model = None
     app.state.qa_model = None
     app.state.analysis_model = None
     app.state.qa_graph = None
@@ -59,7 +58,6 @@ async def lifespan(app: FastAPI):
     app.state.analysis_consumer = None
     app.state.analysis_task = None
     try:
-        app.state.chat_model = create_chat_model(settings)
         app.state.qa_model = create_chat_model(settings, streaming=True)
         app.state.analysis_model = create_chat_model(
             settings, timeout=settings.analysis_timeout
@@ -81,7 +79,7 @@ async def lifespan(app: FastAPI):
         app.state.qa_graph = build_qa_graph(app.state.qa_model, app.state.java_tools)
         if internal_client is not None:
             app.state.learning_graph = build_learning_graph(
-                app.state.chat_model, app.state.qa_model, internal_client
+                app.state.qa_model, internal_client
             )
 
         if settings.rabbitmq_enabled and internal_client is not None:

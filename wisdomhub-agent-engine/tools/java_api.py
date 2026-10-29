@@ -25,6 +25,14 @@ MAX_CHAIN_DEPTH = 5
 MAX_TECHNOLOGY_CHARS = 50
 
 
+class TechnologyNotFound(ToolException):
+    """技术名不在图谱词表里；属于可预期的用户输入问题。"""
+
+
+class KnowledgeServiceUnavailable(ToolException):
+    """图谱服务不可用；属于瞬时故障。"""
+
+
 async def get_article_snapshot(
     client: InternalClient, article_id: str
 ) -> dict[str, Any]:
@@ -61,8 +69,8 @@ async def query_knowledge_graph(
                     exc.kind, exc.status, exc.code)
         if exc.code == 404 or exc.status == 404:
             target = name or f"tagId={tag}"
-            raise ToolException(f"知识图谱中没有找到技术「{target}」") from exc
-        raise ToolException("知识图谱服务暂不可用，请稍后重试") from exc
+            raise TechnologyNotFound(f"知识图谱中没有找到技术「{target}」") from exc
+        raise KnowledgeServiceUnavailable("知识图谱服务暂不可用，请稍后重试") from exc
 
     if not isinstance(data, dict):
         raise ToolException("知识图谱返回格式异常")
@@ -91,8 +99,8 @@ async def query_prerequisite_chain(
         log.warning("query_prerequisite_chain 失败 kind=%s status=%s code=%s",
                     exc.kind, exc.status, exc.code)
         if exc.code == 404 or exc.status == 404:
-            raise ToolException(f"知识图谱中没有找到技术「{name}」") from exc
-        raise ToolException("知识图谱服务暂不可用，请稍后重试") from exc
+            raise TechnologyNotFound(f"知识图谱中没有找到技术「{name}」") from exc
+        raise KnowledgeServiceUnavailable("知识图谱服务暂不可用，请稍后重试") from exc
 
     if not isinstance(data, dict):
         raise ToolException("知识图谱返回格式异常")
