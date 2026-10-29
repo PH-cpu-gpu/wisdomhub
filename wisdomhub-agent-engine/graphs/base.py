@@ -7,5 +7,5 @@ class AgentState(MessagesState):
 
 
 def new_graph() -> StateGraph:
-    """工作流从这里开始加节点/边；B3.14 起使用。"""
+    """工作流从这里开始加节点/边。"""
     return StateGraph(AgentState)

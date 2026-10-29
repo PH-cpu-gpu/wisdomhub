@@ -4,7 +4,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """环境相关的配置全在这儿；契约常量（服务名 / group / 路由）留在各自模块里硬编码。"""
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
