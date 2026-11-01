@@ -29,6 +29,9 @@ public class Tag implements Serializable {
     /** 标签名，uk_name 唯一；库 collation 区分大小写 */
     private String name;
 
+    /** 归一化标签名，uk_name_norm 唯一；由 TagNameNormalizer 维护 */
+    private String nameNorm;
+
     /** 展示分组。与图谱 Technology.category 是两套无关的词表 */
     private String category;
 

@@ -23,9 +23,6 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class GraphArticleService {
 
-    /** 按 name 解析到 Tag，走 tag_name_unique 索引 */
-    private static final String RESOLVE = "UNWIND $names AS name MATCH (t:Tag {name: name}) RETURN name, t.tagId AS tagId";
-
     private static final String DELETE_ABOUT = "MATCH (a:Article {articleId: $articleId})-[r:ABOUT]->() DELETE r";
 
     private static final String MERGE_ARTICLE = "MERGE (a:Article {articleId: $articleId})";
@@ -36,6 +33,7 @@ public class GraphArticleService {
     private static final String DELETE_ARTICLE = "MATCH (a:Article {articleId: $articleId}) DETACH DELETE a";
 
     private final Neo4jClient neo4jClient;
+    private final TagNameResolver tagNameResolver;
 
     /**
      * 整篇重建该文章的 ABOUT 边。
@@ -45,14 +43,14 @@ public class GraphArticleService {
     public void rebuildAbout(Long articleId, Collection<String> names) {
         String id = String.valueOf(articleId);
         Set<String> wanted = names.stream()
-                .filter(name -> name != null && !name.isBlank())
+                .filter(name -> name != null)
+                .map(String::trim)
+                .filter(name -> !name.isEmpty())
                 .collect(Collectors.toCollection(LinkedHashSet::new));
 
-        Collection<Map<String, Object>> matched = neo4jClient.query(RESOLVE)
-                .bind(wanted).to("names")
-                .fetch().all();
-        Set<String> matchedNames = matched.stream().map(row -> (String) row.get("name")).collect(Collectors.toSet());
-        List<String> tagIds = matched.stream().map(row -> (String) row.get("tagId")).distinct().toList();
+        Map<String, String> resolved = tagNameResolver.resolve(wanted);
+        Set<String> matchedNames = resolved.keySet();
+        List<String> tagIds = resolved.values().stream().distinct().toList();
 
         if (matchedNames.size() < wanted.size()) {
             Set<String> dropped = new LinkedHashSet<>(wanted);

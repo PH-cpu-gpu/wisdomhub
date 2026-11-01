@@ -19,23 +19,38 @@ import com.wisdomhub.content.constants.TagConstants;
 import com.wisdomhub.content.domain.dto.TagDTO;
 import com.wisdomhub.content.domain.entity.ArticleTag;
 import com.wisdomhub.content.domain.entity.Tag;
+import com.wisdomhub.content.domain.entity.TagAlias;
+import com.wisdomhub.content.domain.entity.TagRelation;
 import com.wisdomhub.content.domain.vo.HotTagVO;
+import com.wisdomhub.content.domain.vo.TagResolveVO;
 import com.wisdomhub.content.domain.vo.TagSyncVO;
 import com.wisdomhub.content.domain.vo.TagVO;
 import com.wisdomhub.content.mapper.ArticleTagMapper;
+import com.wisdomhub.content.mapper.TagAliasMapper;
 import com.wisdomhub.content.mapper.TagMapper;
+import com.wisdomhub.content.mapper.TagRelationMapper;
 import com.wisdomhub.content.service.TagService;
+import com.wisdomhub.content.util.TagNameNormalizer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 @Slf4j
 @Service
@@ -44,8 +59,11 @@ public class TagServiceImpl implements TagService {
 
     private static final int SYNC_DEFAULT_SIZE = 200;
     private static final int SYNC_MAX_SIZE = 500;
+    private static final int RESOLVE_MAX_NAMES = 200;
 
     private final TagMapper tagMapper;
+    private final TagAliasMapper tagAliasMapper;
+    private final TagRelationMapper tagRelationMapper;
     private final ArticleTagMapper articleTagMapper;
     private final EventPublisher eventPublisher;
 
@@ -109,12 +127,14 @@ public class TagServiceImpl implements TagService {
     public Long createTag(TagDTO dto) {
         CurrentUserUtil.id();
         String name = dto.getName().trim();
-        if (tagMapper.exists(new LambdaQueryWrapper<Tag>().eq(Tag::getName, name))) {
-            throw new BusinessException(CommonErrorCode.CONFLICT, "标签名已存在");
+        String nameNorm = normalizeOrThrow(name);
+        if (nameTaken(nameNorm, null)) {
+            throw new BusinessException(CommonErrorCode.CONFLICT, "标签名或别名已存在");
         }
-        // 并发下预检可能同时通过，最终由 uk_name 抛 DuplicateKeyException → 全局 409
+        // 并发下预检可能同时通过，最终由 uk_name_norm 抛 DuplicateKeyException → 全局 409
         Tag tag = Tag.builder()
                 .name(name)
+                .nameNorm(nameNorm)
                 .category(StrUtil.blankToDefault(dto.getCategory(), TagConstants.CATEGORY_DEFAULT).trim())
                 .description(StrUtil.nullToEmpty(dto.getDescription()).trim())
                 .build();
@@ -134,13 +154,13 @@ public class TagServiceImpl implements TagService {
             throw new BusinessException(CommonErrorCode.NOT_FOUND, "标签不存在");
         }
         String name = dto.getName().trim();
-        if (tagMapper.exists(new LambdaQueryWrapper<Tag>()
-                .eq(Tag::getName, name)
-                .ne(Tag::getId, tagId))) {
-            throw new BusinessException(CommonErrorCode.CONFLICT, "标签名已存在");
+        String nameNorm = normalizeOrThrow(name);
+        if (nameTaken(nameNorm, tagId)) {
+            throw new BusinessException(CommonErrorCode.CONFLICT, "标签名或别名已存在");
         }
         tagMapper.update(null, new LambdaUpdateWrapper<Tag>()
                 .set(Tag::getName, name)
+                .set(Tag::getNameNorm, nameNorm)
                 .set(Tag::getCategory, StrUtil.blankToDefault(dto.getCategory(), TagConstants.CATEGORY_DEFAULT).trim())
                 .set(Tag::getDescription, StrUtil.nullToEmpty(dto.getDescription()).trim())
                 .set(Tag::getUpdateTime, LocalDateTime.now(ZoneOffset.UTC))
@@ -149,6 +169,7 @@ public class TagServiceImpl implements TagService {
     }
 
     @Override
+    @Transactional
     @Caching(evict = {
             @CacheEvict(cacheNames = TagConstants.CACHE_TAG, allEntries = true),
             @CacheEvict(cacheNames = TagConstants.CACHE_HOT_TAG, allEntries = true)
@@ -158,11 +179,22 @@ public class TagServiceImpl implements TagService {
         if (tagMapper.selectById(tagId) == null) {
             throw new BusinessException(CommonErrorCode.NOT_FOUND, "标签不存在");
         }
-        // 顺序：先删关系行，再删标签本体。
+        // 顺序：先删关联行，再删标签本体。
         articleTagMapper.delete(new LambdaQueryWrapper<ArticleTag>().eq(ArticleTag::getTagId, tagId));
+        tagAliasMapper.delete(new LambdaQueryWrapper<TagAlias>().eq(TagAlias::getTagId, tagId));
+        tagRelationMapper.delete(new LambdaQueryWrapper<TagRelation>()
+                .eq(TagRelation::getFromTagId, tagId)
+                .or()
+                .eq(TagRelation::getToTagId, tagId));
         tagMapper.deleteById(tagId);
         // 标签是物理删，行没了就再也查不到 —— 这条事件是下游清 ES 里残留标签的唯一线索
-        sendEvent(new TagDeletedEvent(TagDeletedPayload.builder().tagId(tagId).build()));
+        // 本方法有事务，回滚后发消息会留下「消息发了但标签还在」，所以放到提交后
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                sendEvent(new TagDeletedEvent(TagDeletedPayload.builder().tagId(tagId).build()));
+            }
+        });
     }
 
     // ==================== 事件 ====================
@@ -220,8 +252,102 @@ public class TagServiceImpl implements TagService {
     }
 
     @Override
+    public List<TagResolveVO> resolveNames(List<String> names) {
+        if (names == null || names.isEmpty()) {
+            return List.of();
+        }
+        LinkedHashSet<String> cleaned = new LinkedHashSet<>();
+        for (String raw : names) {
+            if (raw == null) {
+                continue;
+            }
+            String name = raw.trim();
+            if (!name.isEmpty()) {
+                cleaned.add(name);
+            }
+        }
+        if (cleaned.isEmpty()) {
+            return List.of();
+        }
+        if (cleaned.size() > RESOLVE_MAX_NAMES) {
+            throw new BusinessException(CommonErrorCode.BAD_REQUEST, "一次最多解析" + RESOLVE_MAX_NAMES + "个标签名");
+        }
+
+        Map<String, String> normByOriginal = new LinkedHashMap<>();
+        for (String name : cleaned) {
+            String norm = TagNameNormalizer.normalize(name);
+            // 归一化后超过列宽的名字不可能命中，直接视为未收录
+            if (!norm.isEmpty() && norm.length() <= TagNameNormalizer.MAX_LENGTH) {
+                normByOriginal.put(name, norm);
+            }
+        }
+        if (normByOriginal.isEmpty()) {
+            return List.of();
+        }
+
+        Set<String> norms = new HashSet<>(normByOriginal.values());
+        List<Tag> direct = tagMapper.selectList(new LambdaQueryWrapper<Tag>().in(Tag::getNameNorm, norms));
+        Map<String, Long> idByNorm = new HashMap<>();
+        Map<Long, String> nameById = new HashMap<>();
+        for (Tag tag : direct) {
+            idByNorm.put(tag.getNameNorm(), tag.getId());
+            nameById.put(tag.getId(), tag.getName());
+        }
+
+        List<TagAlias> aliases = tagAliasMapper.selectList(
+                new LambdaQueryWrapper<TagAlias>().in(TagAlias::getAliasNorm, norms));
+        List<Long> aliasTagIds = aliases.stream()
+                .map(TagAlias::getTagId)
+                .filter(id -> !nameById.containsKey(id))
+                .distinct()
+                .toList();
+        if (!aliasTagIds.isEmpty()) {
+            for (Tag tag : tagMapper.selectBatchIds(aliasTagIds)) {
+                nameById.put(tag.getId(), tag.getName());
+            }
+        }
+        for (TagAlias alias : aliases) {
+            idByNorm.putIfAbsent(alias.getAliasNorm(), alias.getTagId());
+        }
+
+        List<TagResolveVO> result = new ArrayList<>();
+        for (Map.Entry<String, String> entry : normByOriginal.entrySet()) {
+            Long tagId = idByNorm.get(entry.getValue());
+            String canonicalName = tagId == null ? null : nameById.get(tagId);
+            if (canonicalName != null) {
+                result.add(TagResolveVO.builder()
+                        .name(entry.getKey())
+                        .tagId(tagId)
+                        .canonicalName(canonicalName)
+                        .build());
+            }
+        }
+        return result;
+    }
+
+    @Override
     @CacheEvict(cacheNames = TagConstants.CACHE_HOT_TAG, allEntries = true)
     public void evictHotTags() {
         // 只清热门：标签字典（名字、描述）没变，变的是各标签下的文章数
+    }
+
+    private String normalizeOrThrow(String name) {
+        String norm = TagNameNormalizer.normalize(name);
+        if (norm.isEmpty()) {
+            throw new BusinessException(CommonErrorCode.BAD_REQUEST, "标签名不能为空");
+        }
+        if (norm.length() > TagNameNormalizer.MAX_LENGTH) {
+            throw new BusinessException(CommonErrorCode.BAD_REQUEST, "标签名归一化后不能超过50字");
+        }
+        return norm;
+    }
+
+    /** 归一化名已被标签名或别名占用。excludeTagId 用于改名时排除自己 */
+    private boolean nameTaken(String nameNorm, Long excludeTagId) {
+        boolean tagTaken = tagMapper.exists(new LambdaQueryWrapper<Tag>()
+                .eq(Tag::getNameNorm, nameNorm)
+                .ne(excludeTagId != null, Tag::getId, excludeTagId));
+        return tagTaken || tagAliasMapper.exists(new LambdaQueryWrapper<TagAlias>()
+                .eq(TagAlias::getAliasNorm, nameNorm));
     }
 }

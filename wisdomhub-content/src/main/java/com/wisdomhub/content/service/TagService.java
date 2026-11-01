@@ -2,6 +2,7 @@ package com.wisdomhub.content.service;
 
 import com.wisdomhub.content.domain.dto.TagDTO;
 import com.wisdomhub.content.domain.vo.HotTagVO;
+import com.wisdomhub.content.domain.vo.TagResolveVO;
 import com.wisdomhub.content.domain.vo.TagSyncVO;
 import com.wisdomhub.content.domain.vo.TagVO;
 
@@ -28,6 +29,9 @@ public interface TagService {
 
     /** 归一化标签 ID：去 null、去重、保序；含不存在的标签抛 400。供发布流程调用 */
     List<Long> normalizeTagIds(List<Long> tagIds);
+
+    /** 按原始名批量解析标签：先按归一化名精确匹配，再查别名；未命中的不出现在结果里 */
+    List<TagResolveVO> resolveNames(List<String> names);
 
     /** 文章标签变更后失效热门缓存。必须跨 bean 调用才会过 AOP 代理 */
     void evictHotTags();

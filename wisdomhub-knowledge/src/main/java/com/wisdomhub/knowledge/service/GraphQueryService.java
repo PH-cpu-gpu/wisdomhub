@@ -49,9 +49,8 @@ public class GraphQueryService {
             + "MATCH (:Tag {tagId: id})-[:PREREQUISITE]->(pre:Tag) "
             + "RETURN DISTINCT pre.tagId AS tagId, pre.name AS name ORDER BY name";
 
-    private static final String FIND_TAG_ID_BY_NAME = "MATCH (t:Tag {name: $name}) RETURN t.tagId AS tagId";
-
     private final Neo4jClient neo4jClient;
+    private final TagNameResolver tagNameResolver;
 
     /** 技术详情 = 节点属性 + 相关技术 */
     @Cacheable(cacheNames = KnowledgeCacheConstants.CACHE_TAG_DETAIL, key = "#tagId")
@@ -83,9 +82,10 @@ public class GraphQueryService {
         if (tech == null || tech.isBlank()) {
             throw new BusinessException(CommonErrorCode.BAD_REQUEST, "tech 不能为空");
         }
-        String tagId = neo4jClient.query(FIND_TAG_ID_BY_NAME).bind(tech.trim()).to("name")
-                .fetch().all().stream().map(row -> (String) row.get("tagId")).findFirst()
-                .orElseThrow(() -> new BusinessException(CommonErrorCode.NOT_FOUND, "技术不存在: " + tech));
+        String tagId = tagNameResolver.resolveOne(tech.trim());
+        if (tagId == null) {
+            throw new BusinessException(CommonErrorCode.NOT_FOUND, "技术不存在: " + tech);
+        }
         return related(tagId);
     }
 
@@ -96,9 +96,10 @@ public class GraphQueryService {
         if (tech == null || tech.isBlank()) {
             throw new BusinessException(CommonErrorCode.BAD_REQUEST, "tech 不能为空");
         }
-        String tagId = neo4jClient.query(FIND_TAG_ID_BY_NAME).bind(tech.trim()).to("name")
-                .fetch().all().stream().map(row -> (String) row.get("tagId")).findFirst()
-                .orElseThrow(() -> new BusinessException(CommonErrorCode.NOT_FOUND, "技术不存在: " + tech));
+        String tagId = tagNameResolver.resolveOne(tech.trim());
+        if (tagId == null) {
+            throw new BusinessException(CommonErrorCode.NOT_FOUND, "技术不存在: " + tech);
+        }
         return prerequisites(tagId, maxDepth);
     }
 

@@ -2,3 +2,4 @@ com.wisdomhub.common.web.exception.GlobalExceptionHandler
 com.wisdomhub.common.web.config.MybatisTimeConfiguration
 com.wisdomhub.common.web.config.MybatisPaginationConfiguration
 com.wisdomhub.common.web.config.UserContextAutoConfiguration
+com.wisdomhub.common.web.config.AdminWebAutoConfiguration

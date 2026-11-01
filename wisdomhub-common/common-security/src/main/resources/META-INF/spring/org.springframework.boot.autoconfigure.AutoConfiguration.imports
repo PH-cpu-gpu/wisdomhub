@@ -1,2 +1,3 @@
 com.wisdomhub.common.security.config.PasswordConfiguration
 com.wisdomhub.common.security.config.InternalSignAutoConfiguration
+com.wisdomhub.common.security.config.AdminAutoConfiguration

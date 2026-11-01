@@ -1,6 +1,7 @@
 package com.wisdomhub.content.controller;
 
 import com.wisdomhub.common.core.result.R;
+import com.wisdomhub.common.web.annotation.RequireAdmin;
 import com.wisdomhub.content.constants.TagConstants;
 import com.wisdomhub.content.domain.dto.TagDTO;
 import com.wisdomhub.content.domain.vo.HotTagVO;
@@ -45,16 +46,16 @@ public class TagController {
         return R.success(tagService.listHotTags(TagConstants.clampHotLimit(limit)));
     }
 
-    /*
-    // 写操作只有管理员能调用, 此处先不实现 —— 普通用户只能查
     @Operation(summary = "创建标签")
     @PostMapping("/tag")
+    @RequireAdmin
     public R<Long> create(@Valid @RequestBody TagDTO tagDTO) {
         return R.success(tagService.createTag(tagDTO));
     }
 
     @Operation(summary = "修改标签")
     @PutMapping("/tag/{tagId}")
+    @RequireAdmin
     public R<Void> update(@PathVariable Long tagId, @Valid @RequestBody TagDTO tagDTO) {
         tagService.updateTag(tagId, tagDTO);
         return R.success();
@@ -62,9 +63,9 @@ public class TagController {
 
     @Operation(summary = "删除标签")
     @DeleteMapping("/tag/{tagId}")
+    @RequireAdmin
     public R<Void> delete(@PathVariable Long tagId) {
         tagService.deleteTag(tagId);
         return R.success();
     }
-    */
 }

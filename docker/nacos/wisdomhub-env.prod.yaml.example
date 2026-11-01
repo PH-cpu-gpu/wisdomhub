@@ -19,6 +19,11 @@ xxl:
     admin-addresses: http://xxl-job-admin:8080
     access-token: change-me
 
+wisdomhub:
+  admin:
+    # 管理员用户 ID，形如 [1001, 1002]；留空则所有管理接口 403
+    user-ids: []
+
 # 环境相关的值全部集中在这里。上线只改这一个文件。
 infra:
   mysql-host: mysql

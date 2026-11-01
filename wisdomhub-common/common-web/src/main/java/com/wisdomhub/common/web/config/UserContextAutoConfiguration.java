@@ -14,6 +14,6 @@ public class UserContextAutoConfiguration implements WebMvcConfigurer {
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
-        registry.addInterceptor(new UserContextInterceptor());
+        registry.addInterceptor(new UserContextInterceptor()).order(0);
     }
 }

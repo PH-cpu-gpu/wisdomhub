@@ -17,6 +17,11 @@ xxl:
     admin-addresses: http://127.0.0.1:8080
     # docker-compose 的 xxl-job-admin 未显式配置 token，本地默认为 default_token
     access-token: change-me
+
+wisdomhub:
+  admin:
+    # 管理员用户 ID，形如 [1001, 1002]；留空则所有管理接口 403
+    user-ids: []
 # ============================================================
 # 环境相关的值全部集中在这里。上线时只需改这一个文件。
 # 其余 9 个服务配置通过 ${infra.*} 引用，不含任何硬编码地址。

@@ -1,6 +1,7 @@
 package com.wisdomhub.content.controller;
 
 import com.wisdomhub.common.core.result.R;
+import com.wisdomhub.content.domain.vo.TagResolveVO;
 import com.wisdomhub.content.domain.vo.TagSyncVO;
 import com.wisdomhub.content.domain.vo.TagVO;
 import com.wisdomhub.content.service.TagService;
@@ -10,6 +11,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -39,5 +42,11 @@ public class InternalTagController {
             @RequestParam(defaultValue = "0") Long lastId,
             @RequestParam(required = false) Integer size) {
         return R.success(tagService.syncTags(since, lastId, size));
+    }
+
+    @Operation(summary = "按名字批量解析标签（归一化 + 别名），供 knowledge 解析抽取实体")
+    @PostMapping("/tag/resolve")
+    public R<List<TagResolveVO>> resolve(@RequestBody List<String> names) {
+        return R.success(tagService.resolveNames(names));
     }
 }
