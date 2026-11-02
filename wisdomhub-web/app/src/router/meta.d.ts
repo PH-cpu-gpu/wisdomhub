@@ -11,6 +11,8 @@ declare module 'vue-router' {
     description?: string
     /** 未登录时跳转登录页 */
     requiresAuth?: boolean
+    /** 仅管理员可进；身份由后端 @RequireAdmin 接口探测 */
+    requiresAdmin?: boolean
     /** 顶部导航高亮项 */
     nav?: 'home' | 'articles' | 'questions' | 'tech' | 'graph' | 'ai'
   }

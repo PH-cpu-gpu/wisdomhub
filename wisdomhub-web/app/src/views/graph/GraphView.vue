@@ -4,16 +4,21 @@ import { RouterLink, useRoute, useRouter } from 'vue-router'
 
 import { isApiError } from '@/api/error'
 import { graph, neighborhood } from '@/api/modules/knowledge'
+import { listProposals } from '@/api/modules/tag-proposal'
 import WhButton from '@/components/base/WhButton.vue'
 import WhSelect from '@/components/base/WhSelect.vue'
 import { toast } from '@/components/base/toast'
 import GraphCanvas from '@/components/business/GraphCanvas.vue'
 import GraphNodePanel from '@/components/business/GraphNodePanel.vue'
 import { useSeo } from '@/composables/useSeo'
-import type { GraphVO } from '@/types/knowledge'
+import { useAdminStore, useAuthStore } from '@/stores'
+import type { GraphEdgeVO, GraphNodeVO, GraphVO } from '@/types/knowledge'
+import type { TagProposalVO } from '@/types/tag-proposal'
 
 const route = useRoute()
 const router = useRouter()
+const auth = useAuthStore()
+const admin = useAdminStore()
 
 const data = ref<GraphVO | null>(null)
 const loading = ref(false)
@@ -21,6 +26,13 @@ const error = ref('')
 const panelOpen = ref(false)
 const panelTagId = ref('')
 const expandedArticleTags = ref(new Set<string>())
+
+// 待审提案的图面标注：只有管理员能看到（提案接口本身仅管理员可读）
+const pendingEdges = ref<GraphEdgeVO[]>([])
+const pendingTagIds = ref<string[]>([])
+const pendingTotal = ref(0)
+/** 图谱加载序号：切换邻域/刷新时用来丢弃过期的待审标注 */
+let loadSeq = 0
 
 const tagId = computed(() => String(route.params.tagId ?? route.query.tagId ?? ''))
 const isNeighborhood = computed(() => Boolean(tagId.value))
@@ -72,24 +84,101 @@ const categoryCount = computed(
 )
 
 async function load(): Promise<void> {
+  const seq = (loadSeq += 1)
   loading.value = true
   error.value = ''
   data.value = null
+  resetPending()
 
   try {
-    data.value = tagId.value
+    const result = tagId.value
       ? await neighborhood(
           tagId.value,
           { depth: depth.value, articleLimit: articleLimit.value },
           { skipErrorToast: true },
         )
       : await graph({ skipErrorToast: true })
+    if (seq !== loadSeq) return
+    data.value = result
+    void loadPending(result, seq)
   } catch (err) {
+    if (seq !== loadSeq) return
     data.value = null
     error.value = isApiError(err) ? err.message : '图谱加载失败，请稍后重试。'
   } finally {
-    loading.value = false
+    if (seq === loadSeq) loading.value = false
   }
+}
+
+function normalizeTagName(value: string): string {
+  return value.replace(/[\s\-_·.]+/g, '').toLowerCase()
+}
+
+function resetPending(): void {
+  pendingEdges.value = []
+  pendingTagIds.value = []
+  pendingTotal.value = 0
+}
+
+/** 把待审提案映射到当前图：关系画虚线预览，端点节点改虚线描边 */
+async function loadPending(graphData: GraphVO, seq: number): Promise<void> {
+  const isAdmin = await admin.ensure(auth.isLoggedIn() ? auth.userId : null)
+  // seq 比对象引用可靠：data.value 是响应式代理，和入参恒不等
+  if (isAdmin !== true || seq !== loadSeq) return
+
+  try {
+    const page = await listProposals({ status: 0, pageSize: 100 }, { skipErrorToast: true })
+    if (seq !== loadSeq) return
+    applyPending(graphData, page.items, page.total)
+  } catch {
+    // 申请标注只是附加信息，加载失败不打扰图谱本身
+  }
+}
+
+function applyPending(graphData: GraphVO, proposals: TagProposalVO[], total: number): void {
+  const tagNodes = new Map<string, GraphNodeVO>()
+  const idByName = new Map<string, string>()
+  for (const node of graphData.nodes) {
+    if (node.type !== 'TAG') continue
+    tagNodes.set(node.id, node)
+    idByName.set(normalizeTagName(node.label), node.id)
+  }
+
+  const edgeKeys = new Set(
+    graphData.edges.map((edge) => `${edge.source}-${edge.target}-${edge.relation}`),
+  )
+  const edges: GraphEdgeVO[] = []
+  const tagIds = new Set<string>()
+
+  for (const proposal of proposals) {
+    if (proposal.proposalType === 1) {
+      // 新增标签提案正常还没进图；万一已有同名节点（投影滞后）就顺带标一下
+      const nodeId = idByName.get(normalizeTagName(proposal.name || proposal.targetKey))
+      if (nodeId) tagIds.add(nodeId)
+      continue
+    }
+
+    const source = proposal.fromTagId
+    const target = proposal.toTagId
+    const relation = proposal.relationType
+    if (!source || !target || !relation || source === target) continue
+    if (!tagNodes.has(source) || !tagNodes.has(target)) continue
+
+    const key = `${source}-${target}-${relation}`
+    const reverseKey = `${target}-${source}-${relation}`
+    if (edgeKeys.has(key) || (relation === 'SIMILAR_TO' && edgeKeys.has(reverseKey))) continue
+    if (edges.some((edge) => edge.source === source && edge.target === target && edge.relation === relation)) {
+      continue
+    }
+
+    edges.push({ source, target, relation })
+    tagIds.add(source)
+    tagIds.add(target)
+  }
+
+  pendingEdges.value = edges
+  pendingTagIds.value = [...tagIds]
+  pendingTotal.value = total
 }
 
 function onNodeClick(node: { id: string; type: 'TAG' | 'ARTICLE'; label: string }): void {
@@ -203,6 +292,9 @@ useSeo({
         <span
           ><b>{{ categoryCount }}</b> 个分类</span
         >
+        <span v-if="pendingTotal > 0"
+          ><b>{{ pendingTotal }}</b> 条待审提案</span
+        >
       </div>
     </header>
 
@@ -249,6 +341,8 @@ useSeo({
       <GraphCanvas
         v-if="data"
         :data="data"
+        :pending-edges="pendingEdges"
+        :pending-tag-ids="pendingTagIds"
         @node-click="onNodeClick"
         @background-click="onBackgroundClick"
       />
@@ -257,6 +351,10 @@ useSeo({
         <span>{{ isNeighborhood ? 'NEIGHBORHOOD' : 'TOTAL OVERVIEW' }}</span>
         <span>{{ nodeCount }} NODES / {{ edgeCount }} EDGES</span>
       </div>
+
+      <p v-if="pendingEdges.length" class="graph-pending">
+        可预览 {{ pendingEdges.length }} 条待审关系 · 虚线
+      </p>
 
       <p v-if="nodeCount > 300" class="graph-density">
         节点数 {{ nodeCount }} &gt; 300，已自动降低标签密度。
@@ -445,6 +543,19 @@ useSeo({
   z-index: 2;
   padding: 4px 8px;
   border: 1px solid var(--verm);
+  background: var(--surface);
+  color: var(--verm-deep);
+  font-family: var(--mono);
+  font-size: var(--text-2xs);
+}
+
+.graph-pending {
+  position: absolute;
+  top: 52px;
+  left: var(--space-3);
+  z-index: 2;
+  padding: 4px 8px;
+  border: 1px dashed var(--verm);
   background: var(--surface);
   color: var(--verm-deep);
   font-family: var(--mono);

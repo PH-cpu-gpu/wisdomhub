@@ -6,7 +6,7 @@ import * as echarts from 'echarts/core'
 import type { ECharts, EChartsCoreOption } from 'echarts/core'
 import { CanvasRenderer } from 'echarts/renderers'
 
-import type { GraphNodeVO, GraphVO } from '@/types/knowledge'
+import type { GraphEdgeVO, GraphNodeVO, GraphVO } from '@/types/knowledge'
 
 echarts.use([GraphChart, LegendComponent, TooltipComponent, CanvasRenderer])
 
@@ -24,10 +24,22 @@ const CATEGORY_COLORS: Record<string, string> = {
 }
 const ARTICLE_COLOR = '#d6d6cf'
 const FALLBACK_COLOR = '#4a4a52'
+/** 待审提案统一用这个颜色（与 verm 系一致，但写死给 ECharts 用） */
+const PENDING_COLOR = '#ff6b4a'
 
-const props = defineProps<{
-  data: GraphVO
-}>()
+const props = withDefaults(
+  defineProps<{
+    data: GraphVO
+    /** 待审关系：虚线预览，不归属任何分类 */
+    pendingEdges?: GraphEdgeVO[]
+    /** 参与待审关系的节点 ID，描边改为虚线提醒 */
+    pendingTagIds?: string[]
+  }>(),
+  {
+    pendingEdges: () => [],
+    pendingTagIds: () => [],
+  },
+)
 
 const emit = defineEmits<{
   nodeClick: [node: { id: string; type: 'TAG' | 'ARTICLE'; label: string }]
@@ -41,6 +53,7 @@ let observer: ResizeObserver | null = null
 const showLabels = computed(() => props.data.nodes.length <= 300)
 
 function buildOption(): EChartsCoreOption {
+  const pendingTagIds = new Set(props.pendingTagIds)
   const categories = [
     ...new Set(
       props.data.nodes
@@ -52,23 +65,43 @@ function buildOption(): EChartsCoreOption {
   const nodes = props.data.nodes.map((node) => {
     const isTag = node.type === 'TAG'
     const color = isTag ? (CATEGORY_COLORS[node.category ?? ''] ?? FALLBACK_COLOR) : ARTICLE_COLOR
+    const pending = pendingTagIds.has(node.id)
 
     return {
       id: node.id,
       name: node.label,
       category: isTag ? categories.indexOf(node.category ?? '') : undefined,
       symbolSize: isTag ? 16 + Math.min(32, (node.degree ?? 0) * 4) : 11,
-      itemStyle: { color },
+      itemStyle: pending
+        ? { color, borderColor: PENDING_COLOR, borderWidth: 2, borderType: 'dashed' }
+        : { color },
       nodeType: node.type,
       degree: node.degree,
+      pending,
     }
   })
 
-  const links = props.data.edges.map((edge) => ({
-    source: edge.source,
-    target: edge.target,
-    relation: edge.relation,
-  }))
+  const links = [
+    ...props.data.edges.map((edge) => ({
+      source: edge.source,
+      target: edge.target,
+      relation: edge.relation,
+      pending: false,
+    })),
+    ...props.pendingEdges.map((edge) => ({
+      source: edge.source,
+      target: edge.target,
+      relation: edge.relation,
+      pending: true,
+      lineStyle: {
+        type: 'dashed',
+        color: PENDING_COLOR,
+        opacity: 0.9,
+        width: 1.4,
+        curveness: 0.12,
+      },
+    })),
+  ]
 
   return {
     backgroundColor: 'transparent',
@@ -82,10 +115,12 @@ function buildOption(): EChartsCoreOption {
         if (params.dataType === 'node' && params.data) {
           const kind = params.data.nodeType === 'TAG' ? '技术' : '文章'
           const degree = params.data.nodeType === 'TAG' ? ` · 连接 ${params.data.degree ?? 0}` : ''
-          return `<strong>${params.data.name}</strong><br/>${kind}${degree}`
+          const pending = params.data.pending ? ' · 有申请中的关系' : ''
+          return `<strong>${params.data.name}</strong><br/>${kind}${degree}${pending}`
         }
         if (params.dataType === 'edge' && params.data) {
-          return String(params.data.relation ?? '')
+          const suffix = params.data.pending ? '（申请中）' : ''
+          return `${String(params.data.relation ?? '')}${suffix}`
         }
         return ''
       },
@@ -185,11 +220,16 @@ onBeforeUnmount(() => {
   chart = null
 })
 
-watch(() => props.data, render, { deep: true })
+watch(() => [props.data, props.pendingEdges, props.pendingTagIds], render, { deep: true })
 </script>
 
 <template>
-  <div class="graph-chart" :data-labels="showLabels ? 'on' : 'off'">
+  <div
+    class="graph-chart"
+    :data-labels="showLabels ? 'on' : 'off'"
+    :data-pending-edges="pendingEdges.length"
+    :data-pending-nodes="pendingTagIds.length"
+  >
     <div ref="chartRef" class="graph-chart__canvas" role="img" aria-label="知识图谱力导向图"></div>
     <ul class="graph-chart__nodes" aria-label="图谱节点">
       <li v-for="node in data.nodes" :key="node.id">

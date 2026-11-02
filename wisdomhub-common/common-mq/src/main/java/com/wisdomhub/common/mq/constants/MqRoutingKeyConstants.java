@@ -23,6 +23,12 @@ public final class MqRoutingKeyConstants {
     public static final String TAG_UPDATED = "tag.updated";
     public static final String TAG_DELETED = "tag.deleted";
 
+    /** 标签关系变更。刻意不带 tag.* 前缀，否则会被 search 的 tag.* 队列当成标签字典事件收走 */
+    public static final String TAG_RELATION_CHANGED = "relation.changed";
+
+    /** 标签/关系提案创建；通知服务按 *.created 收下后扇出给所有管理员 */
+    public static final String PROPOSAL_CREATED = "proposal.created";
+
     public static final String USER_REGISTERED = "user.registered";
     public static final String USER_UPDATED = "user.updated";
     public static final String USER_FOLLOWED = "user.followed";

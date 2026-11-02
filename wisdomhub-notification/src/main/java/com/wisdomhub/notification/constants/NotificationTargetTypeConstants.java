@@ -10,6 +10,7 @@ public final class NotificationTargetTypeConstants {
     public static final int QUESTION = 3;
     public static final int COLUMN = 4;
     public static final int USER = 5;
+    public static final int TAG_PROPOSAL = 6;
 
     private NotificationTargetTypeConstants() {
     }

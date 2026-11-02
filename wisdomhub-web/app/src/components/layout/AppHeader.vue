@@ -4,7 +4,7 @@ import { RouterLink, useRoute, useRouter } from 'vue-router'
 
 import { toast } from '@/components/base/toast'
 import { useNotificationChannel } from '@/composables/useNotificationChannel'
-import { useAuthStore, useNotificationStore } from '@/stores'
+import { useAdminStore, useAuthStore, useNotificationStore } from '@/stores'
 
 import BrandMark from './BrandMark.vue'
 import GlobalSearch from './GlobalSearch.vue'
@@ -13,6 +13,7 @@ const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
 const notification = useNotificationStore()
+const admin = useAdminStore()
 useNotificationChannel()
 
 const menuOpen = ref(false)
@@ -22,6 +23,16 @@ const mobilePanel = ref<HTMLElement | null>(null)
 const loggingOut = ref(false)
 
 const showUnread = computed(() => auth.isLoggedIn() && notification.unreadCount > 0)
+// 管理员入口：探测到 true 才显示，非管理员与未知状态都不渲染
+const showAdminEntry = computed(() => auth.isLoggedIn() && admin.isAdmin === true)
+
+watch(
+  () => (auth.isLoggedIn() ? auth.userId : null),
+  (userId) => {
+    void admin.ensure(userId)
+  },
+  { immediate: true },
+)
 const unreadText = computed(() =>
   notification.unreadCount > 99 ? '99+' : String(notification.unreadCount),
 )
@@ -68,6 +79,7 @@ async function handleLogout(): Promise<void> {
   try {
     await auth.logout()
     notification.reset()
+    admin.reset()
     toast.success('已退出登录')
     closeMenu()
     if (route.meta.requiresAuth) await router.replace({ name: 'home' })
@@ -194,6 +206,10 @@ onBeforeUnmount(() => {
 
         <RouterLink class="cta" to="/editor/new">写文章</RouterLink>
 
+        <RouterLink v-if="showAdminEntry" class="admin" to="/admin/tag-proposals">
+          提案
+        </RouterLink>
+
         <RouterLink v-if="!accountTarget && !isLoginPage" class="login" :to="loginTarget">
           登录
         </RouterLink>
@@ -286,6 +302,14 @@ onBeforeUnmount(() => {
               <span v-if="showUnread" class="mobile-menu__badge" aria-hidden="true">
                 {{ unreadText }}
               </span>
+            </RouterLink>
+            <RouterLink
+              v-if="showAdminEntry"
+              class="mobile-menu__ghost"
+              to="/admin/tag-proposals"
+              @click="closeMenu"
+            >
+              提案收件箱
             </RouterLink>
             <RouterLink
               v-if="!accountTarget && !isLoginPage"
@@ -494,6 +518,28 @@ onBeforeUnmount(() => {
 }
 
 .account:hover {
+  background: var(--ink);
+  color: var(--acid);
+}
+
+.admin {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 10px;
+  border: 1px solid var(--line-strong);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+  transition:
+    background var(--dur) var(--ease),
+    border-color var(--dur) var(--ease),
+    color var(--dur) var(--ease);
+}
+
+.admin:hover {
+  border-color: var(--ink);
   background: var(--ink);
   color: var(--acid);
 }

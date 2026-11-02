@@ -21,6 +21,7 @@ from registry.naming import SERVICE_NAME, deregister_self, register_self
 from security.internal_sign import InternalSigner, load_internal_sign_secret
 from tools.internal_client import create_internal_client
 from tools.java_api import build_java_tools
+from tools.proposals import build_proposal_tools
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
@@ -53,6 +54,7 @@ async def lifespan(app: FastAPI):
     app.state.java_tools = []
     app.state.qa_model = None
     app.state.analysis_model = None
+    app.state.reflection_model = None
     app.state.qa_graph = None
     app.state.learning_graph = None
     app.state.analysis_consumer = None
@@ -61,6 +63,10 @@ async def lifespan(app: FastAPI):
         app.state.qa_model = create_chat_model(settings, streaming=True)
         app.state.analysis_model = create_chat_model(
             settings, timeout=settings.analysis_timeout
+        )
+        # 提案自检不需要流式，单独给一个短超时的模型实例
+        app.state.reflection_model = create_chat_model(
+            settings, timeout=settings.proposal_reflection_timeout
         )
         await ping_database(engine)
         app.state.session_factory = create_session_factory(engine)
@@ -73,7 +79,12 @@ async def lifespan(app: FastAPI):
             signer = InternalSigner(secret, service_name=SERVICE_NAME)
             internal_client = create_internal_client(settings, naming_client, signer)
             app.state.internal_client = internal_client
-            app.state.java_tools = build_java_tools(internal_client)
+            app.state.java_tools = [
+                *build_java_tools(internal_client),
+                *build_proposal_tools(
+                    internal_client, app.state.reflection_model, settings
+                ),
+            ]
         else:
             log.info("nacos_enabled=false，跳过 Nacos 注册与内部调用客户端")
         app.state.qa_graph = build_qa_graph(app.state.qa_model, app.state.java_tools)

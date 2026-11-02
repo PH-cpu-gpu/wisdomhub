@@ -23,6 +23,12 @@ public class KnowledgeMqConfiguration {
     public static final String ARTICLE_QUEUE = "knowledge.article.q";
     public static final String ARTICLE_DLQ = ARTICLE_QUEUE + MqTopologyConstants.DLQ_SUFFIX;
 
+    public static final String TAG_QUEUE = "knowledge.tag.q";
+    public static final String TAG_DLQ = TAG_QUEUE + MqTopologyConstants.DLQ_SUFFIX;
+
+    public static final String RELATION_QUEUE = "knowledge.relation.q";
+    public static final String RELATION_DLQ = RELATION_QUEUE + MqTopologyConstants.DLQ_SUFFIX;
+
     @Bean
     public Queue knowledgeExtractQueue() {
         return QueueBuilder.durable(EXTRACT_QUEUE)
@@ -67,5 +73,52 @@ public class KnowledgeMqConfiguration {
     @Bean
     public Binding knowledgeArticleDeadLetterBinding(Queue knowledgeArticleDeadLetterQueue, DirectExchange deadLetterExchange) {
         return BindingBuilder.bind(knowledgeArticleDeadLetterQueue).to(deadLetterExchange).with(ARTICLE_DLQ);
+    }
+
+    @Bean
+    public Queue knowledgeTagQueue() {
+        return QueueBuilder.durable(TAG_QUEUE)
+                .deadLetterExchange(MqTopologyConstants.DLX_EXCHANGE)
+                .deadLetterRoutingKey(TAG_DLQ)
+                .build();
+    }
+
+    @Bean
+    public Queue knowledgeTagDeadLetterQueue() {
+        return QueueBuilder.durable(TAG_DLQ).build();
+    }
+
+    @Bean
+    public Binding knowledgeTagBinding(Queue knowledgeTagQueue, TopicExchange eventExchange) {
+        return BindingBuilder.bind(knowledgeTagQueue).to(eventExchange).with("tag.*");
+    }
+
+    @Bean
+    public Binding knowledgeTagDeadLetterBinding(Queue knowledgeTagDeadLetterQueue, DirectExchange deadLetterExchange) {
+        return BindingBuilder.bind(knowledgeTagDeadLetterQueue).to(deadLetterExchange).with(TAG_DLQ);
+    }
+
+    @Bean
+    public Queue knowledgeRelationQueue() {
+        return QueueBuilder.durable(RELATION_QUEUE)
+                .deadLetterExchange(MqTopologyConstants.DLX_EXCHANGE)
+                .deadLetterRoutingKey(RELATION_DLQ)
+                .build();
+    }
+
+    @Bean
+    public Queue knowledgeRelationDeadLetterQueue() {
+        return QueueBuilder.durable(RELATION_DLQ).build();
+    }
+
+    @Bean
+    public Binding knowledgeRelationBinding(Queue knowledgeRelationQueue, TopicExchange eventExchange) {
+        return BindingBuilder.bind(knowledgeRelationQueue).to(eventExchange)
+                .with(MqRoutingKeyConstants.TAG_RELATION_CHANGED);
+    }
+
+    @Bean
+    public Binding knowledgeRelationDeadLetterBinding(Queue knowledgeRelationDeadLetterQueue, DirectExchange deadLetterExchange) {
+        return BindingBuilder.bind(knowledgeRelationDeadLetterQueue).to(deadLetterExchange).with(RELATION_DLQ);
     }
 }

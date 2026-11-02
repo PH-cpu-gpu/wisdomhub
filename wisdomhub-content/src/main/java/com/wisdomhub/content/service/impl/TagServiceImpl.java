@@ -120,6 +120,7 @@ public class TagServiceImpl implements TagService {
     // 三个写方法都清两个缓存
 
     @Override
+    @Transactional
     @Caching(evict = {
             @CacheEvict(cacheNames = TagConstants.CACHE_TAG, allEntries = true),
             @CacheEvict(cacheNames = TagConstants.CACHE_HOT_TAG, allEntries = true)
@@ -139,11 +140,12 @@ public class TagServiceImpl implements TagService {
                 .description(StrUtil.nullToEmpty(dto.getDescription()).trim())
                 .build();
         tagMapper.insert(tag);
-        sendEvent(new TagCreatedEvent(loadTagPayload(tag.getId())));
+        sendEventAfterCommit(new TagCreatedEvent(loadTagPayload(tag.getId())));
         return tag.getId();
     }
 
     @Override
+    @Transactional
     @Caching(evict = {
             @CacheEvict(cacheNames = TagConstants.CACHE_TAG, allEntries = true),
             @CacheEvict(cacheNames = TagConstants.CACHE_HOT_TAG, allEntries = true)
@@ -165,7 +167,7 @@ public class TagServiceImpl implements TagService {
                 .set(Tag::getDescription, StrUtil.nullToEmpty(dto.getDescription()).trim())
                 .set(Tag::getUpdateTime, LocalDateTime.now(ZoneOffset.UTC))
                 .eq(Tag::getId, tagId));
-        sendEvent(new TagUpdatedEvent(loadTagPayload(tagId)));
+        sendEventAfterCommit(new TagUpdatedEvent(loadTagPayload(tagId)));
     }
 
     @Override
@@ -188,13 +190,7 @@ public class TagServiceImpl implements TagService {
                 .eq(TagRelation::getToTagId, tagId));
         tagMapper.deleteById(tagId);
         // 标签是物理删，行没了就再也查不到 —— 这条事件是下游清 ES 里残留标签的唯一线索
-        // 本方法有事务，回滚后发消息会留下「消息发了但标签还在」，所以放到提交后
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCommit() {
-                sendEvent(new TagDeletedEvent(TagDeletedPayload.builder().tagId(tagId).build()));
-            }
-        });
+        sendEventAfterCommit(new TagDeletedEvent(TagDeletedPayload.builder().tagId(tagId).build()));
     }
 
     // ==================== 事件 ====================
@@ -225,6 +221,23 @@ public class TagServiceImpl implements TagService {
         } catch (Exception e) {
             log.error("标签事件发送失败, eventType={}", event.getEventType(), e);
         }
+    }
+
+    /** 有事务就等提交后再发，回滚时不留「消息发了但数据没落」 */
+    private void sendEventAfterCommit(BaseEvent<?> event) {
+        if (event.getPayload() == null) {
+            return;
+        }
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            sendEvent(event);
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                sendEvent(event);
+            }
+        });
     }
 
     // ==================== 供发布流程调用 ====================

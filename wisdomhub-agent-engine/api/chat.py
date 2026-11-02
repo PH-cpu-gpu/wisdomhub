@@ -29,6 +29,7 @@ from db.turn import TurnContext, TurnOutcome, prepare_turn
 from models.tokenizer import TiktokenCounter
 from prompts.learning import LEARNING_PROMPT
 from security.user import current_user_id
+from tools.request_context import reset_chat_user, set_chat_user
 
 log = logging.getLogger(__name__)
 
@@ -235,6 +236,8 @@ async def chat(
     )
 
     stream = guard_events(persisted.stream(ctx), idle_timeout=settings.stream_idle_timeout)
+    # 提案工具靠这个上下文取用户身份做限流，模型不参与传参
+    user_token = set_chat_user(turn.user_id)
     try:
         yield encode(meta_event(turn.conversation_id, turn.message_id))
         async for event in stream:
@@ -242,3 +245,4 @@ async def chat(
     finally:
         with contextlib.suppress(Exception):
             await stream.aclose()
+        reset_chat_user(user_token)

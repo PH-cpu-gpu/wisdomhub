@@ -44,6 +44,10 @@ class Settings(BaseSettings):
     analysis_retry_times: int = 2
     article_analysis_ttl: int = 1800
 
+    # 提案申请：每小时每用户最多提交几次 + 自检（reflection）超时（秒）
+    proposal_rate_limit_per_hour: int = 5
+    proposal_reflection_timeout: float = 30.0
+
     # 测试使用
     # false 用于本地旁路测试：跳过 Nacos 注册
     nacos_enabled: bool = True

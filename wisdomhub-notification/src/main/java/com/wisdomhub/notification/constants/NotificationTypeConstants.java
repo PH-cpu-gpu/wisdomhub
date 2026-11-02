@@ -12,6 +12,8 @@ public final class NotificationTypeConstants {
     public static final int COLUMN_PURCHASE = 5;
     public static final int AI_ANALYSIS = 6;
     public static final int SYSTEM = 7;
+    /** 标签/关系提案待审，发给所有管理员 */
+    public static final int TAG_PROPOSAL = 8;
 
     private NotificationTypeConstants() {
     }

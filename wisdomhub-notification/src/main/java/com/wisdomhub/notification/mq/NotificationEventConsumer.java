@@ -9,7 +9,9 @@ import com.wisdomhub.common.mq.event.payload.AnswerLikedPayload;
 import com.wisdomhub.common.mq.event.payload.ArticleLikedPayload;
 import com.wisdomhub.common.mq.event.payload.CommentCreatedPayload;
 import com.wisdomhub.common.mq.event.payload.OrderPaidPayload;
+import com.wisdomhub.common.mq.event.payload.TagProposalSubmittedPayload;
 import com.wisdomhub.common.mq.event.payload.UserFollowedPayload;
+import com.wisdomhub.common.security.config.AdminProperties;
 import com.wisdomhub.notification.config.NotificationMqConfiguration;
 import com.wisdomhub.notification.constants.NotificationRedisConstants;
 import com.wisdomhub.notification.constants.NotificationTargetTypeConstants;
@@ -26,7 +28,9 @@ import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
+import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 通知落库消费端。去重在这里做，不进 common-mq：通知没有业务主键可收敛，是唯一注定要 eventId 去重的地方。
@@ -40,6 +44,7 @@ public class NotificationEventConsumer {
     private final StringRedisTemplate stringRedisTemplate;
     private final NotificationService notificationService;
     private final NotificationPushService notificationPushService;
+    private final AdminProperties adminProperties;
 
     @RabbitListener(queues = NotificationMqConfiguration.NOTIFICATION_QUEUE)
     public void onEvent(NotificationEventEnvelope event, Channel channel,
@@ -128,7 +133,29 @@ public class NotificationEventConsumer {
                 createAndPush(payload.getAuthorId(), null,
                         NotificationTypeConstants.AI_ANALYSIS, NotificationTargetTypeConstants.ARTICLE, payload.getArticleId());
             }
+            case MqRoutingKeyConstants.PROPOSAL_CREATED -> {
+                TagProposalSubmittedPayload payload = payload(event, TagProposalSubmittedPayload.class);
+                requireId(payload.getProposalId(), "proposalId");
+                fanOutProposal(payload.getProposalId());
+            }
             default -> log.debug("忽略不关心的路由键: {}", event.getEventType());
+        }
+    }
+
+    /** 提案通知扇出：每个管理员一条；系统触发，没有 sender */
+    private void fanOutProposal(Long proposalId) {
+        Set<Long> admins = new LinkedHashSet<>(adminProperties.getUserIds());
+        if (admins.isEmpty()) {
+            log.warn("未配置管理员，提案通知未发送: proposalId={}", proposalId);
+            return;
+        }
+        for (Long adminId : admins) {
+            if (adminId != null) {
+                createAndPush(adminId, null,
+                        NotificationTypeConstants.TAG_PROPOSAL,
+                        NotificationTargetTypeConstants.TAG_PROPOSAL,
+                        proposalId);
+            }
         }
     }
 
@@ -147,7 +174,8 @@ public class NotificationEventConsumer {
                 || MqRoutingKeyConstants.ANSWER_CREATED.equals(eventType)
                 || MqRoutingKeyConstants.USER_FOLLOWED.equals(eventType)
                 || MqRoutingKeyConstants.ORDER_PAID.equals(eventType)
-                || MqRoutingKeyConstants.AI_COMPLETED.equals(eventType);
+                || MqRoutingKeyConstants.AI_COMPLETED.equals(eventType)
+                || MqRoutingKeyConstants.PROPOSAL_CREATED.equals(eventType);
     }
 
     private <T> T payload(NotificationEventEnvelope event, Class<T> type) {

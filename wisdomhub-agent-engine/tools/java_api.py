@@ -114,7 +114,7 @@ def build_java_tools(client: InternalClient) -> list[BaseTool]:
 
     @tool(KNOWLEDGE_TOOL_NAME)
     async def query_knowledge_graph_tool(
-        technology: Annotated[str, Field(description="技术名，必须与词表一致且大小写敏感，如 Redis、Spring Boot")],
+        technology: Annotated[str, Field(description="技术名，如 Redis、Spring Boot；大小写/空格/连字符写法都能识别，别名也可以")],
     ) -> dict[str, Any]:
         """查询技术知识图谱中某技术的直接关联技术，按关系类型分组：
         PREREQUISITE 前置知识、BASED_ON 基于、USES 使用、SIMILAR_TO 相似、BELONGS_TO 属于；
@@ -123,7 +123,7 @@ def build_java_tools(client: InternalClient) -> list[BaseTool]:
 
     @tool(PREREQUISITE_TOOL_NAME)
     async def query_prerequisite_chain_tool(
-        technology: Annotated[str, Field(description="目标技术名，必须与词表一致且大小写敏感，如 Redis、Spring Boot")],
+        technology: Annotated[str, Field(description="目标技术名，如 Redis、Spring Boot；大小写/空格/连字符写法都能识别，别名也可以")],
     ) -> dict[str, Any]:
         """查询技术的前置知识链，按层返回：level 1 是直接前置，数字越大越基础；
         truncated 为 true 表示还有更基础的前置没展开。技术名不在词表里会报错。"""

@@ -34,6 +34,7 @@ public class GraphArticleService {
 
     private final Neo4jClient neo4jClient;
     private final TagNameResolver tagNameResolver;
+    private final UnknownEntityReporter unknownEntityReporter;
 
     /**
      * 整篇重建该文章的 ABOUT 边。
@@ -57,6 +58,8 @@ public class GraphArticleService {
             dropped.removeAll(matchedNames);
             if (!dropped.isEmpty()) {
                 log.warn("抽取的实体不在标签表，丢弃: articleId={} names={}", articleId, dropped);
+                // 只存证据，升不升级由 content 的 job 按文章证据判断
+                unknownEntityReporter.reportExtract(articleId, dropped);
             }
         }
 

@@ -6,6 +6,12 @@ import lombok.Data;
 @Data
 public class GraphReconcileResult {
 
+    private int tagNodes;
+
+    private int staleTags;
+
+    private int staleRelations;
+
     private int articleNodes;
 
     private int missingArticles;
@@ -13,7 +19,8 @@ public class GraphReconcileResult {
     private int noEdgeNodes;
 
     public String summary() {
-        return "articleNodes=" + articleNodes + ", missingArticles=" + missingArticles
+        return "tagNodes=" + tagNodes + ", staleTags=" + staleTags + ", staleRelations=" + staleRelations
+                + ", articleNodes=" + articleNodes + ", missingArticles=" + missingArticles
                 + ", noEdgeNodes=" + noEdgeNodes;
     }
 }

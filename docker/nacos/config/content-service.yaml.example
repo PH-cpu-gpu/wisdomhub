@@ -55,3 +55,8 @@ wisdomhub:
     pause-millis: 100
     mongo-batch-size: 500
     publish-delete-events: true
+  tag:
+    promote:
+      # 至少被多少篇不同文章抽到才自动提提案；查询次数不参与判断
+      min-articles: 3
+      batch-size: 50

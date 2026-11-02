@@ -30,6 +30,9 @@ const meOrders = () => import('@/views/me/MyOrdersView.vue')
 const orderPay = () => import('@/views/order/OrderPayView.vue')
 const aiWorkbench = () => import('@/views/ai/AiWorkbenchView.vue')
 const userProfile = () => import('@/views/user/UserProfileView.vue')
+const tagProposalInbox = () => import('@/views/admin/TagProposalInboxView.vue')
+const tagProposalDetail = () => import('@/views/admin/TagProposalDetailView.vue')
+const tagAdmin = () => import('@/views/admin/TagAdminView.vue')
 const devUi = () => import('@/views/DevUiView.vue')
 const devTokens = () => import('@/views/DevTokensView.vue')
 const forbidden = () => import('@/views/ForbiddenView.vue')
@@ -389,6 +392,45 @@ const routes: RouteRecordRaw[] = [
           nav: 'ai',
           requiresAuth: true,
           description: 'QA 与学习路线双模式，SSE 流式输出与参考文章。',
+        },
+      },
+      {
+        path: 'admin/tag-proposals',
+        name: 'tag-proposal-inbox',
+        component: tagProposalInbox,
+        meta: {
+          title: '提案收件箱',
+          section: 'ADMIN',
+          task: 'F10.1',
+          requiresAuth: true,
+          requiresAdmin: true,
+          description: '管理员查看 AI 与系统提交的标签 / 关系提案，按状态筛选并分页。',
+        },
+      },
+      {
+        path: 'admin/tag-proposals/:proposalId',
+        name: 'tag-proposal-detail',
+        component: tagProposalDetail,
+        meta: {
+          title: '提案详情',
+          section: 'ADMIN',
+          task: 'F10.2',
+          requiresAuth: true,
+          requiresAdmin: true,
+          description: '提案内容、触发证据与审批操作；同意会立即落地标签或关系。',
+        },
+      },
+      {
+        path: 'admin/tags',
+        name: 'tag-admin',
+        component: tagAdmin,
+        meta: {
+          title: '标签管理',
+          section: 'ADMIN',
+          task: 'F10.3',
+          requiresAuth: true,
+          requiresAdmin: true,
+          description: '标签 CRUD 与别名维护；删除会级联清关系并同步到图谱。',
         },
       },
       {

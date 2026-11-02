@@ -28,6 +28,7 @@ class InternalClientError(Exception):
         path: str,
         status: int | None = None,
         code: int | None = None,
+        data: Any = None,
     ) -> None:
         super().__init__(message)
         self.kind = kind
@@ -35,6 +36,8 @@ class InternalClientError(Exception):
         self.path = path
         self.status = status
         self.code = code
+        # 失败响应里的 data；目前只有提案接口会带 issues，其余为 None
+        self.data = data
 
 
 class InternalUnavailable(InternalClientError):
@@ -193,6 +196,7 @@ class InternalClient:
 
         code = payload["code"]
         message = payload.get("message") or "内部接口失败"
+        data = payload.get("data")
         if response.status_code == 401 or code == 401:
             log.warning("内部签名被拒 service=%s path=%s，检查 Nacos 密钥是否一致", service, path)
             raise InternalClientError(
@@ -202,13 +206,13 @@ class InternalClient:
         if response.status_code != 200:
             raise InternalClientError(
                 "http", message, service=service, path=path,
-                status=response.status_code, code=code,
+                status=response.status_code, code=code, data=data,
             )
         if code != 200:
             raise InternalClientError(
-                "business", message, service=service, path=path, code=code
+                "business", message, service=service, path=path, code=code, data=data
             )
-        return payload.get("data")
+        return data
 
 
 def create_internal_client(

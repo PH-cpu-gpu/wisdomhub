@@ -20,8 +20,7 @@ TRUNCATED_MARKER = "\n……（已截断）"
 
 
 class ArticleAnalysisError(Exception):
-    """文章分析失败；B3.6 按具体类型决定 ACK / 重试。"""
-
+    pass
 
 class ArticleNotFound(ArticleAnalysisError):
     pass
@@ -37,7 +36,7 @@ class ArticleContentMissing(ArticleAnalysisError):
 
 class ArticleAnalysisDraft(BaseModel):
     topic: str = Field(default="", description="一句话主题")
-    entities: list[str] = Field(default_factory=list, description="文章中出现的技术实体名")
+    entities: list[str] = Field(default_factory=list, description="文章中出现的技术实体名（不要人名、公司名、营销词）")
     knowledge_points: list[str] = Field(default_factory=list, description="文章讲清楚的知识点")
 
 

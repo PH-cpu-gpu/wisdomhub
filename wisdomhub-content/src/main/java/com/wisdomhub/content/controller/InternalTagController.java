@@ -1,10 +1,18 @@
 package com.wisdomhub.content.controller;
 
+import com.wisdomhub.common.core.result.CommonErrorCode;
 import com.wisdomhub.common.core.result.R;
+import com.wisdomhub.content.domain.dto.TagProposalSubmitDTO;
+import com.wisdomhub.content.domain.vo.TagProposalIssueVO;
+import com.wisdomhub.content.domain.vo.TagProposalSubmitResult;
+import com.wisdomhub.content.domain.vo.TagRelationSyncVO;
 import com.wisdomhub.content.domain.vo.TagResolveVO;
 import com.wisdomhub.content.domain.vo.TagSyncVO;
 import com.wisdomhub.content.domain.vo.TagVO;
+import com.wisdomhub.content.service.TagProposalService;
+import com.wisdomhub.content.service.TagRelationService;
 import com.wisdomhub.content.service.TagService;
+import com.wisdomhub.content.util.TagProposalErrorMapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +36,8 @@ import java.util.List;
 public class InternalTagController {
 
     private final TagService tagService;
+    private final TagRelationService tagRelationService;
+    private final TagProposalService tagProposalService;
 
     @Operation(summary = "全量标签字典，供 knowledge-service 建图谱种子")
     @GetMapping("/tag/all")
@@ -48,5 +58,25 @@ public class InternalTagController {
     @PostMapping("/tag/resolve")
     public R<List<TagResolveVO>> resolve(@RequestBody List<String> names) {
         return R.success(tagService.resolveNames(names));
+    }
+
+    @Operation(summary = "全量标签关系，供 knowledge 建图与对账")
+    @GetMapping("/tag-relation/all")
+    public R<List<TagRelationSyncVO>> listAllRelations() {
+        return R.success(tagRelationService.listAll());
+    }
+
+    @Operation(summary = "提交标签/关系提案；校验失败时 data 里带 issues，供 Agent 调用")
+    @PostMapping("/tag-proposal")
+    public R<TagProposalSubmitResult> submitProposal(@RequestBody TagProposalSubmitDTO dto) {
+        TagProposalSubmitResult result = tagProposalService.submit(dto);
+        if (result.isValid()) {
+            return R.success(result);
+        }
+        if (result.getIssues() == null || result.getIssues().isEmpty()) {
+            return R.error(CommonErrorCode.BAD_REQUEST, "提案不合法", result);
+        }
+        TagProposalIssueVO first = result.getIssues().get(0);
+        return R.error(TagProposalErrorMapper.toErrorCode(first.getCode()), first.getMessage(), result);
     }
 }

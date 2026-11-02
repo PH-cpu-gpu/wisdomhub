@@ -1,7 +1,7 @@
 import type { Router } from 'vue-router'
 
 import { toast } from '@/components/base/toast'
-import { pinia, useAuthStore } from '@/stores'
+import { pinia, useAdminStore, useAuthStore } from '@/stores'
 
 /**
  * F1.3 起守卫主动续期：access 过期但 refresh 存在时先刷新，失败才清 token 跳登录。
@@ -18,6 +18,12 @@ export function installGuards(router: Router): void {
 
     if (to.meta.requiresAuth && !authed) {
       return { name: 'login', query: { redirect: to.fullPath } }
+    }
+
+    // 管理员页面：探测为 false 才拦，未知（服务异常）放行让页面自己报错
+    if (to.meta.requiresAdmin && authed) {
+      const isAdmin = await useAdminStore(pinia).ensure(auth.userId)
+      if (isAdmin === false) return { name: 'forbidden' }
     }
 
     if (authed && (to.name === 'login' || to.name === 'register')) {

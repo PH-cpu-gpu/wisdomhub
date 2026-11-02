@@ -1,7 +1,7 @@
 import { AxiosHeaders, type AxiosResponse, type InternalAxiosRequestConfig } from 'axios'
 
 import type { PageResponse, R } from '@/types/common'
-import type { ArticleListItemVO, ColumnVO, CommentVO } from '@/types/content'
+import type { ArticleListItemVO, ColumnVO, CommentVO, TagAliasVO } from '@/types/content'
 import type {
   GraphEdgeVO,
   GraphNodeVO,
@@ -37,6 +37,7 @@ import {
   mockQuestions,
   mockRecommendations,
   mockSocialUsers,
+  mockTagProposals,
   mockTagRelations,
   mockTags,
   MOCK_ARTICLE_MARKDOWN,
@@ -48,6 +49,23 @@ const MOCK_DELAY = 180
 /** Mock 永远视为已登录的 1001 */
 const MOCK_USER_ID = '1001'
 const mockFollowing = new Set<string>()
+/** 提案 mock 是有状态的：审批后要把状态写回，刷新详情/列表才能看到变化 */
+const mockProposalState = mockTagProposals.map((proposal) => ({ ...proposal }))
+
+/** 标签管理 mock：CRUD 与别名都改这份内存状态，刷新浏览器后回到初始数据 */
+const mockTagState = mockTags.map((tag) => ({ ...tag }))
+let mockTagSequence = 900
+let mockAliasSequence = 100
+const mockTagAliasState: Record<string, TagAliasVO[]> = {
+  '2': [{ id: '1', tagId: '2', alias: 'SpringBoot' }],
+  '3': [{ id: '2', tagId: '3', alias: 'Vue.js' }],
+  '9': [{ id: '3', tagId: '9', alias: 'Docker 容器' }],
+}
+
+/** 与后端 TagNameNormalizer 同口径：忽略大小写、空白与常见分隔符 */
+function normalizeTagName(value: string): string {
+  return value.replace(/[\s\-_·.]+/g, '').toLowerCase()
+}
 const mockFavoriteArticleIds = new Set<string>([
   '1001',
   '1002',
@@ -609,6 +627,27 @@ function pathOf(config: InternalAxiosRequestConfig): string {
   return new URL(config.url ?? '/', 'http://mock.local').pathname
 }
 
+function decideMockProposal(
+  config: InternalAxiosRequestConfig,
+  rawId: string,
+  status: 1 | 2,
+): AxiosResponse {
+  // 本地手动开关：用来看并发 409 提示
+  if (localStorage.getItem('wisdomhub:mock.conflictProposals') === '1') {
+    return failure(config, 409, '提案已被其他管理员处理')
+  }
+
+  const id = decodeURIComponent(rawId)
+  const proposal = mockProposalState.find((item) => item.id === id)
+  if (!proposal) return failure(config, 404, '提案不存在')
+  if (proposal.status !== 0) return failure(config, 409, '提案已被其他管理员处理')
+
+  proposal.status = status
+  proposal.decidedBy = MOCK_USER_ID
+  proposal.decidedAt = new Date().toISOString()
+  return response(config, null)
+}
+
 function limitOf(config: InternalAxiosRequestConfig, fallback: number): number {
   const params = config.params as { limit?: number } | undefined
   const limit = Number(params?.limit ?? fallback)
@@ -683,7 +722,163 @@ export async function handleMockRequest(
   }
 
   if (method === 'get' && path === '/api/content/tag') {
-    return response(config, mockTags)
+    return response(config, mockTagState)
+  }
+
+  const tagAliasMatch = path.match(/^\/api\/content\/tag\/([^/]+)\/alias$/)
+  if (method === 'get' && tagAliasMatch?.[1]) {
+    const tagId = decodeURIComponent(tagAliasMatch[1])
+    if (!mockTagState.some((tag) => tag.tagId === tagId)) return failure(config, 404, '标签不存在')
+    return response(config, mockTagAliasState[tagId] ?? [])
+  }
+
+  if (method === 'post' && tagAliasMatch?.[1]) {
+    const tagId = decodeURIComponent(tagAliasMatch[1])
+    const body = bodyOf<{ alias?: string }>(config)
+    const alias = (body?.alias ?? '').trim()
+    if (!alias) return failure(config, 400, '别名不能为空')
+    if (alias.length > 50) return failure(config, 400, '别名长度不能超过50')
+    if (!mockTagState.some((tag) => tag.tagId === tagId)) return failure(config, 404, '标签不存在')
+
+    const norm = normalizeTagName(alias)
+    if (mockTagState.some((tag) => normalizeTagName(tag.name) === norm)) {
+      return failure(config, 409, '别名与已有标签名冲突')
+    }
+    const existing = mockTagAliasState[tagId] ?? []
+    if (existing.some((item) => normalizeTagName(item.alias) === norm)) {
+      return failure(config, 409, '别名已存在')
+    }
+
+    const created: TagAliasVO = { id: String(mockAliasSequence++), tagId, alias }
+    mockTagAliasState[tagId] = [...existing, created].sort((left, right) =>
+      left.alias.localeCompare(right.alias),
+    )
+    return response(config, created)
+  }
+
+  const tagAliasDeleteMatch = path.match(/^\/api\/content\/tag\/([^/]+)\/alias\/([^/]+)$/)
+  if (method === 'delete' && tagAliasDeleteMatch?.[1] && tagAliasDeleteMatch[2]) {
+    const tagId = decodeURIComponent(tagAliasDeleteMatch[1])
+    const aliasId = decodeURIComponent(tagAliasDeleteMatch[2])
+    const existing = mockTagAliasState[tagId] ?? []
+    if (!existing.some((item) => item.id === aliasId)) return failure(config, 404, '别名不存在')
+    mockTagAliasState[tagId] = existing.filter((item) => item.id !== aliasId)
+    return response(config, null)
+  }
+
+  if (method === 'post' && path === '/api/content/tag') {
+    const body = bodyOf<{ name?: string; category?: string; description?: string }>(config)
+    const name = (body?.name ?? '').trim()
+    if (!name) return failure(config, 400, '标签名不能为空')
+    if (name.length > 50) return failure(config, 400, '标签名长度不能超过50')
+    const category = (body?.category ?? '').trim()
+    if (category.length > 20) return failure(config, 400, '分组长度不能超过20')
+    const description = (body?.description ?? '').trim()
+    if (description.length > 255) return failure(config, 400, '描述长度不能超过255')
+
+    const norm = normalizeTagName(name)
+    const aliasClash = Object.values(mockTagAliasState).some((list) =>
+      list.some((item) => normalizeTagName(item.alias) === norm),
+    )
+    if (aliasClash || mockTagState.some((tag) => normalizeTagName(tag.name) === norm)) {
+      return failure(config, 409, '标签或别名已存在')
+    }
+
+    const created = {
+      tagId: String(mockTagSequence++),
+      name,
+      category: category || '其他',
+      description,
+    }
+    mockTagState.push(created)
+    return response(config, created.tagId)
+  }
+
+  const tagWriteMatch = path.match(/^\/api\/content\/tag\/([^/]+)$/)
+  if (method === 'put' && tagWriteMatch?.[1]) {
+    const tagId = decodeURIComponent(tagWriteMatch[1])
+    const tag = mockTagState.find((item) => item.tagId === tagId)
+    if (!tag) return failure(config, 404, '标签不存在')
+
+    const body = bodyOf<{ name?: string; category?: string; description?: string }>(config)
+    const name = (body?.name ?? '').trim()
+    if (!name) return failure(config, 400, '标签名不能为空')
+    if (name.length > 50) return failure(config, 400, '标签名长度不能超过50')
+    const category = (body?.category ?? '').trim()
+    if (category.length > 20) return failure(config, 400, '分组长度不能超过20')
+    const description = (body?.description ?? '').trim()
+    if (description.length > 255) return failure(config, 400, '描述长度不能超过255')
+
+    const norm = normalizeTagName(name)
+    if (mockTagState.some((item) => item.tagId !== tagId && normalizeTagName(item.name) === norm)) {
+      return failure(config, 409, '标签名已存在')
+    }
+    const aliasClash = Object.values(mockTagAliasState).some((list) =>
+      list.some((item) => normalizeTagName(item.alias) === norm),
+    )
+    if (aliasClash) return failure(config, 409, '标签名与已有别名冲突')
+
+    tag.name = name
+    tag.category = category || '其他'
+    tag.description = description
+    return response(config, null)
+  }
+
+  if (method === 'delete' && tagWriteMatch?.[1]) {
+    const tagId = decodeURIComponent(tagWriteMatch[1])
+    const index = mockTagState.findIndex((item) => item.tagId === tagId)
+    if (index < 0) return failure(config, 404, '标签不存在')
+    mockTagState.splice(index, 1)
+    delete mockTagAliasState[tagId]
+    return response(config, null)
+  }
+
+  if (method === 'get' && path === '/api/content/tag-proposal') {
+    // 模拟非管理员：图谱页的「申请中」标注应当不出现
+    if (localStorage.getItem('wisdomhub:mock.notAdmin') === '1') {
+      return failure(config, 403, '无权限访问')
+    }
+    // 与图谱 mock 一致：本地可手动切错误 / 空态
+    if (localStorage.getItem('wisdomhub:mock.failProposals') === '1') {
+      return failure(config, 500, '提案加载失败')
+    }
+    if (localStorage.getItem('wisdomhub:mock.emptyProposals') === '1') {
+      return response(config, { total: 0, pages: 0, pageSize: 10, page: 1, items: [] })
+    }
+
+    const params = (config.params ?? {}) as {
+      status?: number | string
+      proposalType?: number | string
+    }
+    const status = params.status === undefined || params.status === '' ? null : Number(params.status)
+    const proposalType =
+      params.proposalType === undefined || params.proposalType === ''
+        ? null
+        : Number(params.proposalType)
+    const items = mockProposalState
+      .filter((proposal) => status === null || proposal.status === status)
+      .filter((proposal) => proposalType === null || proposal.proposalType === proposalType)
+      .sort((left, right) => right.createTime.localeCompare(left.createTime))
+    return response(config, pageOf(items, config))
+  }
+
+  const proposalApproveMatch = path.match(/^\/api\/content\/tag-proposal\/([^/]+)\/approve$/)
+  if (method === 'post' && proposalApproveMatch?.[1]) {
+    return decideMockProposal(config, proposalApproveMatch[1], 1)
+  }
+
+  const proposalRejectMatch = path.match(/^\/api\/content\/tag-proposal\/([^/]+)\/reject$/)
+  if (method === 'post' && proposalRejectMatch?.[1]) {
+    return decideMockProposal(config, proposalRejectMatch[1], 2)
+  }
+
+  const proposalDetailMatch = path.match(/^\/api\/content\/tag-proposal\/([^/]+)$/)
+  if (method === 'get' && proposalDetailMatch?.[1]) {
+    const proposal = mockProposalState.find(
+      (item) => item.id === decodeURIComponent(proposalDetailMatch[1]),
+    )
+    if (!proposal) return failure(config, 404, '提案不存在')
+    return response(config, { ...proposal })
   }
 
   if (method === 'get' && path === '/api/knowledge/graph') {

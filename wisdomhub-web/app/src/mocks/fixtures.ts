@@ -11,6 +11,7 @@ import type {
 } from '@/types/content'
 import type { RecommendationItemVO } from '@/types/recommendation'
 import type { QuestionListItemVO, AnswerVO } from '@/types/qa'
+import type { TagProposalVO } from '@/types/tag-proposal'
 import type { LoginVO, UserBriefVO, UserProfileVO } from '@/types/user'
 
 const PUBLISHED = '2026-10-20T08:30:00Z'
@@ -41,6 +42,96 @@ export const mockSocialUsers: UserBriefVO[] = [
   { userId: '3010', username: '程野', avatar: null, bio: 'Go / 微服务' },
   { userId: '3011', username: '白露', avatar: null, bio: '数据可视化' },
   { userId: '3012', username: '韩川', avatar: null, bio: '计算机图形学' },
+]
+
+export const mockTagProposals: TagProposalVO[] = [
+  {
+    id: '9001',
+    proposalType: 1,
+    status: 0,
+    targetKey: 'argocd',
+    name: 'Argo CD',
+    category: '中间件与运维',
+    description: '基于 GitOps 的 Kubernetes 持续交付工具',
+    proposerType: 3,
+    createTime: '2026-11-01T02:10:00Z',
+    evidence: { source: 'unknown_entity', extractCount: 3, queryCount: 2, sampleArticleId: '1003' },
+  },
+  {
+    id: '9002',
+    proposalType: 1,
+    status: 0,
+    targetKey: 'bun',
+    name: 'Bun',
+    category: '工具',
+    description: '一体化 JavaScript 运行时与包管理器',
+    proposerType: 1,
+    createTime: '2026-11-01T01:40:00Z',
+    evidence: { source: 'agent_chat', reason: '用户问到 Bun 与 Node.js 的区别' },
+  },
+  {
+    id: '9003',
+    proposalType: 2,
+    status: 0,
+    targetKey: '6:PREREQUISITE:7',
+    fromTagId: '6',
+    toTagId: '7',
+    relationType: 'PREREQUISITE',
+    proposerType: 3,
+    createTime: '2026-10-31T13:05:00Z',
+    evidence: { source: 'unknown_entity', extractCount: 4, queryCount: 0, sampleArticleId: '1005' },
+  },
+  {
+    id: '9004',
+    proposalType: 2,
+    status: 1,
+    targetKey: '1:PREREQUISITE:2',
+    fromTagId: '1',
+    toTagId: '2',
+    relationType: 'PREREQUISITE',
+    proposerType: 1,
+    proposerId: null,
+    decidedBy: '1001',
+    decidedAt: '2026-10-30T09:20:00Z',
+    createTime: '2026-10-29T08:00:00Z',
+    evidence: { source: 'agent_chat', reason: 'Java 是 Spring Boot 的常见前置' },
+  },
+  {
+    id: '9005',
+    proposalType: 1,
+    status: 2,
+    targetKey: '某科技',
+    name: '某科技',
+    category: '其他',
+    proposerType: 1,
+    decidedBy: '1001',
+    decidedAt: '2026-10-28T11:30:00Z',
+    createTime: '2026-10-27T07:15:00Z',
+    evidence: { source: 'agent_chat', reason: '用户提到公司名，不是技术' },
+  },
+  {
+    id: '9006',
+    proposalType: 2,
+    status: 3,
+    targetKey: '9:BELONGS_TO:13',
+    fromTagId: '9',
+    toTagId: '13',
+    relationType: 'BELONGS_TO',
+    proposerType: 3,
+    createTime: '2026-10-20T05:45:00Z',
+    evidence: { source: 'unknown_entity', extractCount: 3, queryCount: 1 },
+  },
+  {
+    id: '9007',
+    proposalType: 1,
+    status: 0,
+    targetKey: 'rust',
+    name: 'Rust',
+    category: '编程语言',
+    proposerType: 1,
+    createTime: '2026-11-02T00:10:00Z',
+    evidence: { source: 'agent_chat', reason: '多篇文章提到系统编程' },
+  },
 ]
 
 export const mockTags: TagVO[] = [

@@ -139,6 +139,19 @@ export interface TagVO {
   description: string
 }
 
+/** 新增 / 修改标签共用；分组留空后端给默认值「其他」 */
+export interface TagPayload {
+  name: string
+  category?: string
+  description?: string
+}
+
+export interface TagAliasVO {
+  id: ID
+  tagId: ID
+  alias: string
+}
+
 export interface HotTagVO {
   tagId: ID
   name: string
