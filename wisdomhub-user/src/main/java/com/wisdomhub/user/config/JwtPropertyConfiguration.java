@@ -1,19 +1,15 @@
 package com.wisdomhub.user.config;
 
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Component;
-
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 
 @Component
 public class JwtPropertyConfiguration {
 
     private final String privateKey;
 
-    public JwtPropertyConfiguration(@Value("classpath:private.key") Resource resource) throws IOException {
-        this.privateKey = resource.getContentAsString(StandardCharsets.UTF_8).trim();
+    public JwtPropertyConfiguration(@Value("${jwt.private-key}") String privateKey) {
+        this.privateKey = privateKey.trim();
     }
 
     public String privateKey() {

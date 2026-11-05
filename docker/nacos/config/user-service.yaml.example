@@ -31,3 +31,7 @@ xxl:
 springdoc:
   api-docs:
     path: /api/user/v3/api-docs
+
+jwt:
+  # 单行 Base64(PKCS#8 DER)，必须与 wisdomhub-common.yaml 的 jwt.public-key 成对
+  private-key: change-me-jwt-private-key

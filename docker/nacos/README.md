@@ -62,14 +62,14 @@ docker/nacos/
 | DataId | 内容 |
 | --- | --- |
 | `wisdomhub-env.yaml` | 环境相关：中间件地址与账号密码、XXL-JOB 调度中心地址与 token |
-| `wisdomhub-common.yaml` | 公共配置：日志格式、内部签名密钥、Feign 超时、RabbitMQ 连接与重试 |
-| `gateway-service.yaml` | 网关路由、限流、CORS、免鉴权路径、JWT 公钥 |
-| `user-service.yaml` | 用户服务：数据源、Redis、上传大小、XXL 执行器、OpenAPI 路径 |
+| `wisdomhub-common.yaml` | 公共配置：日志格式、内部签名密钥、Feign 超时、RabbitMQ 连接与重试、JWT 公钥 |
+| `gateway-service.yaml` | 网关路由、限流、CORS、免鉴权路径 |
+| `user-service.yaml` | 用户服务：数据源、Redis、上传大小、XXL 执行器、OpenAPI 路径、JWT 私钥 |
 | `content-service.yaml` | 内容服务：数据源、Redis、MongoDB、Seata、对账与清理参数 |
 | `search-service.yaml` | 搜索服务：Elasticsearch、Redis、XXL 执行器、对账参数 |
 | `knowledge-service.yaml` | 知识图谱服务：Neo4j、Redis、XXL 执行器 |
 | `recommendation-service.yaml` | 推荐服务：Redis、Caffeine/Redis 缓存 TTL |
-| `notification-service.yaml` | 通知服务：数据源、Redis、JWT 公钥、死信重放 |
+| `notification-service.yaml` | 通知服务：数据源、Redis、死信重放 |
 | `order-service.yaml` | 订单服务：数据源、Redis、Seata |
 | `agent-service.yaml` | Agent 的 Spring 侧配置：Redis、MongoDB、OpenAPI 路径 |
 | `cos-key.yaml` | 腾讯云 COS 凭据（头像上传） |
@@ -80,13 +80,17 @@ docker/nacos/
 | --- | --- | --- |
 | `change-me` | 各中间件密码、XXL-JOB `access-token`、COS 密钥 | 实际密码 / 密钥 |
 | `change-me-to-a-random-64-hex` | `wisdomhub-common.yaml` 的 `internal-sign.secret` | 64 位十六进制随机串，可用 `openssl rand -hex 32` 生成 |
+| `change-me-jwt-private-key` | `user-service.yaml` 的 `jwt.private-key` | 单行 Base64(PKCS#8 DER)，必须与 common 的 `jwt.public-key` 成对 |
 | `your-bucket-name-APPID` | `cos-key.yaml` | COS 存储桶名 |
 | `https://your-bucket-name-APPID.cos.ap-shanghai.myqcloud.com` | `cos-key.yaml` | COS 访问域名 |
 
 补充说明：
 
-- **JWT 公钥不算秘密**，模板中保留了原值。更换密钥对时，`gateway-service.yaml` 与
-  `notification-service.yaml` 的 `jwt.public-key`、以及 `wisdomhub-user` 的私钥需要同步更新。
+- **JWT 公私钥都在 Nacos**：私钥只在 `user-service.yaml` 的 `jwt.private-key`，公钥只在
+  `wisdomhub-common.yaml` 的 `jwt.public-key`（gateway / notification 共读，不再各存一份）。
+  更换密钥对时必须同时更新这两处，二者成对。
+- 模板里的 `jwt.private-key` 是占位符，**真实私钥只填 Nacos，不进仓库**。
+  Nacos 明文存储且本地未开鉴权，能连 8848 的进程都能读到私钥；生产需限制访问或改用密钥管理服务。
 - `wisdomhub-env.yaml` 里的 `spring.cloud.nacos.discovery.ip: 127.0.0.1` 是本地开发值，
   多机部署时改成实际网卡 IP。
 - 模板中所有 `localhost` 地址按本地 Docker Compose 环境填写，部署到其他环境时统一在

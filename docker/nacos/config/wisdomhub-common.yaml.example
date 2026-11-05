@@ -69,3 +69,6 @@ spring:
           initial-interval: 200ms
           multiplier: 2
           max-interval: 1s
+
+jwt:
+  public-key: MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAxvmRfews5UhIHTtfwESyWTHL8v/zFnvmYZr3PJdL7mA8cpW5BLIRPcNv0sbOkmKFpsnpV/vi1thsF4YveRD8GAqBSaLSqrbLa0R6F1ehP9ibulsmtqhnEu9AamgRf57RRwC4HSoBdY5k7kkwC4wa83M7ZP5TIm7X1ZmtIt52Uq+OmVOPKok2sm56jSD0d8SFiEAMUJUAF98xHeOF09ajPdwJu1wdKLi/WCw1VNxoIWWYveR/rn53UUdVWlSMFTQym7BVUfeydoFq6hrfFdTrmW3kGynAt836hyPYFoh8xooK4fVB678AR5ubSLuFJ6aonpML+pO9eT3REugMz0ybywIDAQAB

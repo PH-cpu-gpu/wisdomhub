@@ -195,5 +195,3 @@ url:
     - /api/content/answer
     - /api/recommendation
     - /api/agent/analysis
-jwt:
-  public-key: MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAuMuu4vMYEexAGxsrnUt6pDNbKnl0Ouzu0E/qvA+wToMXc1SLrVy48YpauXzmq8aTNEfddCaleqJdvesHlY1I6W9U0BpyGLVLw5chGnCHNzXoum4HNdDzWC0/PYluOY6uGjhovPhm6pxzih5dGopOBvOXUfQ/m1i28D0s/tSQfqE31XcCIxwRzMr5APB8Bv/UMlRsXj/7QuaeEbH30DEalAH/1SC9+MiWmgKpeWgYxySbAAgZEE18ykxN4hcJcacovTVsH+7QFq6bfKz1yiDORxxmBUvL6iPlGBsV/YlyDphd7VONbw5SVOTyDfjp5JxeRPzDbxPE0xVxSsEk4iY9VwIDAQAB
