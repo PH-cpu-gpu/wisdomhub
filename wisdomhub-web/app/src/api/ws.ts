@@ -70,7 +70,7 @@ function buildClient(): Client {
     },
   })
 
-  // refreshToken 不轮换，accessToken 可能已续期；每次握手前取最新 token
+  // accessToken 可能已续期；每次握手前取最新 token
   next.beforeConnect = () => {
     next.connectHeaders = { Authorization: `Bearer ${getAccessToken() ?? ''}` }
   }

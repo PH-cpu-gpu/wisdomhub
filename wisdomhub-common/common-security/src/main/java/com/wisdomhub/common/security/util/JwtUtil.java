@@ -12,8 +12,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * JWT工具类, 可以创建, 解析,校验token, 使用RSA非对称加密
- * 密钥按照纯Base64存储
+ * JWT工具类, 可以创建, 解析, 校验token, 使用RSA非对称加密
+ * 密钥按照纯 Base64 存储
  */
 @Slf4j
 public class JwtUtil {

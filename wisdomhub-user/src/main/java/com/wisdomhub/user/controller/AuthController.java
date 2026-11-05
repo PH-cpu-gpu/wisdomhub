@@ -2,6 +2,7 @@ package com.wisdomhub.user.controller;
 
 import com.wisdomhub.common.core.result.R;
 import com.wisdomhub.user.domain.dto.LoginDTO;
+import com.wisdomhub.user.domain.dto.LogoutAllDTO;
 import com.wisdomhub.user.domain.dto.LogoutDTO;
 import com.wisdomhub.user.domain.dto.RefreshDTO;
 import com.wisdomhub.user.domain.dto.RegisterDTO;
@@ -47,6 +48,13 @@ public class AuthController {
     @PostMapping("/logout")
     public R<Void> logout(@Valid @RequestBody LogoutDTO logoutDTO) {
         userService.logout(logoutDTO);
+        return R.success();
+    }
+
+    @Operation(summary = "登出所有设备")
+    @PostMapping("/logout-all")
+    public R<Void> logoutAll(@Valid @RequestBody LogoutAllDTO logoutAllDTO) {
+        userService.logoutAll(logoutAllDTO);
         return R.success();
     }
 

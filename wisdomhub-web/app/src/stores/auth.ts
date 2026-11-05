@@ -92,7 +92,7 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  /** 401 刷新成功后由 http 层回调；refreshToken 不轮换，缺省时保留旧值 */
+  /** 401 刷新成功后由 http 层回调；响应带轮换后的 refreshToken，未带时保留旧值 */
   function updateTokens(tokens: { accessToken: string; refreshToken?: string | null }): void {
     setTokens(tokens)
     accessToken.value = tokens.accessToken

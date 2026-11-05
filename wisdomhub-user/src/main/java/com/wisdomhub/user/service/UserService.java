@@ -4,6 +4,7 @@ import com.wisdomhub.common.core.result.PageResponse;
 import java.util.List;
 import com.wisdomhub.user.domain.dto.BindEmailDTO;
 import com.wisdomhub.user.domain.dto.LoginDTO;
+import com.wisdomhub.user.domain.dto.LogoutAllDTO;
 import com.wisdomhub.user.domain.dto.LogoutDTO;
 import com.wisdomhub.user.domain.dto.ProfileDTO;
 import com.wisdomhub.user.domain.dto.RegisterDTO;
@@ -29,6 +30,8 @@ public interface UserService {
     LoginVO refresh(String refreshToken);
 
     void logout(LogoutDTO logoutDTO);
+
+    void logoutAll(LogoutAllDTO logoutAllDTO);
 
     void updateProfile(ProfileDTO profileDTO);
 
