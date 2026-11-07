@@ -183,6 +183,7 @@
         <module>wisdomhub-gateway</module>
         <module>wisdomhub-user</module>
         <module>wisdomhub-content</module>
+        <module>wisdomhub-interaction</module>
         <module>wisdomhub-search</module>
         <module>wisdomhub-knowledge</module>
         <module>wisdomhub-recommendation</module>

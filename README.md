@@ -29,6 +29,7 @@ WisdomHub 把 **内容社区 + 全文搜索 + 知识图谱 + 推荐系统 + AI A
 | `wisdomhub-recommendation` | 9095 | 个性化内容推荐 |
 | `wisdomhub-notification` | 9096 | 站内通知与 WebSocket 推送 |
 | `wisdomhub-order` | 9097 | 付费技术专栏订单 |
+| `wisdomhub-interaction` | 9098 | 评论、点赞、收藏与互动计数 |
 | `wisdomhub-agent-engine` | 8000 | Python AI Agent（问答 / 学习规划 / 文章分析） |
 | `wisdomhub-common` | — | 公共模块：core、cache、feign、job、mq、security、web |
 | `wisdomhub-web` | 5173 | 前端：`landing` 静态着陆页 + `app` Vue 应用 |
@@ -41,6 +42,7 @@ WisdomHub/
 ├── wisdomhub-gateway/       网关
 ├── wisdomhub-user/          用户与认证
 ├── wisdomhub-content/       文章、问答、评论
+├── wisdomhub-interaction/   评论、点赞、收藏与计数
 ├── wisdomhub-search/        全文检索
 ├── wisdomhub-knowledge/     知识图谱
 ├── wisdomhub-recommendation/推荐
@@ -79,7 +81,7 @@ bash docker/elasticsearch/install-ik.sh 8.18.8
 
 ### 3. 配置 Nacos
 
-各业务服务的配置统一由 Nacos 管理（命名空间 `wisdomhub`），12 个配置的脱敏模板见
+各业务服务的配置统一由 Nacos 管理（命名空间 `wisdomhub`），13 个配置的脱敏模板见
 [`docker/nacos/config/`](docker/nacos/config/)。先把模板中的占位符替换为实际值，再执行导入脚本：
 
 ```powershell

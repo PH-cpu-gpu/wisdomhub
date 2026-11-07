@@ -21,6 +21,7 @@ wisdomhub:
       service-name: ${spring.application.name}
       allowed-services:
         - content-service
+        - interaction-service
         - knowledge-service
         - notification-service
         - order-service

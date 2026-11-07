@@ -1,0 +1,18 @@
+# =============================================================================
+# Nacos 配置模板（已脱敏）
+# DataId   : interaction-service.yaml
+# Group    : DEFAULT_GROUP
+# Namespace: wisdomhub
+#
+# 导入前请把 change-me / your-xxx 占位符替换为实际值。
+# 导入方式见 docker/nacos/README.md
+# =============================================================================
+spring:
+  datasource:
+    url: jdbc:mysql://${infra.mysql-host}:${infra.mysql-port}/wisdomhub_interaction?characterEncoding=utf8&${infra.mysql-params}
+    username: ${infra.mysql-user}
+    password: ${infra.mysql-password}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+springdoc:
+  api-docs:
+    path: /api/interaction/v3/api-docs

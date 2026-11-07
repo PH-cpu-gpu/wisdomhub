@@ -1,0 +1,15 @@
+server:
+  port: 9098
+
+spring:
+  application:
+    name: interaction-service
+  profiles:
+    active: local
+  cloud:
+    nacos:
+      discovery:
+        namespace: wisdomhub
+      config:
+        namespace: wisdomhub
+        file-extension: yaml
