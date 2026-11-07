@@ -574,7 +574,7 @@ public class UserServiceImpl implements UserService {
     private TokenDTO createTokenByUserId(Long userId) {
         String refreshUserKey = RedisKeyConstants.REFRESH_TOKEN_BY_USER_KEY + userId;
         long now = System.currentTimeMillis();
-        // 清理过期refreshToken
+        // 清理过期的单个 refreshToken
         stringRedisTemplate.opsForZSet().removeRangeByScore(refreshUserKey, 0, now);
         // 生成新的双token
         String accessToken = JwtUtil.createToken(Map.of(JwtPayloadConstants.USER_ID, userId),
