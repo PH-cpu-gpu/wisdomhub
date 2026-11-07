@@ -1,5 +1,6 @@
 package com.wisdomhub.search.service.reconcile;
 
+import com.wisdomhub.common.core.constants.ContentTargetTypeConstants;
 import com.wisdomhub.common.mq.event.ArticleDeletedEvent;
 import com.wisdomhub.common.mq.event.ArticleUpdatedEvent;
 import com.wisdomhub.common.mq.event.payload.ArticleDeletedPayload;
@@ -7,9 +8,11 @@ import com.wisdomhub.common.mq.event.payload.ArticleEventPayload;
 import com.wisdomhub.common.mq.util.EventPublisher;
 import com.wisdomhub.search.api.ContentFeign;
 import com.wisdomhub.search.api.dto.ArticleInternalDTO;
+import com.wisdomhub.search.api.dto.InteractionCountVO;
 import com.wisdomhub.search.config.ReconcileProperties;
 import com.wisdomhub.search.domain.document.ArticleIndexDoc;
 import com.wisdomhub.search.service.EsIndexService;
+import com.wisdomhub.search.service.InteractionCountQueryService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -44,6 +47,7 @@ public class ArticleReconcileService {
     private static final DateTimeFormatter ISO = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
 
     private final ContentFeign contentFeign;
+    private final InteractionCountQueryService interactionCountQueryService;
     private final EsIndexService esIndexService;
     private final EventPublisher eventPublisher;
     private final ReconcileProperties properties;
@@ -64,10 +68,13 @@ public class ArticleReconcileService {
             result.setScanned(result.getScanned() + page.size());
             List<Long> ids = page.stream().map(ArticleInternalDTO::getArticleId).filter(Objects::nonNull).toList();
             Map<Long, ArticleIndexDoc> docs = esIndexService.mgetArticles(ids);
+            Map<Long, InteractionCountVO> counts = interactionCountQueryService.byTargetIds(
+                    ContentTargetTypeConstants.ARTICLE, ids);
             for (ArticleInternalDTO article : page) {
                 if (article.getArticleId() == null) {
                     continue;
                 }
+                applyCounts(article, counts.get(article.getArticleId()));
                 sourceIds.add(article.getArticleId());
                 compareAndPublish(article, docs.get(article.getArticleId()), result);
             }
@@ -102,6 +109,16 @@ public class ArticleReconcileService {
             result.setMismatched(result.getMismatched() + 1);
             publishUpdated(article, result);
         }
+    }
+
+    private void applyCounts(ArticleInternalDTO article, InteractionCountVO counts) {
+        article.setLikeCount(counts == null ? 0 : nvl(counts.getLikeCount()));
+        article.setCommentCount(counts == null ? 0 : nvl(counts.getCommentCount()));
+        article.setFavoriteCount(counts == null ? 0 : nvl(counts.getFavoriteCount()));
+    }
+
+    private int nvl(Integer value) {
+        return value == null ? 0 : value;
     }
 
     private boolean sameArticle(ArticleInternalDTO source, ArticleIndexDoc doc) {

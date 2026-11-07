@@ -3,13 +3,16 @@ package com.wisdomhub.search.mq;
 import com.rabbitmq.client.Channel;
 import com.wisdomhub.common.core.exception.BusinessException;
 import com.wisdomhub.common.core.result.CommonErrorCode;
+import com.wisdomhub.common.core.constants.ContentTargetTypeConstants;
 import com.wisdomhub.common.mq.constants.MqRoutingKeyConstants;
 import com.wisdomhub.search.api.ContentFeign;
 import com.wisdomhub.search.api.dto.ArticleInternalDTO;
 import com.wisdomhub.search.api.dto.ArticleTagDTO;
+import com.wisdomhub.search.api.dto.InteractionCountVO;
 import com.wisdomhub.search.config.SearchMqConfiguration;
 import com.wisdomhub.search.domain.document.ArticleIndexDoc;
 import com.wisdomhub.search.service.EsIndexService;
+import com.wisdomhub.search.service.InteractionCountQueryService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
@@ -36,6 +39,7 @@ public class ArticleIndexConsumer {
     private static final int STATE_PUBLISH = 2;
 
     private final ContentFeign contentFeign;
+    private final InteractionCountQueryService interactionCountQueryService;
     private final EsIndexService esIndexService;
 
     @RabbitListener(queues = SearchMqConfiguration.ARTICLE_QUEUE)
@@ -77,10 +81,12 @@ public class ArticleIndexConsumer {
             esIndexService.deleteArticle(articleId);
             return;
         }
-        esIndexService.indexArticle(toDoc(article));
+        InteractionCountVO counts = interactionCountQueryService.get(
+                ContentTargetTypeConstants.ARTICLE, articleId);
+        esIndexService.indexArticle(toDoc(article, counts));
     }
 
-    private ArticleIndexDoc toDoc(ArticleInternalDTO article) {
+    private ArticleIndexDoc toDoc(ArticleInternalDTO article, InteractionCountVO counts) {
         List<ArticleIndexDoc.Tag> tags = article.getTags() == null ? List.of()
                 : article.getTags().stream().map(this::toTag).toList();
         return ArticleIndexDoc.builder()
@@ -96,9 +102,9 @@ public class ArticleIndexConsumer {
                 .publishTime(article.getPublishTime())
                 .updateTime(article.getUpdateTime())
                 .viewCount(article.getViewCount())
-                .likeCount(article.getLikeCount())
-                .commentCount(article.getCommentCount())
-                .favoriteCount(article.getFavoriteCount())
+                .likeCount(counts == null ? 0 : nvl(counts.getLikeCount()))
+                .commentCount(counts == null ? 0 : nvl(counts.getCommentCount()))
+                .favoriteCount(counts == null ? 0 : nvl(counts.getFavoriteCount()))
                 .build();
     }
 
@@ -108,5 +114,9 @@ public class ArticleIndexConsumer {
                 .name(tag.getName())
                 .category(tag.getCategory())
                 .build();
+    }
+
+    private int nvl(Integer value) {
+        return value == null ? 0 : value;
     }
 }

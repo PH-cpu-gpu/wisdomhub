@@ -1,11 +1,14 @@
 package com.wisdomhub.search.mq;
 
 import com.rabbitmq.client.Channel;
+import com.wisdomhub.common.core.constants.ContentTargetTypeConstants;
 import com.wisdomhub.common.mq.constants.MqRoutingKeyConstants;
 import com.wisdomhub.common.mq.event.payload.QuestionEventPayload;
+import com.wisdomhub.search.api.dto.InteractionCountVO;
 import com.wisdomhub.search.config.SearchMqConfiguration;
 import com.wisdomhub.search.domain.document.QuestionIndexDoc;
 import com.wisdomhub.search.service.EsIndexService;
+import com.wisdomhub.search.service.InteractionCountQueryService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
@@ -25,6 +28,7 @@ import java.io.IOException;
 @RequiredArgsConstructor
 public class QuestionIndexConsumer {
 
+    private final InteractionCountQueryService interactionCountQueryService;
     private final EsIndexService esIndexService;
 
     @RabbitListener(queues = SearchMqConfiguration.QUESTION_QUEUE)
@@ -37,7 +41,11 @@ public class QuestionIndexConsumer {
     private void handle(QuestionEventEnvelope event) {
         Long questionId = requireQuestionId(event);
         switch (event.getEventType()) {
-            case MqRoutingKeyConstants.QUESTION_CREATED -> esIndexService.indexQuestion(toDoc(event.getPayload()));
+            case MqRoutingKeyConstants.QUESTION_CREATED -> {
+                InteractionCountVO counts = interactionCountQueryService.get(
+                        ContentTargetTypeConstants.QUESTION, questionId);
+                esIndexService.indexQuestion(toDoc(event.getPayload(), counts));
+            }
             case MqRoutingKeyConstants.QUESTION_DELETED -> esIndexService.deleteQuestion(questionId);
             default -> log.debug("忽略不关心的路由键: {}", event.getEventType());
         }
@@ -52,7 +60,7 @@ public class QuestionIndexConsumer {
         return questionId;
     }
 
-    private QuestionIndexDoc toDoc(QuestionEventPayload payload) {
+    private QuestionIndexDoc toDoc(QuestionEventPayload payload, InteractionCountVO counts) {
         return QuestionIndexDoc.builder()
                 .questionId(payload.getQuestionId())
                 .title(payload.getTitle())
@@ -60,10 +68,14 @@ public class QuestionIndexConsumer {
                 .content(payload.getContent())
                 .userId(payload.getUserId())
                 .answerCount(payload.getAnswerCount())
-                .favoriteCount(payload.getFavoriteCount())
+                .favoriteCount(counts == null ? 0 : nvl(counts.getFavoriteCount()))
                 .acceptedAnswerId(payload.getAcceptedAnswerId())
                 .createTime(payload.getCreateTime())
                 .updateTime(payload.getUpdateTime())
                 .build();
+    }
+
+    private int nvl(Integer value) {
+        return value == null ? 0 : value;
     }
 }

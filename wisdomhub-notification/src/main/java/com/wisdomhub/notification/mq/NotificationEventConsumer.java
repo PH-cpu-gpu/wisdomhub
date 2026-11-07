@@ -14,7 +14,7 @@ import com.wisdomhub.common.mq.event.payload.UserFollowedPayload;
 import com.wisdomhub.common.security.config.AdminProperties;
 import com.wisdomhub.notification.config.NotificationMqConfiguration;
 import com.wisdomhub.notification.constants.NotificationRedisConstants;
-import com.wisdomhub.notification.constants.NotificationTargetTypeConstants;
+import com.wisdomhub.common.core.constants.ContentTargetTypeConstants;
 import com.wisdomhub.notification.constants.NotificationTypeConstants;
 import com.wisdomhub.notification.domain.entity.Notification;
 import com.wisdomhub.notification.service.NotificationPushService;
@@ -83,7 +83,7 @@ public class NotificationEventConsumer {
                 requireId(payload.getUserId(), "userId");
                 requireId(payload.getAuthorId(), "authorId");
                 createAndPush(payload.getAuthorId(), payload.getUserId(),
-                        NotificationTypeConstants.LIKE, NotificationTargetTypeConstants.ARTICLE, payload.getArticleId());
+                        NotificationTypeConstants.LIKE, ContentTargetTypeConstants.ARTICLE, payload.getArticleId());
             }
             case MqRoutingKeyConstants.ANSWER_LIKED -> {
                 AnswerLikedPayload payload = payload(event, AnswerLikedPayload.class);
@@ -91,7 +91,7 @@ public class NotificationEventConsumer {
                 requireId(payload.getUserId(), "userId");
                 requireId(payload.getAuthorId(), "authorId");
                 createAndPush(payload.getAuthorId(), payload.getUserId(),
-                        NotificationTypeConstants.LIKE, NotificationTargetTypeConstants.ANSWER, payload.getAnswerId());
+                        NotificationTypeConstants.LIKE, ContentTargetTypeConstants.ANSWER, payload.getAnswerId());
             }
             case MqRoutingKeyConstants.COMMENT_CREATED -> {
                 CommentCreatedPayload payload = payload(event, CommentCreatedPayload.class);
@@ -108,14 +108,14 @@ public class NotificationEventConsumer {
                 requireId(payload.getUserId(), "userId");
                 requireId(payload.getQuestionAuthorId(), "questionAuthorId");
                 createAndPush(payload.getQuestionAuthorId(), payload.getUserId(),
-                        NotificationTypeConstants.ANSWER, NotificationTargetTypeConstants.QUESTION, payload.getQuestionId());
+                        NotificationTypeConstants.ANSWER, ContentTargetTypeConstants.QUESTION, payload.getQuestionId());
             }
             case MqRoutingKeyConstants.USER_FOLLOWED -> {
                 UserFollowedPayload payload = payload(event, UserFollowedPayload.class);
                 requireId(payload.getFollowerId(), "followerId");
                 requireId(payload.getFolloweeId(), "followeeId");
                 createAndPush(payload.getFolloweeId(), payload.getFollowerId(),
-                        NotificationTypeConstants.FOLLOW, NotificationTargetTypeConstants.USER, payload.getFolloweeId());
+                        NotificationTypeConstants.FOLLOW, ContentTargetTypeConstants.USER, payload.getFolloweeId());
             }
             case MqRoutingKeyConstants.ORDER_PAID -> {
                 OrderPaidPayload payload = payload(event, OrderPaidPayload.class);
@@ -123,7 +123,7 @@ public class NotificationEventConsumer {
                 requireId(payload.getUserId(), "userId");
                 requireId(payload.getColumnAuthorId(), "columnAuthorId");
                 createAndPush(payload.getColumnAuthorId(), payload.getUserId(),
-                        NotificationTypeConstants.COLUMN_PURCHASE, NotificationTargetTypeConstants.COLUMN, payload.getColumnId());
+                        NotificationTypeConstants.COLUMN_PURCHASE, ContentTargetTypeConstants.COLUMN, payload.getColumnId());
             }
             case MqRoutingKeyConstants.AI_COMPLETED -> {
                 AgentAnalysisCompletedPayload payload = payload(event, AgentAnalysisCompletedPayload.class);
@@ -131,7 +131,7 @@ public class NotificationEventConsumer {
                 requireId(payload.getAuthorId(), "authorId");
                 // 系统触发，没有 sender
                 createAndPush(payload.getAuthorId(), null,
-                        NotificationTypeConstants.AI_ANALYSIS, NotificationTargetTypeConstants.ARTICLE, payload.getArticleId());
+                        NotificationTypeConstants.AI_ANALYSIS, ContentTargetTypeConstants.ARTICLE, payload.getArticleId());
             }
             case MqRoutingKeyConstants.PROPOSAL_CREATED -> {
                 TagProposalSubmittedPayload payload = payload(event, TagProposalSubmittedPayload.class);
@@ -153,7 +153,7 @@ public class NotificationEventConsumer {
             if (adminId != null) {
                 createAndPush(adminId, null,
                         NotificationTypeConstants.TAG_PROPOSAL,
-                        NotificationTargetTypeConstants.TAG_PROPOSAL,
+                        ContentTargetTypeConstants.TAG_PROPOSAL,
                         proposalId);
             }
         }

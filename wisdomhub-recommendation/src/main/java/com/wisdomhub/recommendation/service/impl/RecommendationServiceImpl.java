@@ -1,5 +1,7 @@
 package com.wisdomhub.recommendation.service.impl;
 
+import com.wisdomhub.common.core.constants.ContentTargetTypeConstants;
+import com.wisdomhub.recommendation.api.interaction.dto.InteractionCountVO;
 import com.wisdomhub.recommendation.api.search.SearchFeign;
 import com.wisdomhub.recommendation.api.search.dto.ArticleRecallDTO;
 import com.wisdomhub.recommendation.api.search.dto.HotRequest;
@@ -12,6 +14,7 @@ import com.wisdomhub.recommendation.domain.vo.RecommendationItemVO;
 import com.wisdomhub.recommendation.domain.vo.RecommendationTagVO;
 import com.wisdomhub.recommendation.domain.vo.ScoredArticleVO;
 import com.wisdomhub.recommendation.domain.vo.TagWeightVO;
+import com.wisdomhub.recommendation.service.InteractionCountQueryService;
 import com.wisdomhub.recommendation.service.InterestProfileService;
 import com.wisdomhub.recommendation.service.RecommendationScorer;
 import com.wisdomhub.recommendation.service.RecommendationService;
@@ -32,6 +35,7 @@ public class RecommendationServiceImpl implements RecommendationService {
     private final SearchFeign searchFeign;
     private final InterestProfileService interestProfileService;
     private final RecommendationScorer recommendationScorer;
+    private final InteractionCountQueryService interactionCountQueryService;
 
     @Override
     @Cacheable(cacheNames = "home",
@@ -119,7 +123,14 @@ public class RecommendationServiceImpl implements RecommendationService {
     /** 缓存值必须是 ArrayList，不能用 List.of / toList 这类不可变集合 */
     private List<RecommendationItemVO> toItems(List<ArticleRecallDTO> articles) {
         List<RecommendationItemVO> items = new ArrayList<>(articles.size());
+        List<Long> articleIds = articles.stream()
+                .map(ArticleRecallDTO::getArticleId)
+                .filter(Objects::nonNull)
+                .toList();
+        Map<Long, InteractionCountVO> counts = interactionCountQueryService.byTargetIds(
+                ContentTargetTypeConstants.ARTICLE, articleIds);
         for (ArticleRecallDTO article : articles) {
+            InteractionCountVO count = article.getArticleId() == null ? null : counts.get(article.getArticleId());
             items.add(RecommendationItemVO.builder()
                     .articleId(article.getArticleId())
                     .authorId(article.getAuthorId())
@@ -128,12 +139,16 @@ public class RecommendationServiceImpl implements RecommendationService {
                     .tags(toTags(article.getTags()))
                     .publishTime(article.getPublishTime())
                     .viewCount(article.getViewCount())
-                    .likeCount(article.getLikeCount())
-                    .commentCount(article.getCommentCount())
-                    .favoriteCount(article.getFavoriteCount())
+                    .likeCount(count == null ? 0 : nvl(count.getLikeCount()))
+                    .commentCount(count == null ? 0 : nvl(count.getCommentCount()))
+                    .favoriteCount(count == null ? 0 : nvl(count.getFavoriteCount()))
                     .build());
         }
         return items;
+    }
+
+    private int nvl(Integer value) {
+        return value == null ? 0 : value;
     }
 
     private List<RecommendationTagVO> toTags(List<TagBriefDTO> tags) {

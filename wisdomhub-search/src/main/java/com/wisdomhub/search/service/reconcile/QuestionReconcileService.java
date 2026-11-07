@@ -1,15 +1,18 @@
 package com.wisdomhub.search.service.reconcile;
 
+import com.wisdomhub.common.core.constants.ContentTargetTypeConstants;
 import com.wisdomhub.common.mq.event.QuestionCreatedEvent;
 import com.wisdomhub.common.mq.event.QuestionDeletedEvent;
 import com.wisdomhub.common.mq.event.payload.QuestionDeletedPayload;
 import com.wisdomhub.common.mq.event.payload.QuestionEventPayload;
 import com.wisdomhub.common.mq.util.EventPublisher;
 import com.wisdomhub.search.api.ContentFeign;
+import com.wisdomhub.search.api.dto.InteractionCountVO;
 import com.wisdomhub.search.api.dto.QuestionSyncDTO;
 import com.wisdomhub.search.config.ReconcileProperties;
 import com.wisdomhub.search.domain.document.QuestionIndexDoc;
 import com.wisdomhub.search.service.EsIndexService;
+import com.wisdomhub.search.service.InteractionCountQueryService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -40,6 +43,7 @@ public class QuestionReconcileService {
     private static final DateTimeFormatter ISO = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
 
     private final ContentFeign contentFeign;
+    private final InteractionCountQueryService interactionCountQueryService;
     private final EsIndexService esIndexService;
     private final EventPublisher eventPublisher;
     private final ReconcileProperties properties;
@@ -60,10 +64,13 @@ public class QuestionReconcileService {
             result.setScanned(result.getScanned() + page.size());
             List<Long> ids = page.stream().map(QuestionSyncDTO::getQuestionId).filter(Objects::nonNull).toList();
             Map<Long, QuestionIndexDoc> docs = esIndexService.mgetQuestions(ids);
+            Map<Long, InteractionCountVO> counts = interactionCountQueryService.byTargetIds(
+                    ContentTargetTypeConstants.QUESTION, ids);
             for (QuestionSyncDTO question : page) {
                 if (question.getQuestionId() == null) {
                     continue;
                 }
+                applyCounts(question, counts.get(question.getQuestionId()));
                 sourceIds.add(question.getQuestionId());
                 compareAndPublish(question, docs.get(question.getQuestionId()), result);
             }
@@ -102,6 +109,14 @@ public class QuestionReconcileService {
             eventPublisher.send(new QuestionCreatedEvent(toPayload(question)));
             result.setRepublished(result.getRepublished() + 1);
         }
+    }
+
+    private void applyCounts(QuestionSyncDTO question, InteractionCountVO counts) {
+        question.setFavoriteCount(counts == null ? 0 : nvl(counts.getFavoriteCount()));
+    }
+
+    private int nvl(Integer value) {
+        return value == null ? 0 : value;
     }
 
     private boolean sameQuestion(QuestionSyncDTO source, QuestionIndexDoc doc) {
