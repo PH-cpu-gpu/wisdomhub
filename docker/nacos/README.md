@@ -67,7 +67,7 @@ docker/nacos/
 | `gateway-service.yaml` | 网关路由、限流、CORS、免鉴权路径 |
 | `user-service.yaml` | 用户服务：数据源、Redis、上传大小、XXL 执行器、OpenAPI 路径、JWT 私钥 |
 | `content-service.yaml` | 内容服务：数据源、Redis、MongoDB、Seata、对账与清理参数 |
-| `interaction-service.yaml` | 互动服务：数据源、OpenAPI 路径 |
+| `interaction-service.yaml` | 互动服务：数据源、Redis、OpenAPI 路径 |
 | `search-service.yaml` | 搜索服务：Elasticsearch、Redis、XXL 执行器、对账参数 |
 | `knowledge-service.yaml` | 知识图谱服务：Neo4j、Redis、XXL 执行器 |
 | `recommendation-service.yaml` | 推荐服务：Redis、Caffeine/Redis 缓存 TTL |

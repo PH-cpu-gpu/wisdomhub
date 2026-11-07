@@ -37,6 +37,12 @@
             <artifactId>common-feign</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <!-- 点赞/收藏防重 gate -->
+        <dependency>
+            <groupId>com.wisdomhub</groupId>
+            <artifactId>common-cache</artifactId>
+            <version>${project.version}</version>
+        </dependency>
 
         <dependency>
             <groupId>org.springframework.boot</groupId>

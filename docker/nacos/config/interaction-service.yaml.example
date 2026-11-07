@@ -13,6 +13,10 @@ spring:
     username: ${infra.mysql-user}
     password: ${infra.mysql-password}
     driver-class-name: com.mysql.cj.jdbc.Driver
+  data:
+    redis:
+      host: ${infra.redis-host}
+      port: ${infra.redis-port}
 springdoc:
   api-docs:
     path: /api/interaction/v3/api-docs
