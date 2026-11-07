@@ -61,4 +61,10 @@ public class InternalArticleController {
     public R<List<Long>> exists(@RequestParam("articleIds") List<Long> articleIds) {
         return R.success(articleService.existingArticleIds(articleIds));
     }
+
+    @Operation(summary = "文章标签 ID 列表，供 interaction 发行为事件")
+    @GetMapping("/article/{articleId}/tag/ids")
+    public R<List<Long>> listTagIds(@PathVariable("articleId") Long articleId) {
+        return R.success(articleService.listArticleTagIds(articleId));
+    }
 }

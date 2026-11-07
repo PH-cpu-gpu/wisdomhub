@@ -5,12 +5,14 @@ import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.wisdomhub.common.core.constants.ContentTargetTypeConstants;
 import com.wisdomhub.common.core.exception.BusinessException;
 import com.wisdomhub.common.core.result.CommonErrorCode;
+import com.wisdomhub.common.mq.constants.BehaviorTypeConstants;
 import com.wisdomhub.common.web.util.CurrentUserUtil;
 import com.wisdomhub.interaction.constants.InteractionRedisKeyConstants;
 import com.wisdomhub.interaction.domain.entity.ContentFavorite;
 import com.wisdomhub.interaction.mapper.ContentFavoriteMapper;
 import com.wisdomhub.interaction.mapper.InteractionCountMapper;
 import com.wisdomhub.interaction.service.FavoriteService;
+import com.wisdomhub.interaction.service.InteractionEventPublisher;
 import com.wisdomhub.interaction.service.InteractionGate;
 import com.wisdomhub.interaction.service.TargetValidator;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +36,7 @@ public class FavoriteServiceImpl implements FavoriteService {
     private final InteractionCountMapper interactionCountMapper;
     private final TargetValidator targetValidator;
     private final InteractionGate interactionGate;
+    private final InteractionEventPublisher eventPublisher;
 
     @Override
     @Transactional
@@ -68,6 +71,9 @@ public class FavoriteServiceImpl implements FavoriteService {
 
         interactionCountMapper.addFavoriteCount(IdWorker.getId(), type, targetId, 1,
                 LocalDateTime.now(ZoneOffset.UTC));
+        if (type == ContentTargetTypeConstants.ARTICLE) {
+            eventPublisher.behaviorRecorded(type, targetId, userId, BehaviorTypeConstants.COLLECT);
+        }
         return readFavoriteCount(type, targetId);
     }
 

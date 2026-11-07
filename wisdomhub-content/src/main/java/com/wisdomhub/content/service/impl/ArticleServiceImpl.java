@@ -3,7 +3,6 @@ package com.wisdomhub.content.service.impl;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
-import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.wisdomhub.common.core.exception.BusinessException;
@@ -18,6 +17,7 @@ import com.wisdomhub.common.mq.event.payload.ArticleDeletedPayload;
 import com.wisdomhub.common.mq.event.payload.BehaviorRecordedPayload;
 import com.wisdomhub.common.mq.constants.BehaviorTypeConstants;
 import com.wisdomhub.common.mq.event.payload.ArticleEventPayload;
+import com.wisdomhub.common.core.constants.ContentTargetTypeConstants;
 import com.wisdomhub.common.mq.util.EventPublisher;
 import com.wisdomhub.common.redis.constants.RedisTtl;
 import com.wisdomhub.common.security.context.UserContext;
@@ -27,18 +27,14 @@ import com.wisdomhub.common.web.util.PageUtil;
 import com.wisdomhub.content.constants.ArticleConstants;
 import com.wisdomhub.content.constants.ArticleRedisKeyConstants;
 import com.wisdomhub.content.constants.ColumnConstants;
-import com.wisdomhub.content.constants.CommentConstants;
 import com.wisdomhub.content.domain.document.ArticleContent;
 import com.wisdomhub.content.domain.dto.ArticleDraftDTO;
 import com.wisdomhub.content.domain.dto.ArticlePublishDTO;
 import com.wisdomhub.content.domain.entity.Article;
-import com.wisdomhub.content.domain.entity.ArticleFavorite;
-import com.wisdomhub.content.domain.entity.ArticleLike;
 import com.wisdomhub.content.domain.entity.ArticleTag;
 import com.wisdomhub.content.domain.entity.Column;
 import com.wisdomhub.content.domain.entity.ColumnArticle;
 import com.wisdomhub.content.domain.entity.ColumnPurchase;
-import com.wisdomhub.content.domain.entity.Comment;
 import com.wisdomhub.content.domain.vo.ArticleAccessVO;
 import com.wisdomhub.content.domain.vo.ArticleBriefVO;
 import com.wisdomhub.content.domain.vo.ArticleColumnVO;
@@ -49,14 +45,12 @@ import com.wisdomhub.content.domain.vo.ArticleSourceVO;
 import com.wisdomhub.content.domain.vo.ArticleTagVO;
 import com.wisdomhub.content.domain.vo.DraftBriefVO;
 import com.wisdomhub.content.domain.vo.TagVO;
-import com.wisdomhub.content.mapper.ArticleFavoriteMapper;
-import com.wisdomhub.content.mapper.ArticleLikeMapper;
 import com.wisdomhub.content.mapper.ArticleMapper;
 import com.wisdomhub.content.mapper.ArticleTagMapper;
 import com.wisdomhub.content.mapper.ColumnArticleMapper;
 import com.wisdomhub.content.mapper.ColumnMapper;
 import com.wisdomhub.content.mapper.ColumnPurchaseMapper;
-import com.wisdomhub.content.mapper.CommentMapper;
+import com.wisdomhub.content.mq.TargetDeletedEventSender;
 import com.wisdomhub.content.repository.ArticleContentRepository;
 import com.wisdomhub.content.service.ArticleService;
 import com.wisdomhub.content.service.TagService;
@@ -105,18 +99,16 @@ public class ArticleServiceImpl implements ArticleService {
 
     private final ArticleMapper articleMapper;
     private final ArticleTagMapper articleTagMapper;
-    private final ArticleLikeMapper articleLikeMapper;
-    private final ArticleFavoriteMapper articleFavoriteMapper;
     private final ColumnArticleMapper columnArticleMapper;
     private final ColumnPurchaseMapper columnPurchaseMapper;
     private final ColumnMapper columnMapper;
-    private final CommentMapper commentMapper;
     private final ArticleContentRepository articleContentRepository;
     private final MarkdownRenderer markdownRenderer;
     private final StringRedisTemplate stringRedisTemplate;
     private final TagService tagService;
     private final TransactionTemplate transactionTemplate;
     private final EventPublisher eventPublisher;
+    private final TargetDeletedEventSender targetDeletedEventSender;
 
     /**
      * 根据用户Id查询其已发布未删除的文章数量
@@ -155,8 +147,7 @@ public class ArticleServiceImpl implements ArticleService {
                                                         Long tagId, Long authorId) {
         LambdaQueryWrapper<Article> wrapper = new LambdaQueryWrapper<Article>()
                 .select(Article::getId, Article::getAuthorId, Article::getTitle, Article::getSummary,
-                        Article::getPublishTime, Article::getViewCount, Article::getLikeCount,
-                        Article::getCommentCount, Article::getFavoriteCount)
+                        Article::getPublishTime, Article::getViewCount)
                 // 对外可见：已发布 + 未删除。
                 .eq(Article::getState, ArticleConstants.PUBLISH)
                 .eq(Article::getDeleted, ArticleConstants.NOT_DELETED)
@@ -189,17 +180,6 @@ public class ArticleServiceImpl implements ArticleService {
         }
     }
 
-    @Override
-    public PageResponse<ArticleListItemVO> listMyFavorites(Integer page, Integer pageSize) {
-        IPage<Article> result = articleMapper.selectFavoritePage(PageUtil.of(page, pageSize),
-                CurrentUserUtil.id(), ArticleConstants.PUBLISH, ArticleConstants.NOT_DELETED);
-        List<ArticleListItemVO> items = result.getRecords().stream()
-                .map(this::toListItem)
-                .toList();
-        return PageUtil.toResponse(result, items);
-    }
-
-
     private ArticleListItemVO toListItem(Article article) {
         return ArticleListItemVO.builder()
                 .articleId(article.getId())
@@ -208,9 +188,6 @@ public class ArticleServiceImpl implements ArticleService {
                 .summary(article.getSummary())
                 .publishTime(article.getPublishTime())
                 .viewCount(article.getViewCount())
-                .likeCount(article.getLikeCount())
-                .commentCount(article.getCommentCount())
-                .favoriteCount(article.getFavoriteCount())
                 .build();
     }
 
@@ -538,12 +515,7 @@ public class ArticleServiceImpl implements ArticleService {
                 .locked(access.getLocked())
                 .columns(access.getColumns())
                 .publishTime(article.getPublishTime())
-                .liked(resolveLiked(article.getId()))
-                .collected(resolveCollected(article.getId()))
                 .viewCount(resolveViewCount(article))
-                .likeCount(article.getLikeCount())
-                .commentCount(article.getCommentCount())
-                .favoriteCount(article.getFavoriteCount())
                 .build();
     }
 
@@ -604,24 +576,6 @@ public class ArticleServiceImpl implements ArticleService {
 
     private boolean isFree(Column column) {
         return column.getPrice() != null && column.getPrice() == 0;
-    }
-
-    /**
-     * 当前用户是否已点赞 / 已收藏。详情是可选登录路径，游客没有 userId → 恒 false。
-     * 走 uk(user_id, article_id) 的索引命中，两次 exists 都很便宜，不值得为它加缓存
-     */
-    private boolean resolveLiked(Long articleId) {
-        Long userId = UserContext.getUserId();
-        return userId != null && articleLikeMapper.exists(new LambdaQueryWrapper<ArticleLike>()
-                .eq(ArticleLike::getUserId, userId)
-                .eq(ArticleLike::getArticleId, articleId));
-    }
-
-    private boolean resolveCollected(Long articleId) {
-        Long userId = UserContext.getUserId();
-        return userId != null && articleFavoriteMapper.exists(new LambdaQueryWrapper<ArticleFavorite>()
-                .eq(ArticleFavorite::getUserId, userId)
-                .eq(ArticleFavorite::getArticleId, articleId));
     }
 
     /**
@@ -763,6 +717,7 @@ public class ArticleServiceImpl implements ArticleService {
                 .articleId(articleId)
                 .authorId(article.getAuthorId())
                 .build()), articleId);
+        targetDeletedEventSender.sendAfterCommit(ContentTargetTypeConstants.ARTICLE, articleId);
     }
 
     /** 文章在已有购买记录的专栏里时禁止删除；先锁专栏行 */
@@ -790,17 +745,7 @@ public class ArticleServiceImpl implements ArticleService {
      * 清文章自己库里的关联行。
      */
     private void cleanUpArticleRelations(Long articleId) {
-        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
         articleTagMapper.delete(new LambdaQueryWrapper<ArticleTag>().eq(ArticleTag::getArticleId, articleId));
-        articleLikeMapper.delete(new LambdaQueryWrapper<ArticleLike>().eq(ArticleLike::getArticleId, articleId));
-        articleFavoriteMapper.delete(new LambdaQueryWrapper<ArticleFavorite>().eq(ArticleFavorite::getArticleId, articleId));
-        // 评论是实体表 → 软删。
-        commentMapper.update(null, new LambdaUpdateWrapper<Comment>()
-                .set(Comment::getDeleted, CommentConstants.DELETED.byteValue())
-                .set(Comment::getUpdateTime, now)
-                .eq(Comment::getTargetType, CommentConstants.TARGET_TYPE_ARTICLE.byteValue())
-                .eq(Comment::getTargetId, articleId)
-                .eq(Comment::getDeleted, CommentConstants.NOT_DELETED));
         columnMapper.update(null, new LambdaUpdateWrapper<Column>()
                 .setSql("article_count = article_count - 1")
                 .inSql(Column::getId, "SELECT column_id FROM column_article WHERE article_id = " + articleId)
@@ -934,6 +879,16 @@ public class ArticleServiceImpl implements ArticleService {
                 .toList();
     }
 
+    @Override
+    public List<Long> listArticleTagIds(Long articleId) {
+        return articleTagMapper.selectList(new LambdaQueryWrapper<ArticleTag>()
+                        .select(ArticleTag::getTagId)
+                        .eq(ArticleTag::getArticleId, articleId))
+                .stream()
+                .map(ArticleTag::getTagId)
+                .toList();
+    }
+
     private ArticleInternalVO toInternalVO(Article article, String markdown, List<ArticleTagVO> tags) {
         return ArticleInternalVO.builder()
                 .articleId(article.getId())
@@ -945,9 +900,6 @@ public class ArticleServiceImpl implements ArticleService {
                 .publishTime(article.getPublishTime())
                 .updateTime(article.getUpdateTime())
                 .viewCount(article.getViewCount())
-                .likeCount(article.getLikeCount())
-                .commentCount(article.getCommentCount())
-                .favoriteCount(article.getFavoriteCount())
                 .tags(tags)
                 .markdown(markdown)
                 .build();

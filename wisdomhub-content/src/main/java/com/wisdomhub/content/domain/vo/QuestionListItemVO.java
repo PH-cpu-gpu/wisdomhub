@@ -25,8 +25,6 @@ public class QuestionListItemVO {
 
     private Integer answerCount;
 
-    private Integer favoriteCount;
-
     /** 是否已采纳答案，由 accepted_answer_id 派生。列表页画「已解决」标记用 */
     private Boolean solved;
 

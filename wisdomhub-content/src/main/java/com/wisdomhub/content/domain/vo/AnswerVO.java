@@ -26,10 +26,5 @@ public class AnswerVO {
 
     private String content;
 
-    private Integer likeCount;
-
-    /** B1.28 无写入方（评论回答未做），恒为 0 */
-    private Integer commentCount;
-
     private LocalDateTime createTime;
 }

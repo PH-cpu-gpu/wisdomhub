@@ -55,21 +55,6 @@ public class Article implements Serializable {
     private Integer viewCount;
 
     /**
-     * 点赞数
-     */
-    private Integer likeCount;
-
-    /**
-     * 评论数
-     */
-    private Integer commentCount;
-
-    /**
-     * 收藏数
-     */
-    private Integer favoriteCount;
-
-    /**
      * 发布时间
      */
     private LocalDateTime publishTime;

@@ -43,6 +43,18 @@
             <artifactId>common-cache</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <!-- 点赞、评论、行为事件 -->
+        <dependency>
+            <groupId>com.wisdomhub</groupId>
+            <artifactId>common-mq</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <!-- 计数快照对账 XXL-JOB 执行器 -->
+        <dependency>
+            <groupId>com.wisdomhub</groupId>
+            <artifactId>common-job</artifactId>
+            <version>${project.version}</version>
+        </dependency>
 
         <dependency>
             <groupId>org.springframework.boot</groupId>

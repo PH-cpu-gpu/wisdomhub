@@ -156,40 +156,6 @@ INSERT IGNORE INTO tag (id, name, description, category, create_time, update_tim
     (129,  'Git',                 '版本控制',                            '开发实践',      NOW(), NOW()),
     (130,  '开源',                '开源项目与社区',                      '开发实践',      NOW(), NOW());
 
-CREATE TABLE comment (
-    id BIGINT PRIMARY KEY COMMENT '雪花 ID',
-    target_type TINYINT NOT NULL COMMENT '目标类型 1-文章 2-回答',
-    target_id BIGINT NOT NULL COMMENT '目标 ID',
-    user_id BIGINT NOT NULL COMMENT '评论者 ID',
-    parent_id BIGINT DEFAULT NULL COMMENT '父评论 ID，二级回复用；一级评论为 NULL',
-    content VARCHAR(1000) NOT NULL COMMENT '评论内容',
-    create_time DATETIME NOT NULL COMMENT '创建时间',
-    update_time DATETIME NOT NULL COMMENT '更新时间',
-    deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除 0-未删除 1-已删除',
-    INDEX idx_target (target_type, target_id, create_time),
-    INDEX idx_user_id (user_id),
-    INDEX idx_parent_id (parent_id),
-    INDEX idx_deleted_update (deleted, update_time)
-) ENGINE=InnoDB COMMENT='评论';
-
-CREATE TABLE article_like (
-    id BIGINT PRIMARY KEY COMMENT '雪花 ID',
-    user_id BIGINT NOT NULL COMMENT '用户 ID',
-    article_id BIGINT NOT NULL COMMENT '文章 ID',
-    create_time DATETIME NOT NULL COMMENT '点赞时间',
-    UNIQUE KEY uk_user_article (user_id, article_id),
-    INDEX idx_article_id (article_id)
-) ENGINE=InnoDB COMMENT='文章点赞';
-
-CREATE TABLE article_favorite (
-    id BIGINT PRIMARY KEY COMMENT '雪花 ID',
-    user_id BIGINT NOT NULL COMMENT '用户 ID',
-    article_id BIGINT NOT NULL COMMENT '文章 ID',
-    create_time DATETIME NOT NULL COMMENT '收藏时间',
-    UNIQUE KEY uk_user_article (user_id, article_id),
-    INDEX idx_article_id (article_id)
-) ENGINE=InnoDB COMMENT='文章收藏';
-
 CREATE TABLE `column` (
     id BIGINT PRIMARY KEY COMMENT '雪花 ID',
     user_id BIGINT NOT NULL COMMENT '创建者 ID',

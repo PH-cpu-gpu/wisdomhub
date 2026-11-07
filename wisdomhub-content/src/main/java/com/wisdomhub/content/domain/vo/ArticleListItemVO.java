@@ -30,10 +30,4 @@ public class ArticleListItemVO {
 
     /** 阅读量 = article.view_count 快照，由 B1.22 每 2 分钟从 Redis 落库，最热排序最多滞后 2 分钟 */
     private Integer viewCount;
-
-    private Integer likeCount;
-
-    private Integer commentCount;
-
-    private Integer favoriteCount;
 }

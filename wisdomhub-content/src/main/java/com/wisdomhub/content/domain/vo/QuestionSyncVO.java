@@ -24,8 +24,6 @@ public class QuestionSyncVO {
 
     private Integer answerCount;
 
-    private Integer favoriteCount;
-
     private Long acceptedAnswerId;
 
     private LocalDateTime createTime;

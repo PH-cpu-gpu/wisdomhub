@@ -16,6 +16,9 @@ public final class MqRoutingKeyConstants {
 
     public static final String QUESTION_CREATED = "question.created";
     public static final String QUESTION_DELETED = "question.deleted";
+
+    /** 互动目标删除级联：content/video → interaction */
+    public static final String TARGET_DELETED = "target.deleted";
     public static final String ANSWER_CREATED = "answer.created";
     public static final String ANSWER_LIKED = "answer.liked";
 

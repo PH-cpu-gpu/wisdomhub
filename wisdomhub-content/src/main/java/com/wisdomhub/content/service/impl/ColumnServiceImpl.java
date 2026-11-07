@@ -377,9 +377,6 @@ public class ColumnServiceImpl implements ColumnService {
                 .summary(article.getSummary())
                 .publishTime(article.getPublishTime())
                 .viewCount(article.getViewCount())
-                .likeCount(article.getLikeCount())
-                .commentCount(article.getCommentCount())
-                .favoriteCount(article.getFavoriteCount())
                 .build();
     }
 }

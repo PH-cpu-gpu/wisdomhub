@@ -20,3 +20,23 @@ spring:
 springdoc:
   api-docs:
     path: /api/interaction/v3/api-docs
+
+xxl:
+  job:
+    executor:
+      appname: wisdomhub-interaction-executor
+      port: 9994
+      log-path: ./logs/xxl-job
+      log-retention-days: 30
+
+wisdomhub:
+  reconcile:
+    count:
+      batch-size: 500
+      pause-millis: 50
+  cleanup:
+    comment:
+      retention-days: 7
+      batch-size: 1000
+      max-batches-per-run: 10
+      pause-millis: 100

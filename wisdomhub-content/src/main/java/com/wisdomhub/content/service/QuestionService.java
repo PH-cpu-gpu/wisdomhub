@@ -20,14 +20,8 @@ public interface QuestionService {
      */
     PageResponse<QuestionListItemVO> listQuestions(Integer page, Integer pageSize, String sort);
 
-    /** 问题详情。未删除才可见，游客可读；登录用户多一个 favorited 布尔 */
+    /** 问题详情。未删除才可见，游客可读 */
     QuestionDetailVO getQuestionDetail(Long questionId);
-
-    /** 收藏问题。设置状态类操作（17.3），幂等，返回最新收藏数 */
-    int favorite(Long questionId);
-
-    /** 取消收藏。幂等：没收藏过也返回 200 */
-    int unfavorite(Long questionId);
 
     /** 采纳答案。只有提问者本人；回答必须属于该问题。再采纳另一条就是改采纳 */
     void acceptAnswer(Long questionId, Long answerId);
@@ -35,15 +29,12 @@ public interface QuestionService {
     /** 取消采纳。只有「当前采纳的正是这一条」才会清空，否则不动（幂等） */
     void cancelAccept(Long questionId, Long answerId);
 
-    /**
-     * 删除问题：仅提问者本人。级联软删该问题下的全部回答（连同这些回答的评论），
-     * 并物理删掉关联行（answer_like / question_favorite）
-     */
+    /** 删除问题：仅提问者本人。级联软删该问题下的全部回答；互动数据由 interaction 消费 target.deleted 清理 */
     void deleteQuestion(Long questionId);
-
-    /** 我的问题收藏分页，按收藏时间倒序 */
-    PageResponse<QuestionListItemVO> listMyFavoriteQuestions(Integer page, Integer pageSize);
 
     /** 对账分页：按 (updateTime, id) 游标，since 为 epoch 表示全量；**包含已删行**，供增量发 question.deleted */
     List<QuestionSyncVO> syncQuestions(LocalDateTime since, Long lastId, Integer size);
+
+    /** 问题下所有回答 ID（含已删除），供 interaction 删除级联 */
+    List<Long> listAnswerIds(Long questionId);
 }

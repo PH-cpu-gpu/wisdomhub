@@ -7,14 +7,14 @@ import com.xxl.job.core.handler.annotation.XxlJob;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-/** 计数快照列对账，以明细 COUNT(*) 为准。 */
+/** 内容自有计数对账（回答数 / 专栏文章数），以明细 COUNT(*) 为准。 */
 @Component
 @RequiredArgsConstructor
 public class CountReconcileJob {
 
     private final CountReconcileService countReconcileService;
 
-    @XxlJob("countReconcileHandler")
+    @XxlJob("contentRelationCountReconcileHandler")
     public void reconcile() {
         try {
             CountReconcileResult result = countReconcileService.reconcile();

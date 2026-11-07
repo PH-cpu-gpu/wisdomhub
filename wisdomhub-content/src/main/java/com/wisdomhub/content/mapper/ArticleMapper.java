@@ -18,14 +18,6 @@ import org.apache.ibatis.annotations.Param;
 public interface ArticleMapper extends BaseMapper<Article> {
 
     /**
-     * 我的收藏分页。
-     */
-    IPage<Article> selectFavoritePage(IPage<Article> page,
-                                      @Param("userId") Long userId,
-                                      @Param("state") Integer state,
-                                      @Param("deleted") Integer deleted);
-
-    /**
      * 专栏内文章分页，按归入时间升序（章节顺序，不是文章发布时间）。
      */
     IPage<Article> selectColumnArticlePage(IPage<Article> page,

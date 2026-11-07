@@ -8,6 +8,7 @@ import com.wisdomhub.common.core.constants.ContentTargetTypeConstants;
 import com.wisdomhub.common.core.exception.BusinessException;
 import com.wisdomhub.common.core.result.CommonErrorCode;
 import com.wisdomhub.common.core.result.PageResponse;
+import com.wisdomhub.common.feign.dto.TargetInfoDTO;
 import com.wisdomhub.common.web.util.CurrentUserUtil;
 import com.wisdomhub.common.web.util.OwnerUtil;
 import com.wisdomhub.common.web.util.PageUtil;
@@ -18,6 +19,7 @@ import com.wisdomhub.interaction.domain.vo.CommentVO;
 import com.wisdomhub.interaction.mapper.CommentMapper;
 import com.wisdomhub.interaction.mapper.InteractionCountMapper;
 import com.wisdomhub.interaction.service.CommentService;
+import com.wisdomhub.interaction.service.InteractionEventPublisher;
 import com.wisdomhub.interaction.service.TargetValidator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -43,6 +45,7 @@ public class CommentServiceImpl implements CommentService {
     private final CommentMapper commentMapper;
     private final InteractionCountMapper interactionCountMapper;
     private final TargetValidator targetValidator;
+    private final InteractionEventPublisher eventPublisher;
 
     @Override
     @Transactional
@@ -50,7 +53,7 @@ public class CommentServiceImpl implements CommentService {
         Long userId = CurrentUserUtil.id();
         int targetType = resolveTargetType(dto.getTargetType());
         Long targetId = dto.getTargetId();
-        targetValidator.requireVisible(targetType, targetId);
+        TargetInfoDTO target = targetValidator.requireVisible(targetType, targetId);
         Long parentId = normalizeParentId(dto.getParentId(), targetType, targetId);
 
         Comment comment = Comment.builder()
@@ -65,6 +68,7 @@ public class CommentServiceImpl implements CommentService {
 
         interactionCountMapper.addCommentCount(IdWorker.getId(), targetType, targetId, 1,
                 LocalDateTime.now(ZoneOffset.UTC));
+        eventPublisher.commentCreated(comment.getId(), targetType, targetId, userId, target.getOwnerId());
         return comment.getId();
     }
 

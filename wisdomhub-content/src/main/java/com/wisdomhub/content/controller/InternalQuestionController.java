@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -32,5 +33,11 @@ public class InternalQuestionController {
             @RequestParam(defaultValue = "0") Long lastId,
             @RequestParam(required = false) Integer size) {
         return R.success(questionService.syncQuestions(since, lastId, size));
+    }
+
+    @Operation(summary = "问题下所有回答 ID（含已删除），供 interaction 删除级联")
+    @GetMapping("/question/{id}/answer/ids")
+    public R<List<Long>> answerIds(@PathVariable("id") Long questionId) {
+        return R.success(questionService.listAnswerIds(questionId));
     }
 }

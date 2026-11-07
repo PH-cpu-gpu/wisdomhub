@@ -37,12 +37,6 @@ public class ArticleInternalVO {
 
     private Integer viewCount;
 
-    private Integer likeCount;
-
-    private Integer commentCount;
-
-    private Integer favoriteCount;
-
     private List<ArticleTagVO> tags;
 
     /** markdown 原文，来自 MongoDB。正文缺失时单篇接口报错、批量接口跳过该行 */

@@ -1,5 +1,7 @@
 package com.wisdomhub.interaction.mapper;
 
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.wisdomhub.interaction.domain.entity.InteractionCount;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -8,7 +10,7 @@ import org.apache.ibatis.annotations.Select;
 import java.time.LocalDateTime;
 
 @Mapper
-public interface InteractionCountMapper {
+public interface InteractionCountMapper extends BaseMapper<InteractionCount> {
 
     /**
      * 计数行不存在则插入，存在则原子增减；负值时不会减成负数。

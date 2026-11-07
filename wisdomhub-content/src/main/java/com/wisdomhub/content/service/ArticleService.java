@@ -48,11 +48,6 @@ public interface ArticleService {
     PageResponse<ArticleListItemVO> listArticles(Integer page, Integer pageSize, String sort,
                                                  Long tagId, Long authorId);
 
-    /**
-     * 我的收藏分页，按收藏时间倒序（不是文章发布时间）。join 过滤掉草稿 / 下架 / 已删的文章，
-     */
-    PageResponse<ArticleListItemVO> listMyFavorites(Integer page, Integer pageSize);
-
     /** 删除已发布文章（仅作者本人；草稿走 deleteDraft）。级联清关联行，再删正文与阅读量 key */
     void deleteArticle(Long articleId);
 
@@ -68,4 +63,7 @@ public interface ArticleService {
 
     /** 批量判断文章是否存在（未删除），供 knowledge 图谱对账 */
     List<Long> existingArticleIds(List<Long> articleIds);
+
+    /** 文章标签 ID 列表，供 interaction 发行为事件 */
+    List<Long> listArticleTagIds(Long articleId);
 }

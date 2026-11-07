@@ -56,13 +56,6 @@ public class ArticleController {
         return R.success(articleService.getDetail(articleId));
     }
 
-    @Operation(summary = "我的收藏")
-    @GetMapping("/article/collect")
-    public R<PageResponse<ArticleListItemVO>> myFavorites(@RequestParam(defaultValue = "1") Integer page,
-                                                          @RequestParam(defaultValue = "10") Integer pageSize) {
-        return R.success(articleService.listMyFavorites(page, pageSize));
-    }
-
     @Operation(summary = "按 ID 批量取文章摘要")
     @GetMapping("/article/brief")
     public R<List<ArticleBriefVO>> listBrief(@RequestParam("articleIds") List<Long> articleIds) {

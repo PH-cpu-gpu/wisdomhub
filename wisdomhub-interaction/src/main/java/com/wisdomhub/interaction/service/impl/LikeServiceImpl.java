@@ -5,11 +5,14 @@ import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.wisdomhub.common.core.constants.ContentTargetTypeConstants;
 import com.wisdomhub.common.core.exception.BusinessException;
 import com.wisdomhub.common.core.result.CommonErrorCode;
+import com.wisdomhub.common.feign.dto.TargetInfoDTO;
+import com.wisdomhub.common.mq.constants.BehaviorTypeConstants;
 import com.wisdomhub.common.web.util.CurrentUserUtil;
 import com.wisdomhub.interaction.constants.InteractionRedisKeyConstants;
 import com.wisdomhub.interaction.domain.entity.ContentLike;
 import com.wisdomhub.interaction.mapper.ContentLikeMapper;
 import com.wisdomhub.interaction.mapper.InteractionCountMapper;
+import com.wisdomhub.interaction.service.InteractionEventPublisher;
 import com.wisdomhub.interaction.service.InteractionGate;
 import com.wisdomhub.interaction.service.LikeService;
 import com.wisdomhub.interaction.service.TargetValidator;
@@ -34,6 +37,7 @@ public class LikeServiceImpl implements LikeService {
     private final InteractionCountMapper interactionCountMapper;
     private final TargetValidator targetValidator;
     private final InteractionGate interactionGate;
+    private final InteractionEventPublisher eventPublisher;
 
     @Override
     @Transactional
@@ -58,9 +62,10 @@ public class LikeServiceImpl implements LikeService {
             return readLikeCount(type, targetId);
         }
 
+        TargetInfoDTO target;
         try {
             // 插入后再校验一次：校验之后被并发下架/删除时回滚这次点赞
-            targetValidator.requireVisible(type, targetId);
+            target = targetValidator.requireVisible(type, targetId);
         } catch (RuntimeException e) {
             interactionGate.clear(gateKey);
             throw e;
@@ -68,6 +73,12 @@ public class LikeServiceImpl implements LikeService {
 
         interactionCountMapper.addLikeCount(IdWorker.getId(), type, targetId, 1,
                 LocalDateTime.now(ZoneOffset.UTC));
+        if (type == ContentTargetTypeConstants.ARTICLE) {
+            eventPublisher.articleLiked(targetId, userId, target.getOwnerId());
+            eventPublisher.behaviorRecorded(type, targetId, userId, BehaviorTypeConstants.LIKE);
+        } else {
+            eventPublisher.answerLiked(targetId, userId, target.getOwnerId());
+        }
         return readLikeCount(type, targetId);
     }
 

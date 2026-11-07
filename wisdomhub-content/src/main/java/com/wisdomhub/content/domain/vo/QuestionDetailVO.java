@@ -27,16 +27,11 @@ public class QuestionDetailVO {
 
     private Integer answerCount;
 
-    private Integer favoriteCount;
-
     /** 未采纳为 null */
     private Long acceptedAnswerId;
 
     /** 已采纳时是被采纳的回答，否则 null */
     private AnswerVO acceptedAnswer;
-
-    /** 当前登录用户是否已收藏。详情是可选登录路径，游客恒 false（同 B1.26） */
-    private Boolean favorited;
 
     private LocalDateTime createTime;
 }

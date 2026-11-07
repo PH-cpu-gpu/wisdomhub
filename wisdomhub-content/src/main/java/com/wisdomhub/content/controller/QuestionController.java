@@ -48,13 +48,6 @@ public class QuestionController {
         return R.success(questionService.listQuestions(page, pageSize, sort));
     }
 
-    @Operation(summary = "我的问题收藏")
-    @GetMapping("/favorite")
-    public R<PageResponse<QuestionListItemVO>> myFavorites(@RequestParam(defaultValue = "1") Integer page,
-                                                           @RequestParam(defaultValue = "10") Integer pageSize) {
-        return R.success(questionService.listMyFavoriteQuestions(page, pageSize));
-    }
-
     @Operation(summary = "问题详情")
     @GetMapping("/{questionId}")
     public R<QuestionDetailVO> detail(@PathVariable Long questionId) {
@@ -66,18 +59,6 @@ public class QuestionController {
     public R<Void> delete(@PathVariable Long questionId) {
         questionService.deleteQuestion(questionId);
         return R.success();
-    }
-
-    @Operation(summary = "收藏问题")
-    @PutMapping("/{questionId}/favorite")
-    public R<Integer> favorite(@PathVariable Long questionId) {
-        return R.success(questionService.favorite(questionId));
-    }
-
-    @Operation(summary = "取消收藏")
-    @DeleteMapping("/{questionId}/favorite")
-    public R<Integer> unfavorite(@PathVariable Long questionId) {
-        return R.success(questionService.unfavorite(questionId));
     }
 
     @Operation(summary = "采纳答案")

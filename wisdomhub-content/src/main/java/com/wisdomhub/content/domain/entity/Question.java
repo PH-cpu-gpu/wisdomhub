@@ -39,9 +39,6 @@ public class Question implements Serializable {
     /** 回答数，快照列，只由发表/删除回答原子 UPDATE */
     private Integer answerCount;
 
-    /** 收藏数，快照列 */
-    private Integer favoriteCount;
-
     /**
      * 采纳的回答 ID，未采纳为 NULL。只有一列 → 采纳是可以改的（PUT 覆盖），
      * 不是「只能采纳一次」；取消采纳就是置回 NULL

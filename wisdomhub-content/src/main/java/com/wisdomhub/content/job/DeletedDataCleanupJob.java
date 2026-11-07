@@ -7,7 +7,7 @@ import com.xxl.job.core.handler.annotation.XxlJob;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-/** 墓碑物理清理；参数空/all，或 comment|answer|question|article|column 单跑。 */
+/** 墓碑物理清理；参数空/all，或 answer|question|article|column 单跑。 */
 @Component
 @RequiredArgsConstructor
 public class DeletedDataCleanupJob {

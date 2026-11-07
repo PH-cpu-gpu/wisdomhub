@@ -13,10 +13,7 @@ import lombok.NoArgsConstructor;
 import java.io.Serializable;
 import java.time.LocalDateTime;
 
-/**
- * 回答。正文同 {@link Question} 留在 MySQL。
- * comment_count 列存在但 B1.28 没有写入方 —— 评论回答（comment.target_type=2）还没做
- */
+/** 回答。正文同 {@link Question} 留在 MySQL；点赞/评论计数归 interaction。 */
 @Data
 @Builder
 @NoArgsConstructor
@@ -34,12 +31,6 @@ public class Answer implements Serializable {
     private Long userId;
 
     private String content;
-
-    /** 点赞数，快照列 */
-    private Integer likeCount;
-
-    /** 评论数，快照列。B1.28 无写入方，见类注释 */
-    private Integer commentCount;
 
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;

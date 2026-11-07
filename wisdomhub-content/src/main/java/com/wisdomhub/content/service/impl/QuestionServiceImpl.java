@@ -3,8 +3,8 @@ package com.wisdomhub.content.service.impl;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
-import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.wisdomhub.common.core.constants.ContentTargetTypeConstants;
 import com.wisdomhub.common.core.exception.BusinessException;
 import com.wisdomhub.common.core.result.CommonErrorCode;
 import com.wisdomhub.common.core.result.PageResponse;
@@ -14,34 +14,24 @@ import com.wisdomhub.common.mq.event.QuestionDeletedEvent;
 import com.wisdomhub.common.mq.event.payload.QuestionDeletedPayload;
 import com.wisdomhub.common.mq.event.payload.QuestionEventPayload;
 import com.wisdomhub.common.mq.util.EventPublisher;
-import com.wisdomhub.common.redis.constants.RedisTtl;
 import com.wisdomhub.common.security.context.UserContext;
 import com.wisdomhub.common.web.util.CurrentUserUtil;
 import com.wisdomhub.common.web.util.OwnerUtil;
 import com.wisdomhub.common.web.util.PageUtil;
-import com.wisdomhub.content.constants.CommentConstants;
 import com.wisdomhub.content.constants.QuestionConstants;
-import com.wisdomhub.content.constants.QuestionRedisKeyConstants;
 import com.wisdomhub.content.domain.dto.QuestionCreateDTO;
 import com.wisdomhub.content.domain.entity.Answer;
-import com.wisdomhub.content.domain.entity.AnswerLike;
-import com.wisdomhub.content.domain.entity.Comment;
 import com.wisdomhub.content.domain.entity.Question;
-import com.wisdomhub.content.domain.entity.QuestionFavorite;
 import com.wisdomhub.content.domain.vo.AnswerVO;
 import com.wisdomhub.content.domain.vo.QuestionDetailVO;
 import com.wisdomhub.content.domain.vo.QuestionListItemVO;
 import com.wisdomhub.content.domain.vo.QuestionSyncVO;
-import com.wisdomhub.content.mapper.AnswerLikeMapper;
 import com.wisdomhub.content.mapper.AnswerMapper;
-import com.wisdomhub.content.mapper.CommentMapper;
-import com.wisdomhub.content.mapper.QuestionFavoriteMapper;
 import com.wisdomhub.content.mapper.QuestionMapper;
+import com.wisdomhub.content.mq.TargetDeletedEventSender;
 import com.wisdomhub.content.service.QuestionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.dao.DuplicateKeyException;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -57,18 +47,14 @@ import java.util.Locale;
 @RequiredArgsConstructor
 public class QuestionServiceImpl implements QuestionService {
 
-    private static final String FAVORITE_COUNT_COLUMN = "favorite_count";
 
     private static final int SYNC_DEFAULT_SIZE = 200;
     private static final int SYNC_MAX_SIZE = 500;
 
     private final QuestionMapper questionMapper;
-    private final QuestionFavoriteMapper questionFavoriteMapper;
     private final AnswerMapper answerMapper;
-    private final AnswerLikeMapper answerLikeMapper;
-    private final CommentMapper commentMapper;
-    private final StringRedisTemplate stringRedisTemplate;
     private final EventPublisher eventPublisher;
+    private final TargetDeletedEventSender targetDeletedEventSender;
 
     // ==================== 读 ====================
 
@@ -76,7 +62,7 @@ public class QuestionServiceImpl implements QuestionService {
     public PageResponse<QuestionListItemVO> listQuestions(Integer page, Integer pageSize, String sort) {
         LambdaQueryWrapper<Question> wrapper = new LambdaQueryWrapper<Question>()
                 .select(Question::getId, Question::getUserId, Question::getTitle, Question::getAnswerCount,
-                        Question::getFavoriteCount, Question::getAcceptedAnswerId, Question::getCreateTime)
+                        Question::getAcceptedAnswerId, Question::getCreateTime)
                 .eq(Question::getDeleted, QuestionConstants.NOT_DELETED);
         applySort(wrapper, sort);
 
@@ -115,19 +101,10 @@ public class QuestionServiceImpl implements QuestionService {
                 .title(question.getTitle())
                 .content(question.getContent())
                 .answerCount(question.getAnswerCount())
-                .favoriteCount(question.getFavoriteCount())
                 .acceptedAnswerId(question.getAcceptedAnswerId())
                 .acceptedAnswer(accepted == null ? null : toAnswerVO(accepted))
-                .favorited(resolveFavorited(questionId))
                 .createTime(question.getCreateTime())
                 .build();
-    }
-
-    @Override
-    public PageResponse<QuestionListItemVO> listMyFavoriteQuestions(Integer page, Integer pageSize) {
-        IPage<Question> result = questionMapper.selectFavoritePage(PageUtil.of(page, pageSize),
-                CurrentUserUtil.id(), QuestionConstants.NOT_DELETED);
-        return PageUtil.toResponse(result, result.getRecords().stream().map(this::toListItem).toList());
     }
 
     // ==================== 写 ====================
@@ -139,57 +116,11 @@ public class QuestionServiceImpl implements QuestionService {
                 .title(dto.getTitle())
                 .content(dto.getContent())
                 .answerCount(0)
-                .favoriteCount(0)
                 .deleted(QuestionConstants.NOT_DELETED.byteValue())
                 .build();
         questionMapper.insert(question);
         publishQuestionCreated(question.getId());
         return question.getId();
-    }
-
-    @Override
-    @Transactional
-    public int favorite(Long questionId) {
-        Long userId = CurrentUserUtil.id();
-        Question question = requireVisibleQuestion(questionId);
-        String gateKey = QuestionRedisKeyConstants.QUESTION_FAVORITE_ONCE_KEY + userId + ":" + questionId;
-        if (!passGate(gateKey)) {
-            // 窗口内已收藏且没取消：直接返回，不碰 DB
-            return question.getFavoriteCount();
-        }
-        try {
-            questionFavoriteMapper.insert(QuestionFavorite.builder()
-                    .userId(userId)
-                    .questionId(questionId)
-                    .build());
-        } catch (DuplicateKeyException e) {
-            // Redis 丢过 key 但关系行还在：幂等返回 200，不能让它冒成 409
-            return question.getFavoriteCount();
-        }
-        if (bumpFavoriteCount(questionId, 1) == 0) {
-            // 校验之后问题被并发删除：回滚这次插入，并撤掉 gate，别把用户白拦一个窗口
-            clearGate(gateKey);
-            throw new BusinessException(CommonErrorCode.NOT_FOUND, "问题不存在");
-        }
-        return readFavoriteCount(questionId);
-    }
-
-    @Override
-    @Transactional
-    public int unfavorite(Long questionId) {
-        Long userId = CurrentUserUtil.id();
-        Question question = requireVisibleQuestion(questionId);
-        // 先撤 gate：不撤的话用户在这个窗口内没法再收藏回来
-        clearGate(QuestionRedisKeyConstants.QUESTION_FAVORITE_ONCE_KEY + userId + ":" + questionId);
-        int deleted = questionFavoriteMapper.delete(new LambdaQueryWrapper<QuestionFavorite>()
-                .eq(QuestionFavorite::getUserId, userId)
-                .eq(QuestionFavorite::getQuestionId, questionId));
-        if (deleted == 0) {
-            // 本来就没收藏过：幂等，不是错误
-            return question.getFavoriteCount();
-        }
-        bumpFavoriteCount(questionId, -1);
-        return readFavoriteCount(questionId);
     }
 
     @Override
@@ -228,20 +159,6 @@ public class QuestionServiceImpl implements QuestionService {
                 .eq(Answer::getQuestionId, questionId)
                 .eq(Answer::getDeleted, QuestionConstants.NOT_DELETED));
 
-        // 这些回答的评论一起软删 —— 与 deleteAnswer 同一条语句，这里把 target 从一个回答换成一整批。
-        // 子查询读的是刚软删过的 answer 行（还在表里），照样能捞到它们的 id
-        commentMapper.update(null, new LambdaUpdateWrapper<Comment>()
-                .set(Comment::getDeleted, CommentConstants.DELETED.byteValue())
-                .set(Comment::getUpdateTime, now)
-                .eq(Comment::getTargetType, CommentConstants.TARGET_TYPE_ANSWER.byteValue())
-                .inSql(Comment::getTargetId, "SELECT id FROM answer WHERE question_id = " + questionId)
-                .eq(Comment::getDeleted, CommentConstants.NOT_DELETED));
-
-        answerLikeMapper.delete(new LambdaQueryWrapper<AnswerLike>()
-                .inSql(AnswerLike::getAnswerId, "SELECT id FROM answer WHERE question_id = " + questionId));
-        questionFavoriteMapper.delete(new LambdaQueryWrapper<QuestionFavorite>()
-                .eq(QuestionFavorite::getQuestionId, questionId));
-
         // 本方法是 @Transactional，直接发会在回滚时留下「消息发了但问题还在」
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
@@ -252,6 +169,7 @@ public class QuestionServiceImpl implements QuestionService {
                         .build()));
             }
         });
+        targetDeletedEventSender.sendAfterCommit(ContentTargetTypeConstants.QUESTION, questionId);
     }
 
     // ==================== 事件 ====================
@@ -267,7 +185,6 @@ public class QuestionServiceImpl implements QuestionService {
                 .title(question.getTitle())
                 .content(question.getContent())
                 .answerCount(question.getAnswerCount())
-                .favoriteCount(question.getFavoriteCount())
                 .acceptedAnswerId(question.getAcceptedAnswerId())
                 .createTime(question.getCreateTime())
                 .updateTime(question.getUpdateTime())
@@ -317,64 +234,13 @@ public class QuestionServiceImpl implements QuestionService {
                 .eq(expectCurrent != null, Question::getAcceptedAnswerId, expectCurrent));
     }
 
-    /** 防重前置拦截：SETNX 成功 = 窗口内首次，失败 = 窗口内已收藏。Redis 不可用时一律放行 */
-    private boolean passGate(String gateKey) {
-        try {
-            return Boolean.TRUE.equals(stringRedisTemplate.opsForValue()
-                    .setIfAbsent(gateKey, "1", RedisTtl.LIKE_ONCE));
-        } catch (Exception e) {
-            log.warn("防重前置拦截不可用, 放行由唯一索引兜底: key={}", gateKey, e);
-            return true;
-        }
-    }
-
-    /** 撤掉 gate：取消操作，或本次操作实际没生效。清不掉只记日志，TTL 会自愈 */
-    private void clearGate(String gateKey) {
-        try {
-            stringRedisTemplate.delete(gateKey);
-        } catch (Exception e) {
-            log.warn("防重 gate 清除失败, 等 TTL 自愈: key={}", gateKey, e);
-        }
-    }
-
-    /**
-     * 收藏数原子增减，绝不读改写。不 bump update_time（同 B1.26：纯计数不该把整行写一遍）。
-     * delta 为负时带非负安全网
-     */
-    private int bumpFavoriteCount(Long questionId, int delta) {
-        LambdaUpdateWrapper<Question> wrapper = new LambdaUpdateWrapper<Question>()
-                .setSql(FAVORITE_COUNT_COLUMN + " = " + FAVORITE_COUNT_COLUMN + " + " + delta)
-                .eq(Question::getId, questionId)
-                .eq(Question::getDeleted, QuestionConstants.NOT_DELETED);
-        if (delta < 0) {
-            wrapper.ge(Question::getFavoriteCount, 1);
-        }
-        return questionMapper.update(null, wrapper);
-    }
-
-    /** 成功路径读回最新收藏数。列是 NOT NULL DEFAULT 0，判空只防「事务内被并发硬删」 */
-    private int readFavoriteCount(Long questionId) {
-        Question latest = questionMapper.selectById(questionId);
-        if (latest == null || latest.getFavoriteCount() == null) {
-            return 0;
-        }
-        return latest.getFavoriteCount();
-    }
-
-    private boolean resolveFavorited(Long questionId) {
-        Long userId = UserContext.getUserId();
-        return userId != null && questionFavoriteMapper.exists(new LambdaQueryWrapper<QuestionFavorite>()
-                .eq(QuestionFavorite::getUserId, userId)
-                .eq(QuestionFavorite::getQuestionId, questionId));
-    }
-
     @Override
     public List<QuestionSyncVO> syncQuestions(LocalDateTime since, Long lastId, Integer size) {
         int limit = (size == null || size <= 0) ? SYNC_DEFAULT_SIZE : Math.min(size, SYNC_MAX_SIZE);
         long cursor = lastId == null ? 0L : lastId;
         LambdaQueryWrapper<Question> wrapper = new LambdaQueryWrapper<Question>()
                 .select(Question::getId, Question::getUserId, Question::getTitle, Question::getContent,
-                        Question::getAnswerCount, Question::getFavoriteCount, Question::getAcceptedAnswerId,
+                        Question::getAnswerCount, Question::getAcceptedAnswerId,
                         Question::getCreateTime, Question::getUpdateTime, Question::getDeleted);
         if (since == null) {
             wrapper.gt(Question::getId, cursor).orderByAsc(Question::getId);
@@ -391,7 +257,6 @@ public class QuestionServiceImpl implements QuestionService {
                         .title(question.getTitle())
                         .content(question.getContent())
                         .answerCount(question.getAnswerCount())
-                        .favoriteCount(question.getFavoriteCount())
                         .acceptedAnswerId(question.getAcceptedAnswerId())
                         .createTime(question.getCreateTime())
                         .updateTime(question.getUpdateTime())
@@ -406,7 +271,6 @@ public class QuestionServiceImpl implements QuestionService {
                 .userId(question.getUserId())
                 .title(question.getTitle())
                 .answerCount(question.getAnswerCount())
-                .favoriteCount(question.getFavoriteCount())
                 .solved(question.getAcceptedAnswerId() != null)
                 .createTime(question.getCreateTime())
                 .build();
@@ -418,9 +282,17 @@ public class QuestionServiceImpl implements QuestionService {
                 .questionId(answer.getQuestionId())
                 .userId(answer.getUserId())
                 .content(answer.getContent())
-                .likeCount(answer.getLikeCount())
-                .commentCount(answer.getCommentCount())
                 .createTime(answer.getCreateTime())
                 .build();
+    }
+
+    @Override
+    public List<Long> listAnswerIds(Long questionId) {
+        return answerMapper.selectList(new LambdaQueryWrapper<Answer>()
+                        .select(Answer::getId)
+                        .eq(Answer::getQuestionId, questionId))
+                .stream()
+                .map(Answer::getId)
+                .toList();
     }
 }

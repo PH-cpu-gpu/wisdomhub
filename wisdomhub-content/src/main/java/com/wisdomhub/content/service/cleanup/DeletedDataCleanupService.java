@@ -10,18 +10,15 @@ import com.wisdomhub.content.config.CleanupProperties;
 import com.wisdomhub.content.constants.ArticleConstants;
 import com.wisdomhub.content.constants.ArticleRedisKeyConstants;
 import com.wisdomhub.content.constants.ColumnConstants;
-import com.wisdomhub.content.constants.CommentConstants;
 import com.wisdomhub.content.constants.QuestionConstants;
 import com.wisdomhub.content.domain.document.ArticleContent;
 import com.wisdomhub.content.domain.entity.Answer;
 import com.wisdomhub.content.domain.entity.Article;
 import com.wisdomhub.content.domain.entity.Column;
-import com.wisdomhub.content.domain.entity.Comment;
 import com.wisdomhub.content.domain.entity.Question;
 import com.wisdomhub.content.mapper.AnswerMapper;
 import com.wisdomhub.content.mapper.ArticleMapper;
 import com.wisdomhub.content.mapper.ColumnMapper;
-import com.wisdomhub.content.mapper.CommentMapper;
 import com.wisdomhub.content.mapper.QuestionMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -44,7 +41,6 @@ import java.util.Locale;
 public class DeletedDataCleanupService {
 
     private final ArticleMapper articleMapper;
-    private final CommentMapper commentMapper;
     private final QuestionMapper questionMapper;
     private final AnswerMapper answerMapper;
     private final ColumnMapper columnMapper;
@@ -59,13 +55,11 @@ public class DeletedDataCleanupService {
         String target = step == null || step.isBlank() ? "all" : step.trim().toLowerCase(Locale.ROOT);
         switch (target) {
             case "all" -> {
-                cleanupComments(result);
                 cleanupAnswers(result);
                 cleanupQuestions(result);
                 cleanupArticles(result);
                 cleanupColumns(result);
             }
-            case "comment" -> cleanupComments(result);
             case "answer" -> cleanupAnswers(result);
             case "question" -> cleanupQuestions(result);
             case "article" -> cleanupArticles(result);
@@ -73,40 +67,6 @@ public class DeletedDataCleanupService {
             default -> throw new IllegalArgumentException("未知清理步骤: " + step);
         }
         return result;
-    }
-
-    private void cleanupComments(CleanupResult result) {
-        LocalDateTime cutoff = cutoff();
-        int scanned = 0;
-        int deleted = 0;
-        int failed = 0;
-        for (int batch = 0; batch < properties.getMaxBatchesPerRun(); batch++) {
-            List<Comment> rows = commentMapper.selectList(new LambdaQueryWrapper<Comment>()
-                    .select(Comment::getId)
-                    .eq(Comment::getDeleted, CommentConstants.DELETED.byteValue())
-                    .lt(Comment::getUpdateTime, cutoff)
-                    .orderByAsc(Comment::getUpdateTime)
-                    .orderByAsc(Comment::getId)
-                    .last("LIMIT " + properties.getBatchSize()));
-            if (rows.isEmpty()) {
-                break;
-            }
-            scanned += rows.size();
-            List<Long> ids = rows.stream().map(Comment::getId).toList();
-            try {
-                deleted += commentMapper.delete(new LambdaQueryWrapper<Comment>()
-                        .in(Comment::getId, ids)
-                        .eq(Comment::getDeleted, CommentConstants.DELETED.byteValue()));
-            } catch (RuntimeException e) {
-                log.error("清理 comment 墓碑失败, size={}", ids.size(), e);
-                failed++;
-                break;
-            }
-            if (rows.size() < properties.getBatchSize() || !pause()) {
-                break;
-            }
-        }
-        result.add("comment", scanned, deleted, 0, failed);
     }
 
     private void cleanupAnswers(CleanupResult result) {
