@@ -1,6 +1,6 @@
 # Nacos 配置模板
 
-`config/` 下是 WisdomHub 全部 13 个 Nacos 配置的**脱敏模板**，由本地 Nacos 导出后逐项脱敏生成，
+`config/` 下是 WisdomHub 全部 15 个 Nacos 配置的**脱敏模板**，由本地 Nacos 导出后逐项脱敏生成，
 随仓库一起维护，保证新环境能按照 `application-*.yml` 的 `spring.config.import` 声明复现出完整配置。
 
 ## 为什么需要
@@ -30,13 +30,15 @@ docker/nacos/
 │   ├── user-service.yaml.example
 │   ├── content-service.yaml.example
 │   ├── interaction-service.yaml.example
+│   ├── video-service.yaml.example
 │   ├── search-service.yaml.example
 │   ├── knowledge-service.yaml.example
 │   ├── recommendation-service.yaml.example
 │   ├── notification-service.yaml.example
 │   ├── order-service.yaml.example
 │   ├── agent-service.yaml.example
-│   └── cos-key.yaml.example
+│   ├── cos-key.yaml.example
+│   └── mps-key.yaml.example
 ├── import.ps1                   # Windows 批量导入
 └── import.sh                    # macOS / Linux 批量导入
 ```
@@ -56,7 +58,7 @@ docker/nacos/
    bash docker/nacos/import.sh
    ```
 
-3. **验证**：登录控制台 <http://127.0.0.1:8849>，在 `wisdomhub` 命名空间下应能看到 13 个配置。
+3. **验证**：登录控制台 <http://127.0.0.1:8849>，在 `wisdomhub` 命名空间下应能看到 15 个配置。
 
 ## DataId 一览
 
@@ -68,13 +70,15 @@ docker/nacos/
 | `user-service.yaml` | 用户服务：数据源、Redis、上传大小、XXL 执行器、OpenAPI 路径、JWT 私钥 |
 | `content-service.yaml` | 内容服务：数据源、Redis、MongoDB、Seata、对账与清理参数 |
 | `interaction-service.yaml` | 互动服务：数据源、Redis、XXL 执行器与计数对账、OpenAPI 路径 |
+| `video-service.yaml` | 视频服务：数据源、OpenAPI 路径 |
 | `search-service.yaml` | 搜索服务：Elasticsearch、Redis、XXL 执行器、对账参数 |
 | `knowledge-service.yaml` | 知识图谱服务：Neo4j、Redis、XXL 执行器 |
 | `recommendation-service.yaml` | 推荐服务：Redis、Caffeine/Redis 缓存 TTL |
 | `notification-service.yaml` | 通知服务：数据源、Redis、死信重放 |
 | `order-service.yaml` | 订单服务：数据源、Redis、Seata |
 | `agent-service.yaml` | Agent 的 Spring 侧配置：Redis、MongoDB、OpenAPI 路径 |
-| `cos-key.yaml` | 腾讯云 COS 凭据（头像上传） |
+| `cos-key.yaml` | 腾讯云 COS 凭据（头像上传、视频源文件） |
+| `mps-key.yaml` | 腾讯云 MPS 凭据与区域（视频转码） |
 
 ## 占位符说明
 

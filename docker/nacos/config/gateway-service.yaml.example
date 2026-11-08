@@ -62,6 +62,16 @@ spring:
                 key-resolver: "#{@userOrIpKeyResolver}"
                 redis-rate-limiter.replenish-rate: 20
                 redis-rate-limiter.burst-capacity: 40
+        - id: video
+          uri: lb://video-service
+          predicates:
+            - Path=/api/video/**
+          filters:
+            - name: RequestRateLimiter
+              args:
+                key-resolver: "#{@userOrIpKeyResolver}"
+                redis-rate-limiter.replenish-rate: 10
+                redis-rate-limiter.burst-capacity: 20
         - id: search
           uri: lb://search-service
           predicates:
@@ -154,6 +164,8 @@ springdoc:
         url: /api/content/v3/api-docs
       - name: interaction-service
         url: /api/interaction/v3/api-docs
+      - name: video-service
+        url: /api/video/v3/api-docs
       - name: search-service
         url: /api/search/v3/api-docs
       - name: knowledge-service
@@ -182,6 +194,7 @@ url:
     - /api/auth/code
     - /api/notification/ws
     - /api/interaction/ping
+    - /api/video/ping
     - /api/user/profile/
     # Swagger：页面 + 静态资源 + 网关自己的 swagger-config
     - /swagger-ui
@@ -191,6 +204,7 @@ url:
     - /api/user/v3/api-docs
     - /api/content/v3/api-docs
     - /api/interaction/v3/api-docs
+    - /api/video/v3/api-docs
     - /api/search/v3/api-docs
     - /api/knowledge/v3/api-docs
     - /api/recommendation/v3/api-docs
@@ -201,6 +215,9 @@ url:
     # 互动读路径公开：游客可看评论/计数，带合法 token 则透传 X-User-Id；
     # 写接口由服务内 CurrentUserUtil 强制登录
     - /api/interaction
+    # 视频读路径公开：游客可看列表/详情，带合法 token 则透传 X-User-Id；
+    # 上传/发布由服务内 CurrentUserUtil 强制登录
+    - /api/video
     # 搜索是公开读路径：游客可搜，带合法 token 则透传 X-User-Id（B2.4）
     - /api/search
     - /api/content/column

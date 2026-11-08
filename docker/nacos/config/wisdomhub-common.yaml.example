@@ -28,6 +28,7 @@ wisdomhub:
         - recommendation-service
         - search-service
         - user-service
+        - video-service
         - agent-engine
       timestamp-window-seconds: 300
       nonce-ttl-seconds: 300

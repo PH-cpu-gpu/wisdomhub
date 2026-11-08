@@ -1,0 +1,14 @@
+# =============================================================================
+# Nacos 配置模板（已脱敏）
+# DataId   : mps-key.yaml
+# Group    : DEFAULT_GROUP
+# Namespace: wisdomhub
+#
+# 导入前请把 change-me 替换为实际值。
+# 导入方式见 docker/nacos/README.md
+# =============================================================================
+mps:
+  secret-id: change-me
+  secret-key: change-me
+  region: ap-shanghai
+  endpoint: mps.tencentcloudapi.com

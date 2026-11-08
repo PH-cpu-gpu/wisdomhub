@@ -1,0 +1,11 @@
+spring:
+  cloud:
+    nacos:
+      server-addr: 127.0.0.1:8848
+  config:
+    import:
+      - nacos:wisdomhub-env.yaml
+      - nacos:wisdomhub-common.yaml
+      - nacos:video-service.yaml
+      - nacos:cos-key.yaml
+      - nacos:mps-key.yaml

@@ -1,0 +1,15 @@
+server:
+  port: 9099
+
+spring:
+  application:
+    name: video-service
+  profiles:
+    active: local
+  cloud:
+    nacos:
+      discovery:
+        namespace: wisdomhub
+      config:
+        namespace: wisdomhub
+        file-extension: yaml

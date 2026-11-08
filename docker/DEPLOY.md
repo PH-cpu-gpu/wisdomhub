@@ -159,12 +159,13 @@ cp docker/nacos/wisdomhub-env.prod.yaml.example docker/nacos/config/wisdomhub-en
 | `wisdomhub-env.yaml.example` | `xxl.job.access-token` | 随便一个随机串 |
 | `wisdomhub-common.yaml.example` | `internal-sign.secret` | `openssl rand -hex 32` |
 | `cos-key.yaml.example` | `secret-id` / `secret-key` / `bucket-name` / `domain` | 腾讯云 COS；没开通也要填占位值，user-service 的 `spring.config.import` 是强制的 |
+| `mps-key.yaml.example` | `secret-id` / `secret-key` | 腾讯云 MPS；没开通也要填占位值，video-service 的 `spring.config.import` 是强制的 |
 
 导入：
 
 ```bash
 export NACOS_PASSWORD='控制台密码'
-bash docker/nacos/import.sh      # 13 个 DataId
+bash docker/nacos/import.sh      # 15 个 DataId
 ```
 
 ### 5.4 加载镜像
@@ -289,7 +290,7 @@ docker exec wisdomhub-mysql sh -c \
 | --- | --- | --- |
 | 服务反复重启，日志连不上 Nacos | 配置没导入 / 命名空间 ID 不对 | `docker logs wisdomhub-user` 首屏；Nacos 客户端日志在配置拉取之前，格式和后面不一样 |
 | 网关返回 200 + `{"code":500}` | 下游没注册或已挂 | Nacos 实例列表；网关日志 `Unable to find instance for <服务名>` |
-| `${infra.mysql-host}` 解析失败 | 只导了服务配置，没导 `wisdomhub-env.yaml` | Nacos 配置列表应有 13 个 DataId |
+| `${infra.mysql-host}` 解析失败 | 只导了服务配置，没导 `wisdomhub-env.yaml` | Nacos 配置列表应有 15 个 DataId |
 | ES 起不来 | 宿主没设 `vm.max_map_count` | `sysctl vm.max_map_count`，重跑 host-init.sh |
 | 搜索切出来是单字 | IK 插件目录空了 | `docker exec wisdomhub-es ls plugins/ik` |
 | 容器反复 OOMKilled | 上限太紧 | `docker inspect <名字> --format '{{.State.OOMKilled}}'` |
