@@ -11,6 +11,7 @@ public final class RedisPrefix {
 
     public static final String USER = APP + "user:";
     public static final String CONTENT = APP + "content:";
+    public static final String VIDEO = APP + "video:";
     public static final String INTERACTION = APP + "interaction:";
     public static final String SEARCH = APP + "search:";
     public static final String KNOWLEDGE = APP + "knowledge:";

@@ -13,6 +13,10 @@ spring:
     username: ${infra.mysql-user}
     password: ${infra.mysql-password}
     driver-class-name: com.mysql.cj.jdbc.Driver
+  data:
+    redis:
+      host: ${infra.redis-host}
+      port: ${infra.redis-port}
 xxl:
   job:
     executor:
@@ -27,6 +31,8 @@ springdoc:
 
 wisdomhub:
   video:
+    playback:
+      url-ttl-seconds: 3600
     upload:
       max-size-bytes: 2147483648   # 2 GiB，B6.13 再按用户收紧
       ticket-ttl-seconds: 900      # 预签名 URL 有效期

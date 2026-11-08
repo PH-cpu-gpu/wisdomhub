@@ -25,6 +25,20 @@ public class CosPresignService {
     private final COSClient cosClient;
     private final CosProperties properties;
 
+    /** 生成预签名 GET，用于播放分片和封面 */
+    public String presignGet(String objectKey, int ttlSeconds) {
+        Date expiration = new Date(System.currentTimeMillis() + ttlSeconds * 1000L);
+        GeneratePresignedUrlRequest request = new GeneratePresignedUrlRequest(
+                properties.getBucketName(), objectKey, HttpMethodName.GET);
+        request.setExpiration(expiration);
+        try {
+            return cosClient.generatePresignedUrl(request).toString();
+        } catch (CosClientException e) {
+            log.error("生成 COS 播放地址失败, objectKey={}", objectKey, e);
+            throw new BusinessException(CommonErrorCode.INTERNAL_ERROR, "播放地址生成失败");
+        }
+    }
+
     /** 生成预签名 PUT，签名覆盖 objectKey 与 Content-Type */
     public PresignedUpload presignPut(String objectKey, String mimeType, int ttlSeconds) {
         Date expiration = new Date(System.currentTimeMillis() + ttlSeconds * 1000L);

@@ -30,7 +30,8 @@ public class FavoriteServiceImpl implements FavoriteService {
 
     private static final Set<Integer> SUPPORTED_TARGET_TYPES = Set.of(
             ContentTargetTypeConstants.ARTICLE,
-            ContentTargetTypeConstants.QUESTION);
+            ContentTargetTypeConstants.QUESTION,
+            ContentTargetTypeConstants.VIDEO);
 
     private final ContentFavoriteMapper contentFavoriteMapper;
     private final InteractionCountMapper interactionCountMapper;

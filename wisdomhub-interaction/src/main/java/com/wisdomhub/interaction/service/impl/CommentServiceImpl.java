@@ -40,7 +40,8 @@ public class CommentServiceImpl implements CommentService {
     private static final Set<Integer> SUPPORTED_TARGET_TYPES = Set.of(
             ContentTargetTypeConstants.ARTICLE,
             ContentTargetTypeConstants.ANSWER,
-            ContentTargetTypeConstants.QUESTION);
+            ContentTargetTypeConstants.QUESTION,
+            ContentTargetTypeConstants.VIDEO);
 
     private final CommentMapper commentMapper;
     private final InteractionCountMapper interactionCountMapper;

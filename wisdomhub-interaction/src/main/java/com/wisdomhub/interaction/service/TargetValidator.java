@@ -4,6 +4,7 @@ import com.wisdomhub.common.core.constants.ContentTargetTypeConstants;
 import com.wisdomhub.common.core.exception.BusinessException;
 import com.wisdomhub.common.core.result.CommonErrorCode;
 import com.wisdomhub.common.feign.client.ContentTargetProviderFeign;
+import com.wisdomhub.common.feign.client.VideoTargetProviderFeign;
 import com.wisdomhub.common.feign.dto.TargetInfoDTO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -14,6 +15,7 @@ import org.springframework.stereotype.Service;
 public class TargetValidator {
 
     private final ContentTargetProviderFeign contentTargetProviderFeign;
+    private final VideoTargetProviderFeign videoTargetProviderFeign;
 
     public TargetInfoDTO requireVisible(int targetType, Long targetId) {
         String typeName;
@@ -22,7 +24,9 @@ public class TargetValidator {
         } catch (IllegalArgumentException e) {
             throw new BusinessException(CommonErrorCode.BAD_REQUEST, "不支持的目标类型");
         }
-        TargetInfoDTO info = contentTargetProviderFeign.getTarget(typeName, targetId);
+        TargetInfoDTO info = targetType == ContentTargetTypeConstants.VIDEO
+                ? videoTargetProviderFeign.getTarget(typeName, targetId)
+                : contentTargetProviderFeign.getTarget(typeName, targetId);
         if (info == null
                 || !Boolean.TRUE.equals(info.getExists())
                 || !Boolean.TRUE.equals(info.getVisible())) {

@@ -1,7 +1,7 @@
 -- =============================================================================
--- 视频服务：独立 schema 与媒体资产（B6.1 / B6.2）
+-- 视频服务：独立 schema、媒体资产与视频（B6.1 / B6.2 / B6.5）
 -- 已初始化过的卷必须手工执行本文件，init 目录只在空卷时自动跑。
--- video / video_tag 在后续任务里追加（B6.5、B6.8）。
+-- video_tag 在后续任务里追加（B6.8）。
 -- =============================================================================
 
 CREATE DATABASE IF NOT EXISTS `wisdomhub_video`
@@ -30,3 +30,24 @@ CREATE TABLE media_asset (
     INDEX idx_owner_time (owner_id, create_time),
     INDEX idx_status_update (status, update_time)
 ) ENGINE=InnoDB COMMENT='媒体资产';
+
+CREATE TABLE video (
+    id BIGINT PRIMARY KEY COMMENT '雪花 ID',
+    asset_id BIGINT NOT NULL COMMENT '媒体资产 ID',
+    author_id BIGINT NOT NULL COMMENT '作者 ID',
+    title VARCHAR(100) NOT NULL COMMENT '标题',
+    summary VARCHAR(1000) DEFAULT NULL COMMENT '简介',
+    cover_key VARCHAR(255) DEFAULT NULL COMMENT '封面对象键',
+    play_key VARCHAR(255) NOT NULL COMMENT 'HLS 入口对象键',
+    duration_ms BIGINT DEFAULT NULL COMMENT '时长（毫秒）',
+    width INT DEFAULT NULL COMMENT '宽度',
+    height INT DEFAULT NULL COMMENT '高度',
+    view_count INT NOT NULL DEFAULT 0 COMMENT '播放量快照',
+    status TINYINT NOT NULL COMMENT '1-已发布 2-已下架 3-已删除',
+    publish_time DATETIME NOT NULL COMMENT '发布时间',
+    create_time DATETIME NOT NULL COMMENT '创建时间',
+    update_time DATETIME NOT NULL COMMENT '更新时间',
+    UNIQUE KEY uk_asset (asset_id),
+    INDEX idx_status_publish (status, publish_time, id),
+    INDEX idx_author_status_time (author_id, status, create_time)
+) ENGINE=InnoDB COMMENT='视频';

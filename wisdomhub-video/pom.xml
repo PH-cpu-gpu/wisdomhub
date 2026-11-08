@@ -30,6 +30,18 @@
             <artifactId>common-security</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <!-- 播放量 Redis 计数 -->
+        <dependency>
+            <groupId>com.wisdomhub</groupId>
+            <artifactId>common-cache</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <!-- /internal/targets 契约 DTO -->
+        <dependency>
+            <groupId>com.wisdomhub</groupId>
+            <artifactId>common-feign</artifactId>
+            <version>${project.version}</version>
+        </dependency>
 
         <dependency>
             <groupId>org.springframework.boot</groupId>

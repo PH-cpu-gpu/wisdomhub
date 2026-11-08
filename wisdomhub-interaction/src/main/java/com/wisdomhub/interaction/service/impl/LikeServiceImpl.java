@@ -31,7 +31,8 @@ public class LikeServiceImpl implements LikeService {
 
     private static final Set<Integer> SUPPORTED_TARGET_TYPES = Set.of(
             ContentTargetTypeConstants.ARTICLE,
-            ContentTargetTypeConstants.ANSWER);
+            ContentTargetTypeConstants.ANSWER,
+            ContentTargetTypeConstants.VIDEO);
 
     private final ContentLikeMapper contentLikeMapper;
     private final InteractionCountMapper interactionCountMapper;
@@ -76,7 +77,7 @@ public class LikeServiceImpl implements LikeService {
         if (type == ContentTargetTypeConstants.ARTICLE) {
             eventPublisher.articleLiked(targetId, userId, target.getOwnerId());
             eventPublisher.behaviorRecorded(type, targetId, userId, BehaviorTypeConstants.LIKE);
-        } else {
+        } else if (type == ContentTargetTypeConstants.ANSWER) {
             eventPublisher.answerLiked(targetId, userId, target.getOwnerId());
         }
         return readLikeCount(type, targetId);

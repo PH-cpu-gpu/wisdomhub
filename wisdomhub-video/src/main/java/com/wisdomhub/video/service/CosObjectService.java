@@ -3,6 +3,7 @@ package com.wisdomhub.video.service;
 import com.qcloud.cos.COSClient;
 import com.qcloud.cos.exception.CosClientException;
 import com.qcloud.cos.exception.CosServiceException;
+import com.qcloud.cos.model.COSObject;
 import com.qcloud.cos.model.ObjectMetadata;
 import com.wisdomhub.video.config.CosProperties;
 import lombok.Getter;
@@ -10,6 +11,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 
 @Slf4j
@@ -30,6 +35,23 @@ public class CosObjectService {
                 return Optional.empty();
             }
             throw e;
+        }
+    }
+
+    /** 读取文本对象；对象不存在返回 null */
+    public String readString(String objectKey) {
+        try {
+            COSObject object = cosClient.getObject(properties.getBucketName(), objectKey);
+            try (InputStream in = object.getObjectContent()) {
+                return new String(in.readAllBytes(), StandardCharsets.UTF_8);
+            }
+        } catch (CosServiceException e) {
+            if (e.getStatusCode() == 404) {
+                return null;
+            }
+            throw e;
+        } catch (IOException e) {
+            throw new UncheckedIOException("读取 COS 对象失败: " + objectKey, e);
         }
     }
 
