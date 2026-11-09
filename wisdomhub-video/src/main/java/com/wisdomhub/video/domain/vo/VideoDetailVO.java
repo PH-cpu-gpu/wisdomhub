@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @Builder
@@ -38,4 +39,7 @@ public class VideoDetailVO {
     private Integer status;
 
     private LocalDateTime publishTime;
+
+    /** 标签 name/category 读时从 content 标签字典取 */
+    private List<VideoTagVO> tags;
 }

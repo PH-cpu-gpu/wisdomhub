@@ -4,6 +4,7 @@ import com.wisdomhub.recommendation.api.search.dto.ArticleRecallDTO;
 import com.wisdomhub.recommendation.api.search.dto.HotRequest;
 import com.wisdomhub.recommendation.api.search.dto.RecallRequest;
 import com.wisdomhub.recommendation.api.search.dto.SimilarRequest;
+import com.wisdomhub.recommendation.api.search.dto.VideoRecallDTO;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -22,4 +23,10 @@ public interface SearchFeign {
 
     @PostMapping("/hot")
     List<ArticleRecallDTO> hot(@RequestBody HotRequest request);
+
+    @PostMapping("/video/recall")
+    List<VideoRecallDTO> videoRecall(@RequestBody RecallRequest request);
+
+    @PostMapping("/video/hot")
+    List<VideoRecallDTO> videoHot(@RequestBody HotRequest request);
 }

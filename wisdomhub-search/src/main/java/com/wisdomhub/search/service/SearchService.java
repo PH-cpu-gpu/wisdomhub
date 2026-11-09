@@ -6,13 +6,14 @@ import com.wisdomhub.search.domain.vo.HotWordVO;
 import com.wisdomhub.search.domain.vo.QuestionSearchVO;
 import com.wisdomhub.search.domain.vo.TagSearchVO;
 import com.wisdomhub.search.domain.vo.UserSearchVO;
+import com.wisdomhub.search.domain.vo.VideoSearchVO;
 
 import java.time.LocalDateTime;
 import java.util.List;
 
 /**
- * 四类搜索。sort 一律走白名单枚举，白名单外的值落回 relevance。
- * 只有文章与问题支持 hot，其余两个的 hot 会落回 relevance。
+ * 五类搜索。sort 一律走白名单枚举，白名单外的值落回 relevance。
+ * 只有文章、问题、视频支持 hot，其余类型的 hot 会落回 relevance。
  */
 public interface SearchService {
 
@@ -22,6 +23,9 @@ public interface SearchService {
 
     PageResponse<QuestionSearchVO> searchQuestions(String keyword, Integer page, Integer pageSize, String sort,
                                                    LocalDateTime startTime, LocalDateTime endTime);
+
+    PageResponse<VideoSearchVO> searchVideos(String keyword, Integer page, Integer pageSize, String sort,
+                                             Long tagId, LocalDateTime startTime, LocalDateTime endTime);
 
     PageResponse<UserSearchVO> searchUsers(String keyword, Integer page, Integer pageSize, String sort);
 

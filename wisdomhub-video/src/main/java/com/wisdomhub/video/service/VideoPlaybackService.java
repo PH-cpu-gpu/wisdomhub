@@ -27,6 +27,15 @@ public class VideoPlaybackService {
         return "/api/video/" + videoId + "/playlist";
     }
 
+    /** 稳定封面入口：按 id 取签名 URL，404 由调用方转成状态码。 */
+    public String coverUrlById(Long videoId) {
+        Video video = videoMapper.selectById(videoId);
+        if (video == null || VideoConstants.DELETED.equals(video.getStatus())) {
+            throw new BusinessException(CommonErrorCode.NOT_FOUND, "视频不存在");
+        }
+        return coverUrl(video);
+    }
+
     public String coverUrl(Video video) {
         String coverKey = video.getCoverKey();
         if (coverKey == null || coverKey.isBlank()) {

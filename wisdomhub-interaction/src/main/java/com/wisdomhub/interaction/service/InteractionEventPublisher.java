@@ -11,6 +11,7 @@ import com.wisdomhub.common.mq.event.payload.BehaviorRecordedPayload;
 import com.wisdomhub.common.mq.event.payload.CommentCreatedPayload;
 import com.wisdomhub.common.mq.util.EventPublisher;
 import com.wisdomhub.interaction.api.ArticleTagFeign;
+import com.wisdomhub.interaction.api.VideoTagFeign;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -25,6 +26,7 @@ public class InteractionEventPublisher {
 
     private final EventPublisher eventPublisher;
     private final ArticleTagFeign articleTagFeign;
+    private final VideoTagFeign videoTagFeign;
 
     public void articleLiked(Long articleId, Long userId, Long authorId) {
         if (authorId == null) {
@@ -78,21 +80,25 @@ public class InteractionEventPublisher {
         }
     }
 
-    /** 行为事件只对文章发送；tagIds 从 content 取，取不到就跳过，不拖累点赞/收藏。 */
+    /** 文章与视频行为；tagIds 从对应服务取，取不到就跳过，不拖累点赞/收藏。 */
     public void behaviorRecorded(int targetType, Long targetId, Long userId, String behaviorType) {
-        if (targetType != ContentTargetTypeConstants.ARTICLE) {
+        if (targetType != ContentTargetTypeConstants.ARTICLE
+                && targetType != ContentTargetTypeConstants.VIDEO) {
             return;
         }
         try {
-            List<Long> tagIds = articleTagFeign.listTagIds(targetId);
-            eventPublisher.send(new BehaviorRecordedEvent(BehaviorRecordedPayload.builder()
+            BehaviorRecordedPayload.BehaviorRecordedPayloadBuilder builder = BehaviorRecordedPayload.builder()
                     .userId(userId)
-                    .articleId(targetId)
-                    .behaviorType(behaviorType)
-                    .tagIds(tagIds)
-                    .build()));
+                    .behaviorType(behaviorType);
+            if (targetType == ContentTargetTypeConstants.ARTICLE) {
+                builder.articleId(targetId).tagIds(articleTagFeign.listTagIds(targetId));
+            } else {
+                builder.videoId(targetId).tagIds(videoTagFeign.listTagIds(targetId));
+            }
+            eventPublisher.send(new BehaviorRecordedEvent(builder.build()));
         } catch (Exception e) {
-            log.error("行为事件发送失败, articleId={}, userId={}, type={}", targetId, userId, behaviorType, e);
+            log.error("行为事件发送失败, targetType={}, targetId={}, userId={}, type={}",
+                    targetType, targetId, userId, behaviorType, e);
         }
     }
 }

@@ -7,6 +7,7 @@ import com.wisdomhub.search.domain.vo.HotWordVO;
 import com.wisdomhub.search.domain.vo.QuestionSearchVO;
 import com.wisdomhub.search.domain.vo.TagSearchVO;
 import com.wisdomhub.search.domain.vo.UserSearchVO;
+import com.wisdomhub.search.domain.vo.VideoSearchVO;
 import com.wisdomhub.search.service.SearchService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -53,6 +54,19 @@ public class SearchController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startTime,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endTime) {
         return R.success(searchService.searchQuestions(keyword, page, pageSize, sort, startTime, endTime));
+    }
+
+    @Operation(summary = "视频搜索：关键词高亮 + 标签/时间过滤 + 相关性/最新/播放量排序")
+    @GetMapping("/video")
+    public R<PageResponse<VideoSearchVO>> videos(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(defaultValue = "1") Integer page,
+            @RequestParam(defaultValue = "10") Integer pageSize,
+            @RequestParam(required = false) String sort,
+            @RequestParam(required = false) Long tagId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startTime,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endTime) {
+        return R.success(searchService.searchVideos(keyword, page, pageSize, sort, tagId, startTime, endTime));
     }
 
     @Operation(summary = "用户搜索：用户名与简介")

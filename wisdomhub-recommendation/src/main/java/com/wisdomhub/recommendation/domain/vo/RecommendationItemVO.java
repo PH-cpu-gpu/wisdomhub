@@ -15,7 +15,12 @@ import java.util.List;
 @AllArgsConstructor
 public class RecommendationItemVO {
 
+    /** 1-文章 7-视频，取值同 ContentTargetTypeConstants */
+    private Integer contentType;
+
     private Long articleId;
+
+    private Long videoId;
 
     private Long authorId;
 
@@ -24,6 +29,14 @@ public class RecommendationItemVO {
     private String summary;
 
     private List<RecommendationTagVO> tags;
+
+    /** 视频封面，文章为空 */
+    private String coverKey;
+
+    private String coverUrl;
+
+    /** 视频时长（毫秒），文章为空 */
+    private Long durationMs;
 
     private LocalDateTime publishTime;
 

@@ -2,9 +2,11 @@ package com.wisdomhub.recommendation.service.impl;
 
 import com.wisdomhub.recommendation.api.search.dto.ArticleRecallDTO;
 import com.wisdomhub.recommendation.api.search.dto.TagBriefDTO;
+import com.wisdomhub.recommendation.api.search.dto.VideoRecallDTO;
 import com.wisdomhub.recommendation.config.ScoringProperties;
 import com.wisdomhub.recommendation.domain.vo.InterestProfileVO;
 import com.wisdomhub.recommendation.domain.vo.ScoredArticleVO;
+import com.wisdomhub.recommendation.domain.vo.ScoredVideoVO;
 import com.wisdomhub.recommendation.service.CollaborativeFilterScorer;
 import com.wisdomhub.recommendation.service.RecommendationScorer;
 import lombok.extern.slf4j.Slf4j;
@@ -51,9 +53,41 @@ public class RecommendationScorerImpl implements RecommendationScorer {
         return scored;
     }
 
+    @Override
+    public List<ScoredVideoVO> scoreVideos(List<VideoRecallDTO> candidates, InterestProfileVO profile) {
+        if (candidates == null || candidates.isEmpty()) {
+            return List.of();
+        }
+        Map<Long, Double> normalizedProfile = normalizeProfile(profile);
+        double maxEngagement = candidates.stream().mapToDouble(this::engagement).max().orElse(0);
+        double weightSum = properties.getInterestWeight() + properties.getHotWeight()
+                + properties.getFreshnessWeight() + properties.getCfWeight();
+        return candidates.stream()
+                .map(candidate -> doScoreVideo(candidate, normalizedProfile, maxEngagement, weightSum))
+                .sorted(videoComparator())
+                .toList();
+    }
+
+    private ScoredVideoVO doScoreVideo(VideoRecallDTO candidate, Map<Long, Double> profile,
+                                       double maxEngagement, double weightSum) {
+        double interest = interestScore(candidate.getTags(), profile);
+        double hot = maxEngagement <= 0 ? 0 : Math.log1p(engagement(candidate)) / Math.log1p(maxEngagement);
+        double freshness = freshnessScore(candidate.getPublishTime());
+        double total = (properties.getInterestWeight() * interest
+                + properties.getHotWeight() * hot
+                + properties.getFreshnessWeight() * freshness) / weightSum;
+        return ScoredVideoVO.builder()
+                .video(candidate)
+                .totalScore(total)
+                .interestScore(interest)
+                .hotScore(hot)
+                .freshnessScore(freshness)
+                .build();
+    }
+
     private ScoredArticleVO doScore(ArticleRecallDTO candidate, Long userId, Map<Long, Double> profile,
                                     double maxEngagement, double weightSum) {
-        double interest = interestScore(candidate, profile);
+        double interest = interestScore(candidate.getTags(), profile);
         double hot = maxEngagement <= 0 ? 0 : Math.log1p(engagement(candidate)) / Math.log1p(maxEngagement);
         double freshness = freshnessScore(candidate.getPublishTime());
         double cf = clamp(cfScorer.score(userId, candidate));
@@ -74,12 +108,12 @@ public class RecommendationScorerImpl implements RecommendationScorer {
     }
 
     /** 画像先按用户最高分归一化；候选按全部标签数取平均，堆无关标签会被稀释 */
-    private double interestScore(ArticleRecallDTO candidate, Map<Long, Double> profile) {
-        if (profile.isEmpty() || candidate.getTags() == null || candidate.getTags().isEmpty()) {
+    private double interestScore(List<TagBriefDTO> tags, Map<Long, Double> profile) {
+        if (profile.isEmpty() || tags == null || tags.isEmpty()) {
             return 0;
         }
         Set<Long> tagIds = new HashSet<>();
-        for (TagBriefDTO tag : candidate.getTags()) {
+        for (TagBriefDTO tag : tags) {
             if (tag.getTagId() != null) {
                 tagIds.add(tag.getTagId());
             }
@@ -112,10 +146,20 @@ public class RecommendationScorerImpl implements RecommendationScorer {
     }
 
     private double engagement(ArticleRecallDTO candidate) {
-        return nz(candidate.getViewCount()) * properties.getViewWeight()
-                + nz(candidate.getLikeCount()) * properties.getLikeWeight()
-                + nz(candidate.getCommentCount()) * properties.getCommentWeight()
-                + nz(candidate.getFavoriteCount()) * properties.getFavoriteWeight();
+        return engagement(candidate.getViewCount(), candidate.getLikeCount(),
+                candidate.getCommentCount(), candidate.getFavoriteCount());
+    }
+
+    private double engagement(VideoRecallDTO candidate) {
+        return engagement(candidate.getViewCount(), candidate.getLikeCount(),
+                candidate.getCommentCount(), candidate.getFavoriteCount());
+    }
+
+    private double engagement(Integer viewCount, Integer likeCount, Integer commentCount, Integer favoriteCount) {
+        return nz(viewCount) * properties.getViewWeight()
+                + nz(likeCount) * properties.getLikeWeight()
+                + nz(commentCount) * properties.getCommentWeight()
+                + nz(favoriteCount) * properties.getFavoriteWeight();
     }
 
     private double freshnessScore(LocalDateTime publishTime) {
@@ -132,6 +176,15 @@ public class RecommendationScorerImpl implements RecommendationScorer {
                 .thenComparing(vo -> vo.getArticle().getPublishTime(),
                         Comparator.nullsLast(Comparator.reverseOrder()))
                 .thenComparing(vo -> vo.getArticle().getArticleId(),
+                        Comparator.nullsLast(Comparator.reverseOrder()));
+    }
+
+    /** 总分降序 → 发布时间降序 → videoId 降序，保证同分稳定 */
+    private Comparator<ScoredVideoVO> videoComparator() {
+        return Comparator.comparingDouble(ScoredVideoVO::getTotalScore).reversed()
+                .thenComparing(vo -> vo.getVideo().getPublishTime(),
+                        Comparator.nullsLast(Comparator.reverseOrder()))
+                .thenComparing(vo -> vo.getVideo().getVideoId(),
                         Comparator.nullsLast(Comparator.reverseOrder()));
     }
 

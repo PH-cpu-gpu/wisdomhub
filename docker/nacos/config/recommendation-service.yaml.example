@@ -16,6 +16,9 @@ springdoc:
   api-docs:
     path: /api/recommendation/v3/api-docs
 wisdomhub:
+  recommendation:
+    mix:
+      video-share: 0.3          # 首页视频占比，0 表示纯文章
   cache:
     redis-ttl:
       home: 3m

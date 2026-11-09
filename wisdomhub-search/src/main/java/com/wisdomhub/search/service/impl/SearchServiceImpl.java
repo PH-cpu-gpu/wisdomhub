@@ -26,12 +26,14 @@ import com.wisdomhub.search.domain.document.ArticleIndexDoc;
 import com.wisdomhub.search.domain.document.QuestionIndexDoc;
 import com.wisdomhub.search.domain.document.TagIndexDoc;
 import com.wisdomhub.search.domain.document.UserIndexDoc;
+import com.wisdomhub.search.domain.document.VideoIndexDoc;
 import com.wisdomhub.search.domain.vo.ArticleSearchVO;
 import com.wisdomhub.search.domain.vo.HotWordVO;
 import com.wisdomhub.search.domain.vo.QuestionSearchVO;
 import com.wisdomhub.search.domain.vo.TagBriefVO;
 import com.wisdomhub.search.domain.vo.TagSearchVO;
 import com.wisdomhub.search.domain.vo.UserSearchVO;
+import com.wisdomhub.search.domain.vo.VideoSearchVO;
 import com.wisdomhub.search.service.EsIndexService;
 import com.wisdomhub.search.service.HotWordService;
 import com.wisdomhub.search.service.SearchService;
@@ -57,6 +59,7 @@ public class SearchServiceImpl implements SearchService {
     /** 字段权重在这里，mapping 只负责把三个字段拆开 */
     private static final List<String> ARTICLE_FIELDS = List.of("title^3", "summary^2", "content^1");
     private static final List<String> QUESTION_FIELDS = List.of("title^3", "content^1");
+    private static final List<String> VIDEO_FIELDS = List.of("title^3", "summary^2");
     private static final List<String> USER_FIELDS = List.of("username^3", "bio^1");
     private static final List<String> TAG_FIELDS = List.of("name^3", "description^1");
 
@@ -170,6 +173,67 @@ public class SearchServiceImpl implements SearchService {
             case SearchConstants.SORT_NEW -> List.of(fieldDesc("createTime"), fieldDesc("questionId"));
             case SearchConstants.SORT_HOT -> List.of(fieldDesc("answerCount"), fieldDesc("createTime"), fieldDesc("questionId"));
             default -> List.of(scoreDesc(), fieldDesc("createTime"), fieldDesc("questionId"));
+        };
+    }
+
+    // ==================== 视频 ====================
+
+    @Override
+    public PageResponse<VideoSearchVO> searchVideos(String keyword, Integer page, Integer pageSize, String sort,
+                                                    Long tagId, LocalDateTime startTime, LocalDateTime endTime) {
+        hotWordService.record(keyword);
+        behaviorEventPublisher.search(keyword, tagId);
+        int pageNo = SearchConstants.clampPage(page);
+        int size = SearchConstants.clampPageSize(pageSize);
+        Query query = buildQuery(keyword, VIDEO_FIELDS, bool -> {
+            if (tagId != null) {
+                bool.filter(f -> f.term(t -> t.field("tags.tagId").value(String.valueOf(tagId))));
+            }
+            addPublishTimeRange(bool, startTime, endTime);
+        });
+        SearchRequest request = baseRequest(EsIndexService.VIDEO_INDEX, query, videoSorts(sort), pageNo, size)
+                .highlight(highlightBuilder()
+                        .fields("title", f -> f.numberOfFragments(0))
+                        .fields("summary", f -> f.numberOfFragments(1).fragmentSize(SearchConstants.FRAGMENT_SIZE))
+                        .build())
+                .build();
+        SearchResponse<VideoIndexDoc> response = execute(request, VideoIndexDoc.class);
+        List<VideoSearchVO> items = response.hits().hits().stream().map(this::toVideoVO).toList();
+        return toPage(response, items, pageNo, size);
+    }
+
+    private VideoSearchVO toVideoVO(Hit<VideoIndexDoc> hit) {
+        VideoIndexDoc doc = hit.source();
+        List<TagBriefVO> tags = doc.getTags() == null ? List.of() : doc.getTags().stream()
+                .map(tag -> TagBriefVO.builder()
+                        .tagId(tag.getTagId())
+                        .name(tag.getName())
+                        .category(tag.getCategory())
+                        .build())
+                .toList();
+        return VideoSearchVO.builder()
+                .videoId(doc.getVideoId())
+                .authorId(doc.getAuthorId())
+                .title(doc.getTitle())
+                .summary(doc.getSummary())
+                .highlight(toHighlight(hit))
+                .tags(tags)
+                .coverKey(doc.getCoverKey())
+                .coverUrl("/api/video/" + doc.getVideoId() + "/cover")
+                .durationMs(doc.getDurationMs())
+                .publishTime(doc.getPublishTime())
+                .viewCount(doc.getViewCount())
+                .likeCount(doc.getLikeCount())
+                .commentCount(doc.getCommentCount())
+                .favoriteCount(doc.getFavoriteCount())
+                .build();
+    }
+
+    private List<SortOptions> videoSorts(String sort) {
+        return switch (normalizeSort(sort)) {
+            case SearchConstants.SORT_NEW -> List.of(fieldDesc("publishTime"), fieldDesc("videoId"));
+            case SearchConstants.SORT_HOT -> List.of(fieldDesc("viewCount"), fieldDesc("publishTime"), fieldDesc("videoId"));
+            default -> List.of(scoreDesc(), fieldDesc("publishTime"), fieldDesc("videoId"));
         };
     }
 
@@ -304,6 +368,7 @@ public class SearchServiceImpl implements SearchService {
             case "question" -> EsIndexService.QUESTION_INDEX;
             case "user" -> EsIndexService.USER_INDEX;
             case "tag" -> EsIndexService.TAG_INDEX;
+            case "video" -> EsIndexService.VIDEO_INDEX;
             default -> EsIndexService.ARTICLE_INDEX;
         };
     }

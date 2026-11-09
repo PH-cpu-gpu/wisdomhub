@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @Builder
@@ -32,4 +33,6 @@ public class MyVideoVO {
     private LocalDateTime publishTime;
 
     private LocalDateTime createTime;
+
+    private List<VideoTagVO> tags;
 }

@@ -5,6 +5,7 @@ import com.wisdomhub.search.domain.dto.HotDTO;
 import com.wisdomhub.search.domain.dto.RecallDTO;
 import com.wisdomhub.search.domain.dto.SimilarDTO;
 import com.wisdomhub.search.domain.vo.ArticleRecallVO;
+import com.wisdomhub.search.domain.vo.VideoRecallVO;
 import com.wisdomhub.search.service.RecallService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -46,5 +47,17 @@ public class InternalSearchController {
     @PostMapping("/hot")
     public R<List<ArticleRecallVO>> hot(@Valid @RequestBody HotDTO dto) {
         return R.success(recallService.hot(dto));
+    }
+
+    @Operation(summary = "按标签 / 关键词召回候选视频")
+    @PostMapping("/video/recall")
+    public R<List<VideoRecallVO>> videoRecall(@Valid @RequestBody RecallDTO dto) {
+        return R.success(recallService.videoRecall(dto));
+    }
+
+    @Operation(summary = "热门视频召回")
+    @PostMapping("/video/hot")
+    public R<List<VideoRecallVO>> videoHot(@Valid @RequestBody HotDTO dto) {
+        return R.success(recallService.videoHot(dto));
     }
 }

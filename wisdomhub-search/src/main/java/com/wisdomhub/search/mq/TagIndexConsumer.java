@@ -16,7 +16,7 @@ import org.springframework.stereotype.Component;
 import java.io.IOException;
 
 /**
- * 消费 tag.* 事件维护 tag_index。改名与删除还要顺手修 article_index
+ * 消费 tag.* 事件维护 tag_index。改名与删除还要顺手修 article_index / video_index
  */
 @Slf4j
 @Component
@@ -40,10 +40,12 @@ public class TagIndexConsumer {
                 TagEventPayload payload = event.getPayload();
                 esIndexService.indexTag(toDoc(payload));
                 esIndexService.renameTagInArticles(tagId, payload.getName(), payload.getCategory());
+                esIndexService.renameTagInVideos(tagId, payload.getName(), payload.getCategory());
             }
             case MqRoutingKeyConstants.TAG_DELETED -> {
                 esIndexService.deleteTag(tagId);
                 esIndexService.removeTagFromArticles(tagId);
+                esIndexService.removeTagFromVideos(tagId);
             }
             default -> log.debug("忽略不关心的路由键: {}", event.getEventType());
         }

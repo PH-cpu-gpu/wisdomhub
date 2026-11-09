@@ -34,6 +34,7 @@ public class EsIndexInitializer implements ApplicationRunner {
         map.put("question_index", "es/question_index.json");
         map.put("user_index", "es/user_index.json");
         map.put("tag_index", "es/tag_index.json");
+        map.put("video_index", "es/video_index.json");
         return Collections.unmodifiableMap(map);
     }
 

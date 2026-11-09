@@ -79,6 +79,8 @@ public class LikeServiceImpl implements LikeService {
             eventPublisher.behaviorRecorded(type, targetId, userId, BehaviorTypeConstants.LIKE);
         } else if (type == ContentTargetTypeConstants.ANSWER) {
             eventPublisher.answerLiked(targetId, userId, target.getOwnerId());
+        } else if (type == ContentTargetTypeConstants.VIDEO) {
+            eventPublisher.behaviorRecorded(type, targetId, userId, BehaviorTypeConstants.LIKE);
         }
         return readLikeCount(type, targetId);
     }

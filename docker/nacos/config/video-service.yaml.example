@@ -30,6 +30,11 @@ springdoc:
     path: /api/video/v3/api-docs
 
 wisdomhub:
+  cache:
+    redis-ttl:
+      tag: 10m                   # content 标签字典，标签治理改完后最多 10 分钟生效
+    caffeine-ttl:
+      tag: 1m
   video:
     playback:
       url-ttl-seconds: 3600

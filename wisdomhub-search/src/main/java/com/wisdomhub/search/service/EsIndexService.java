@@ -17,6 +17,7 @@ import com.wisdomhub.search.domain.document.ArticleIndexDoc;
 import com.wisdomhub.search.domain.document.QuestionIndexDoc;
 import com.wisdomhub.search.domain.document.TagIndexDoc;
 import com.wisdomhub.search.domain.document.UserIndexDoc;
+import com.wisdomhub.search.domain.document.VideoIndexDoc;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -38,9 +39,10 @@ public class EsIndexService {
     public static final String QUESTION_INDEX = "question_index";
     public static final String USER_INDEX = "user_index";
     public static final String TAG_INDEX = "tag_index";
+    public static final String VIDEO_INDEX = "video_index";
 
-    /** 标签改名的就地更新。 */
-    private static final String RENAME_TAG_IN_ARTICLES = """
+    /** 标签改名的就地更新，article/video 的 tags 结构一致。 */
+    private static final String RENAME_TAG_IN_DOCS = """
             if (ctx._source.tags != null) {
               for (def t : ctx._source.tags) {
                 if (params.tagId.equals(t.tagId)) {
@@ -51,7 +53,7 @@ public class EsIndexService {
             }
             """;
 
-    private static final String REMOVE_TAG_FROM_ARTICLES = """
+    private static final String REMOVE_TAG_FROM_DOCS = """
             if (ctx._source.tags != null) {
               for (int i = ctx._source.tags.size() - 1; i >= 0; i--) {
                 if (params.tagId.equals(ctx._source.tags[i].tagId)) {
@@ -79,6 +81,10 @@ public class EsIndexService {
         index(TAG_INDEX, "标签", doc.getTagId(), doc);
     }
 
+    public void indexVideo(VideoIndexDoc doc) {
+        index(VIDEO_INDEX, "视频", doc.getVideoId(), doc);
+    }
+
     public void deleteArticle(Long articleId) {
         delete(ARTICLE_INDEX, "文章", articleId);
     }
@@ -95,19 +101,41 @@ public class EsIndexService {
         delete(USER_INDEX, "用户", userId);
     }
 
+    public void deleteVideo(Long videoId) {
+        delete(VIDEO_INDEX, "视频", videoId);
+    }
+
     /**
      * 标签改名 / 改分组后修 article_index 里的残留。
      */
     public void renameTagInArticles(Long tagId, String name, String category) {
-        updateTagInArticles("标签改名", RENAME_TAG_IN_ARTICLES, tagId, Map.of(
+        renameTag("文章", ARTICLE_INDEX, tagId, name, category);
+    }
+
+    /** 标签改名 / 改分组后修 video_index 里的残留。 */
+    public void renameTagInVideos(Long tagId, String name, String category) {
+        renameTag("视频", VIDEO_INDEX, tagId, name, category);
+    }
+
+    /** 标签被物理删掉后，把它从所有文章的 tags 数组里摘下来 */
+    public void removeTagFromArticles(Long tagId) {
+        removeTag("文章", ARTICLE_INDEX, tagId);
+    }
+
+    /** 标签被物理删掉后，把它从所有视频的 tags 数组里摘下来 */
+    public void removeTagFromVideos(Long tagId) {
+        removeTag("视频", VIDEO_INDEX, tagId);
+    }
+
+    private void renameTag(String label, String indexName, Long tagId, String name, String category) {
+        updateTagInIndex(label + "标签改名", indexName, RENAME_TAG_IN_DOCS, tagId, Map.of(
                 "tagId", JsonData.of(String.valueOf(tagId)),
                 "name", JsonData.of(name),
                 "category", JsonData.of(category)));
     }
 
-    /** 标签被物理删掉后，把它从所有文章的 tags 数组里摘下来 */
-    public void removeTagFromArticles(Long tagId) {
-        updateTagInArticles("标签删除", REMOVE_TAG_FROM_ARTICLES, tagId,
+    private void removeTag(String label, String indexName, Long tagId) {
+        updateTagInIndex(label + "标签删除", indexName, REMOVE_TAG_FROM_DOCS, tagId,
                 Map.of("tagId", JsonData.of(String.valueOf(tagId))));
     }
 
@@ -125,6 +153,10 @@ public class EsIndexService {
         return get(TAG_INDEX, tagId, TagIndexDoc.class);
     }
 
+    public VideoIndexDoc getVideo(Long videoId) {
+        return get(VIDEO_INDEX, videoId, VideoIndexDoc.class);
+    }
+
     public Map<Long, ArticleIndexDoc> mgetArticles(List<Long> articleIds) {
         return mget(ARTICLE_INDEX, articleIds, ArticleIndexDoc.class);
     }
@@ -135,6 +167,10 @@ public class EsIndexService {
 
     public Map<Long, TagIndexDoc> mgetTags(List<Long> tagIds) {
         return mget(TAG_INDEX, tagIds, TagIndexDoc.class);
+    }
+
+    public Map<Long, VideoIndexDoc> mgetVideos(List<Long> videoIds) {
+        return mget(VIDEO_INDEX, videoIds, VideoIndexDoc.class);
     }
 
     public Map<Long, UserIndexDoc> mgetUsers(List<Long> userIds) {
@@ -156,6 +192,10 @@ public class EsIndexService {
 
     public List<Long> scanUserIds(String afterId, int size) {
         return scanIds(USER_INDEX, "userId", afterId, size);
+    }
+
+    public List<Long> scanVideoIds(String afterId, int size) {
+        return scanIds(VIDEO_INDEX, "videoId", afterId, size);
     }
 
     private <T> T get(String indexName, Long id, Class<T> type) {
@@ -238,13 +278,14 @@ public class EsIndexService {
     }
 
     /**
-     * 更新 article_index 中关于标签的信息
+     * 就地更新指定索引里关于标签的信息。
      */
-    private void updateTagInArticles(String label, String source, Long tagId, Map<String, JsonData> params) {
+    private void updateTagInIndex(String label, String indexName, String source, Long tagId,
+                                  Map<String, JsonData> params) {
         String id = String.valueOf(tagId);
         try {
             UpdateByQueryResponse response = elasticsearchClient.updateByQuery(u -> u
-                    .index(ARTICLE_INDEX)
+                    .index(indexName)
                     .query(q -> q.term(t -> t.field("tags.tagId").value(id)))
                     .conflicts(Conflicts.Proceed)
                     .script(s -> s.lang(ScriptLanguage.Painless)
@@ -252,9 +293,9 @@ public class EsIndexService {
                             .params(params)));
             if (!response.failures().isEmpty()) {
                 throw new BusinessException(CommonErrorCode.INTERNAL_ERROR,
-                        label + "回填文章标签失败: " + response.failures().getFirst().cause().reason());
+                        label + "回填失败: " + response.failures().getFirst().cause().reason());
             }
-            log.info("{}回填文章标签完成, tagId={}, updated={}", label, tagId, response.updated());
+            log.info("{}回填完成, index={}, tagId={}, updated={}", label, indexName, tagId, response.updated());
         } catch (IOException e) {
             throw new BusinessException(CommonErrorCode.INTERNAL_ERROR, "更新 ES 文档失败: " + e.getMessage());
         }

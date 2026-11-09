@@ -72,7 +72,7 @@ public class FavoriteServiceImpl implements FavoriteService {
 
         interactionCountMapper.addFavoriteCount(IdWorker.getId(), type, targetId, 1,
                 LocalDateTime.now(ZoneOffset.UTC));
-        if (type == ContentTargetTypeConstants.ARTICLE) {
+        if (type == ContentTargetTypeConstants.ARTICLE || type == ContentTargetTypeConstants.VIDEO) {
             eventPublisher.behaviorRecorded(type, targetId, userId, BehaviorTypeConstants.COLLECT);
         }
         return readFavoriteCount(type, targetId);

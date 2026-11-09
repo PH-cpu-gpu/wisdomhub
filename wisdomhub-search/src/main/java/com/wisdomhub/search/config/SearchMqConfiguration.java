@@ -29,6 +29,9 @@ public class SearchMqConfiguration {
     public static final String TAG_QUEUE = "search.tag.q";
     public static final String TAG_DLQ = TAG_QUEUE + MqTopologyConstants.DLQ_SUFFIX;
 
+    public static final String VIDEO_QUEUE = "search.video.q";
+    public static final String VIDEO_DLQ = VIDEO_QUEUE + MqTopologyConstants.DLQ_SUFFIX;
+
     @Bean
     public Queue searchArticleQueue() {
         return QueueBuilder.durable(ARTICLE_QUEUE)
@@ -121,5 +124,30 @@ public class SearchMqConfiguration {
     @Bean
     public Binding searchTagDeadLetterBinding(Queue searchTagDeadLetterQueue, DirectExchange deadLetterExchange) {
         return BindingBuilder.bind(searchTagDeadLetterQueue).to(deadLetterExchange).with(TAG_DLQ);
+    }
+
+    // ==================== video ====================
+
+    @Bean
+    public Queue searchVideoQueue() {
+        return QueueBuilder.durable(VIDEO_QUEUE)
+                .deadLetterExchange(MqTopologyConstants.DLX_EXCHANGE)
+                .deadLetterRoutingKey(VIDEO_DLQ)
+                .build();
+    }
+
+    @Bean
+    public Queue searchVideoDeadLetterQueue() {
+        return QueueBuilder.durable(VIDEO_DLQ).build();
+    }
+
+    @Bean
+    public Binding searchVideoBinding(Queue searchVideoQueue, TopicExchange eventExchange) {
+        return BindingBuilder.bind(searchVideoQueue).to(eventExchange).with("video.*");
+    }
+
+    @Bean
+    public Binding searchVideoDeadLetterBinding(Queue searchVideoDeadLetterQueue, DirectExchange deadLetterExchange) {
+        return BindingBuilder.bind(searchVideoDeadLetterQueue).to(deadLetterExchange).with(VIDEO_DLQ);
     }
 }

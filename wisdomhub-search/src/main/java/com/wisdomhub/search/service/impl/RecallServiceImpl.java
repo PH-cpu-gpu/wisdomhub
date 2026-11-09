@@ -16,11 +16,13 @@ import com.wisdomhub.common.core.exception.BusinessException;
 import com.wisdomhub.common.core.result.CommonErrorCode;
 import com.wisdomhub.search.constants.SearchConstants;
 import com.wisdomhub.search.domain.document.ArticleIndexDoc;
+import com.wisdomhub.search.domain.document.VideoIndexDoc;
 import com.wisdomhub.search.domain.dto.HotDTO;
 import com.wisdomhub.search.domain.dto.RecallDTO;
 import com.wisdomhub.search.domain.dto.SimilarDTO;
 import com.wisdomhub.search.domain.vo.ArticleRecallVO;
 import com.wisdomhub.search.domain.vo.TagBriefVO;
+import com.wisdomhub.search.domain.vo.VideoRecallVO;
 import com.wisdomhub.search.service.EsIndexService;
 import com.wisdomhub.search.service.RecallService;
 import lombok.RequiredArgsConstructor;
@@ -45,6 +47,12 @@ public class RecallServiceImpl implements RecallService {
     /** 只取打分要用的字段：正文整篇不进响应体 */
     private static final List<String> SOURCE_FIELDS = List.of("articleId", "authorId", "title", "summary",
             "tags", "publishTime", "viewCount", "likeCount", "commentCount", "favoriteCount");
+
+    private static final List<String> VIDEO_FIELDS = List.of("title^3", "summary^2");
+
+    private static final List<String> VIDEO_SOURCE_FIELDS = List.of("videoId", "authorId", "title", "summary",
+            "tags", "coverKey", "durationMs", "publishTime", "viewCount", "likeCount", "commentCount",
+            "favoriteCount");
 
     private final ElasticsearchClient elasticsearchClient;
 
@@ -101,6 +109,37 @@ public class RecallServiceImpl implements RecallService {
         return search(bool.build(), hotSorts(), size);
     }
 
+    @Override
+    public List<VideoRecallVO> videoRecall(RecallDTO dto) {
+        int size = SearchConstants.clampRecallSize(dto.getLimit());
+        boolean hasKeyword = StrUtil.isNotBlank(dto.getKeyword());
+        BoolQuery.Builder bool = new BoolQuery.Builder();
+        if (hasKeyword) {
+            bool.must(m -> m.multiMatch(mm -> mm
+                    .query(dto.getKeyword().trim())
+                    .fields(VIDEO_FIELDS)
+                    .type(TextQueryType.BestFields)
+                    .minimumShouldMatch(SearchConstants.MINIMUM_SHOULD_MATCH)));
+        }
+        if (dto.getTagIds() != null && !dto.getTagIds().isEmpty()) {
+            bool.filter(f -> f.terms(t -> t.field("tags.tagId").terms(tv -> tv.value(toValues(dto.getTagIds())))));
+        }
+        exclude(bool, dto.getExcludeIds());
+        List<SortOptions> sorts = hasKeyword ? videoRelevanceSorts() : videoHotSorts();
+        return searchVideoCandidates(bool.build(), sorts, size);
+    }
+
+    @Override
+    public List<VideoRecallVO> videoHot(HotDTO dto) {
+        int size = SearchConstants.clampRecallSize(dto.getLimit());
+        BoolQuery.Builder bool = new BoolQuery.Builder();
+        if (dto.getTagId() != null) {
+            bool.filter(f -> f.term(t -> t.field("tags.tagId").value(dto.getTagId().toString())));
+        }
+        exclude(bool, dto.getExcludeIds());
+        return searchVideoCandidates(bool.build(), videoHotSorts(), size);
+    }
+
     // ==================== 共用 ====================
 
     private List<ArticleRecallVO> search(BoolQuery bool, List<SortOptions> sorts, int size) {
@@ -123,6 +162,29 @@ public class RecallServiceImpl implements RecallService {
             throw new BusinessException(CommonErrorCode.SERVICE_UNAVAILABLE, "搜索服务暂不可用");
         } catch (ElasticsearchException e) {
             log.error("召回查询失败", e);
+            throw new BusinessException(CommonErrorCode.INTERNAL_ERROR, "查询失败");
+        }
+    }
+
+    private List<VideoRecallVO> searchVideoCandidates(BoolQuery bool, List<SortOptions> sorts, int size) {
+        SearchRequest request = new SearchRequest.Builder()
+                .index(EsIndexService.VIDEO_INDEX)
+                .query(Query.of(q -> q.bool(bool)))
+                .size(size)
+                .source(s -> s.filter(f -> f.includes(VIDEO_SOURCE_FIELDS)))
+                .sort(sorts)
+                .build();
+        try {
+            SearchResponse<VideoIndexDoc> response = elasticsearchClient.search(request, VideoIndexDoc.class);
+            List<VideoRecallVO> items = new ArrayList<>(response.hits().hits().size());
+            for (Hit<VideoIndexDoc> hit : response.hits().hits()) {
+                items.add(toVideoVO(hit.source()));
+            }
+            return items;
+        } catch (IOException e) {
+            throw new BusinessException(CommonErrorCode.SERVICE_UNAVAILABLE, "搜索服务暂不可用");
+        } catch (ElasticsearchException e) {
+            log.error("视频召回查询失败", e);
             throw new BusinessException(CommonErrorCode.INTERNAL_ERROR, "查询失败");
         }
     }
@@ -159,6 +221,30 @@ public class RecallServiceImpl implements RecallService {
                 .build();
     }
 
+    private VideoRecallVO toVideoVO(VideoIndexDoc doc) {
+        List<TagBriefVO> tags = doc.getTags() == null ? List.of() : doc.getTags().stream()
+                .map(tag -> TagBriefVO.builder()
+                        .tagId(tag.getTagId())
+                        .name(tag.getName())
+                        .category(tag.getCategory())
+                        .build())
+                .toList();
+        return VideoRecallVO.builder()
+                .videoId(doc.getVideoId())
+                .authorId(doc.getAuthorId())
+                .title(doc.getTitle())
+                .summary(doc.getSummary())
+                .tags(tags)
+                .coverKey(doc.getCoverKey())
+                .durationMs(doc.getDurationMs())
+                .publishTime(doc.getPublishTime())
+                .viewCount(doc.getViewCount())
+                .likeCount(doc.getLikeCount())
+                .commentCount(doc.getCommentCount())
+                .favoriteCount(doc.getFavoriteCount())
+                .build();
+    }
+
     /** 排除调用方已经推过的文章。按 _id 排除，本身不会命中不存在的文档 */
     private void exclude(BoolQuery.Builder bool, List<Long> excludeIds) {
         if (excludeIds == null || excludeIds.isEmpty()) {
@@ -180,6 +266,14 @@ public class RecallServiceImpl implements RecallService {
 
     private List<SortOptions> hotSorts() {
         return List.of(fieldDesc("viewCount"), fieldDesc("publishTime"), fieldDesc("articleId"));
+    }
+
+    private List<SortOptions> videoRelevanceSorts() {
+        return List.of(scoreDesc(), fieldDesc("publishTime"), fieldDesc("videoId"));
+    }
+
+    private List<SortOptions> videoHotSorts() {
+        return List.of(fieldDesc("viewCount"), fieldDesc("publishTime"), fieldDesc("videoId"));
     }
 
     private SortOptions fieldDesc(String field) {
