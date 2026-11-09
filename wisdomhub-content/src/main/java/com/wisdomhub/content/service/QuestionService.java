@@ -20,6 +20,9 @@ public interface QuestionService {
      */
     PageResponse<QuestionListItemVO> listQuestions(Integer page, Integer pageSize, String sort);
 
+    /** 按 ID 批量取问题摘要（收藏页回填用）；已删除或不存在的不返回 */
+    List<QuestionListItemVO> listBrief(List<Long> questionIds);
+
     /** 问题详情。未删除才可见，游客可读 */
     QuestionDetailVO getQuestionDetail(Long questionId);
 

@@ -9,7 +9,9 @@ import WhPagination from '@/components/base/WhPagination.vue'
 import AuthorChip from '@/components/business/AuthorChip.vue'
 import PageContainer from '@/components/layout/PageContainer.vue'
 import { useAuthorBrief } from '@/composables/useAuthorBrief'
+import { useInteractionCounts } from '@/composables/useInteractionCounts'
 import { useSeo } from '@/composables/useSeo'
+import { CONTENT_TARGET_TYPE } from '@/types/interaction'
 import type { PrerequisiteTreeVO, TagDetailVO } from '@/types/knowledge'
 import type { ArticleSearchVO, QuestionSearchVO } from '@/types/search'
 
@@ -42,6 +44,16 @@ const questionTotal = ref(0)
 const questionPage = ref(1)
 const questionLoading = ref(false)
 const questionError = ref('')
+const { countsFor } = useInteractionCounts(() => [
+  ...articlesList.value.map((item) => ({
+    targetType: CONTENT_TARGET_TYPE.ARTICLE,
+    targetId: item.articleId,
+  })),
+  ...questionsList.value.map((item) => ({
+    targetType: CONTENT_TARGET_TYPE.QUESTION,
+    targetId: item.questionId,
+  })),
+])
 
 const loading = ref(false)
 const error = ref('')
@@ -291,7 +303,10 @@ useSeo({
                 <div class="tech-meta">
                   <AuthorChip :author="authors[article.authorId]" size="xs" />
                   <span>{{ article.viewCount }} 阅读</span>
-                  <span>{{ article.likeCount }} 赞</span>
+                  <span
+                    >{{ countsFor(CONTENT_TARGET_TYPE.ARTICLE, article.articleId)?.likeCount ?? '—' }}
+                    赞</span
+                  >
                 </div>
               </article>
 
@@ -336,7 +351,10 @@ useSeo({
                 <div class="tech-meta">
                   <AuthorChip :author="authors[question.userId]" size="xs" />
                   <span>{{ question.answerCount }} 回答</span>
-                  <span>{{ question.favoriteCount }} 收藏</span>
+                  <span
+                    >{{ countsFor(CONTENT_TARGET_TYPE.QUESTION, question.questionId)?.favoriteCount ?? '—' }}
+                    收藏</span
+                  >
                 </div>
               </article>
 

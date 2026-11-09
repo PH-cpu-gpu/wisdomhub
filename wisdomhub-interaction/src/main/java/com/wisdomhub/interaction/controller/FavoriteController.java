@@ -1,12 +1,16 @@
 package com.wisdomhub.interaction.controller;
 
+import com.wisdomhub.common.core.result.PageResponse;
 import com.wisdomhub.common.core.result.R;
+import com.wisdomhub.interaction.domain.vo.FavoriteItemVO;
 import com.wisdomhub.interaction.service.FavoriteService;
+import com.wisdomhub.interaction.service.InteractionQueryService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -20,6 +24,16 @@ import org.springframework.web.bind.annotation.RestController;
 public class FavoriteController {
 
     private final FavoriteService favoriteService;
+    private final InteractionQueryService interactionQueryService;
+
+    @Operation(summary = "我的收藏分页（按收藏时间倒序，targetType 可选）")
+    @GetMapping
+    public R<PageResponse<FavoriteItemVO>> page(
+            @RequestParam(required = false) Integer targetType,
+            @RequestParam(defaultValue = "1") Integer page,
+            @RequestParam(defaultValue = "10") Integer pageSize) {
+        return R.success(interactionQueryService.pageFavorites(targetType, page, pageSize));
+    }
 
     @Operation(summary = "收藏（幂等，返回最新收藏数）")
     @PutMapping

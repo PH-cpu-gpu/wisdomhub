@@ -4,6 +4,7 @@ import { RouterLink } from 'vue-router'
 import AuthorChip from '@/components/business/AuthorChip.vue'
 import type { ID } from '@/types/common'
 import type { ArticleListItemVO } from '@/types/content'
+import type { InteractionCountVO } from '@/types/interaction'
 import type { UserBriefVO } from '@/types/user'
 import { formatDateTime } from '@/utils'
 
@@ -12,6 +13,8 @@ withDefaults(
     article: ArticleListItemVO
     author?: UserBriefVO | null
     tags?: { tagId: ID; name: string }[]
+    /** 互动计数由列表页批量取后传入；未加载时展示占位符 */
+    counts?: InteractionCountVO | null
     compact?: boolean
   }>(),
   {
@@ -51,13 +54,13 @@ withDefaults(
         >阅读 <b>{{ article.viewCount }}</b></span
       >
       <span
-        >赞 <b>{{ article.likeCount }}</b></span
+        >赞 <b>{{ counts?.likeCount ?? '—' }}</b></span
       >
       <span
-        >评论 <b>{{ article.commentCount }}</b></span
+        >评论 <b>{{ counts?.commentCount ?? '—' }}</b></span
       >
       <span
-        >收藏 <b>{{ article.favoriteCount }}</b></span
+        >收藏 <b>{{ counts?.favoriteCount ?? '—' }}</b></span
       >
     </div>
   </article>

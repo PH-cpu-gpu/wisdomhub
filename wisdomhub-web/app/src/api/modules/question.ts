@@ -29,6 +29,11 @@ export function detail(questionId: ID, options: RequestOptions = {}): Promise<Qu
   return get<QuestionDetailVO>(`/api/content/question/${questionId}`, undefined, options)
 }
 
+/** 按 ID 批量取问题摘要，收藏页回填用 */
+export function listBrief(questionIds: ID[]): Promise<QuestionListItemVO[]> {
+  return get<QuestionListItemVO[]>('/api/content/question/brief', { questionIds })
+}
+
 export function remove(questionId: ID): Promise<void> {
   return del<void>(`/api/content/question/${questionId}`)
 }

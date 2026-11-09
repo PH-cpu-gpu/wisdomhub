@@ -5,7 +5,6 @@ export interface QuestionListItemVO {
   userId: ID
   title: string
   answerCount: number
-  favoriteCount: number
   solved: boolean
   createTime: string
 }
@@ -15,8 +14,6 @@ export interface AnswerVO {
   questionId: ID
   userId: ID
   content: string
-  likeCount: number
-  commentCount: number
   createTime: string
 }
 
@@ -26,10 +23,8 @@ export interface QuestionDetailVO {
   title: string
   content: string
   answerCount: number
-  favoriteCount: number
   acceptedAnswerId: ID | null
   acceptedAnswer: AnswerVO | null
-  favorited: boolean
   createTime: string
 }
 

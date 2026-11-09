@@ -2,6 +2,7 @@
 import { RouterLink } from 'vue-router'
 
 import AuthorChip from '@/components/business/AuthorChip.vue'
+import type { InteractionCountVO } from '@/types/interaction'
 import type { QuestionListItemVO } from '@/types/qa'
 import type { UserBriefVO } from '@/types/user'
 import { formatDateTime } from '@/utils'
@@ -9,6 +10,8 @@ import { formatDateTime } from '@/utils'
 defineProps<{
   question: QuestionListItemVO
   author?: UserBriefVO | null
+  /** 收藏数由列表页批量取互动计数后传入 */
+  counts?: InteractionCountVO | null
 }>()
 </script>
 
@@ -33,7 +36,7 @@ defineProps<{
     <div class="question-card__meta">
       <AuthorChip :author="author" size="xs" />
       <span class="question-card__stat">{{ question.answerCount }} 回答</span>
-      <span class="question-card__stat">{{ question.favoriteCount }} 收藏</span>
+      <span class="question-card__stat">{{ counts?.favoriteCount ?? '—' }} 收藏</span>
     </div>
   </article>
 </template>

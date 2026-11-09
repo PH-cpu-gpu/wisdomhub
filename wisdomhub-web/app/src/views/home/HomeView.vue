@@ -16,8 +16,10 @@ import HomeSection from '@/components/home/HomeSection.vue'
 import PageContainer from '@/components/layout/PageContainer.vue'
 import { useAsyncData } from '@/composables/useAsyncData'
 import { useArticleAuthors } from '@/composables/useArticleAuthors'
+import { useInteractionCounts } from '@/composables/useInteractionCounts'
 import { useSeo } from '@/composables/useSeo'
 import { useAuthStore } from '@/stores'
+import { CONTENT_TARGET_TYPE } from '@/types/interaction'
 import { formatDateTime } from '@/utils'
 
 const auth = useAuthStore()
@@ -84,6 +86,27 @@ const { authors } = useArticleAuthors(
   hotArticles,
   () => latestArticles.value?.items,
 )
+
+/** 三个文章区块 + 热门问题共用一个批取：重复 id 在 composable 里去重 */
+const homeInteractionTargets = computed(() => [
+  ...(recommendations.value ?? []).map((article) => ({
+    targetType: CONTENT_TARGET_TYPE.ARTICLE,
+    targetId: article.articleId,
+  })),
+  ...(hotArticles.value ?? []).map((article) => ({
+    targetType: CONTENT_TARGET_TYPE.ARTICLE,
+    targetId: article.articleId,
+  })),
+  ...(latestArticles.value?.items ?? []).map((article) => ({
+    targetType: CONTENT_TARGET_TYPE.ARTICLE,
+    targetId: article.articleId,
+  })),
+  ...(hotQuestions.value?.items ?? []).map((question) => ({
+    targetType: CONTENT_TARGET_TYPE.QUESTION,
+    targetId: question.questionId,
+  })),
+])
+const { countsFor } = useInteractionCounts(homeInteractionTargets)
 
 const recommendationsEmpty = computed(
   () =>
@@ -232,6 +255,7 @@ void loadHome()
               :key="article.articleId"
               :article="article"
               :author="authors[article.authorId]"
+              :counts="countsFor(CONTENT_TARGET_TYPE.ARTICLE, article.articleId)"
               compact
               :tags="article.tags"
             />
@@ -285,6 +309,7 @@ void loadHome()
               :key="article.articleId"
               :article="article"
               :author="authors[article.authorId]"
+              :counts="countsFor(CONTENT_TARGET_TYPE.ARTICLE, article.articleId)"
               compact
               :tags="article.tags"
             />
@@ -319,7 +344,10 @@ void loadHome()
                 </RouterLink>
                 <div class="home-question__meta">
                   <span>{{ question.answerCount }} 回答</span>
-                  <span>{{ question.favoriteCount }} 收藏</span>
+                  <span
+                    >{{ countsFor(CONTENT_TARGET_TYPE.QUESTION, question.questionId)?.favoriteCount ?? '—' }}
+                    收藏</span
+                  >
                   <time :datetime="question.createTime">
                     {{ formatDateTime(question.createTime, 'YYYY-MM-DD') }}
                   </time>
@@ -350,6 +378,7 @@ void loadHome()
               :key="article.articleId"
               :article="article"
               :author="authors[article.authorId]"
+              :counts="countsFor(CONTENT_TARGET_TYPE.ARTICLE, article.articleId)"
               compact
             />
           </div>

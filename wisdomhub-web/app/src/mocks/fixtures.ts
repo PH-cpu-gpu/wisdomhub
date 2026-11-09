@@ -4,11 +4,11 @@ import type {
   ArticleDetailVO,
   ArticleListItemVO,
   ColumnVO,
-  CommentVO,
   HotTagVO,
   PurchasedColumnVO,
   TagVO,
 } from '@/types/content'
+import type { CommentVO } from '@/types/interaction'
 import type { RecommendationItemVO } from '@/types/recommendation'
 import type { QuestionListItemVO, AnswerVO } from '@/types/qa'
 import type { TagProposalVO } from '@/types/tag-proposal'
@@ -233,7 +233,14 @@ export const mockAuthors: UserBriefVO[] = [
   },
 ]
 
-export const mockArticles: ArticleListItemVO[] = [
+/** mock 行带互动计数：列表 VO 已不再承载计数，下面会拆成 mockArticles + mockArticleStats */
+type MockArticleRow = ArticleListItemVO & {
+  likeCount: number
+  commentCount: number
+  favoriteCount: number
+}
+
+const mockArticleRows: MockArticleRow[] = [
   {
     articleId: '1001',
     authorId: '2001',
@@ -434,6 +441,26 @@ export const mockArticles: ArticleListItemVO[] = [
   },
 ]
 
+/** 互动计数的 mock 真值，由 /api/interaction/counts 与 /state 读取 */
+export const mockArticleStats: Record<
+  string,
+  { likeCount: number; commentCount: number; favoriteCount: number }
+> = Object.fromEntries(
+  mockArticleRows.map(({ articleId, likeCount, commentCount, favoriteCount }) => [
+    articleId,
+    { likeCount, commentCount, favoriteCount },
+  ]),
+)
+
+export const mockArticles: ArticleListItemVO[] = mockArticleRows.map((row) => ({
+  articleId: row.articleId,
+  authorId: row.authorId,
+  title: row.title,
+  summary: row.summary,
+  publishTime: row.publishTime,
+  viewCount: row.viewCount,
+}))
+
 const articleTagIds: string[][] = [
   ['4'],
   ['3'],
@@ -456,7 +483,10 @@ export const mockRecommendations: RecommendationItemVO[] = mockArticles.map((art
     .map((tag) => ({ tagId: tag.tagId, name: tag.name, category: tag.category })),
 }))
 
-export const mockQuestions: QuestionListItemVO[] = [
+/** 问题行带收藏数：列表 VO 已不再承载计数，下面拆成 mockQuestions + mockQuestionStats */
+type MockQuestionRow = QuestionListItemVO & { favoriteCount: number }
+
+const mockQuestionRows: MockQuestionRow[] = [
   {
     questionId: '4001',
     userId: '2001',
@@ -513,6 +543,19 @@ export const mockQuestions: QuestionListItemVO[] = [
   },
 ]
 
+export const mockQuestionStats: Record<string, { favoriteCount: number }> = Object.fromEntries(
+  mockQuestionRows.map(({ questionId, favoriteCount }) => [questionId, { favoriteCount }]),
+)
+
+export const mockQuestions: QuestionListItemVO[] = mockQuestionRows.map((row) => ({
+  questionId: row.questionId,
+  userId: row.userId,
+  title: row.title,
+  answerCount: row.answerCount,
+  solved: row.solved,
+  createTime: row.createTime,
+}))
+
 export const mockQuestionContents: Record<string, string> = {
   '4001':
     '在同一个 Service 类里，方法 A 直接调用方法 B，调用走的是 this，不经过 Spring 代理，因此 @Transactional 不会生效。\n\n我已经确认方法都是 public，也试过把注解挪到类上，但仍然没有回滚。请问除了拆到另一个 Bean，还有别的办法吗？',
@@ -527,7 +570,10 @@ export const mockQuestionContents: Record<string, string> = {
   '4006': 'RAG 问答给出的引用经常看起来相关但答非所问，引用准确率和答案准确率应该分别怎么评估？',
 }
 
-export const mockAnswers: AnswerVO[] = [
+/** 回答行带点赞/评论数：拆成 mockAnswers + mockAnswerStats */
+type MockAnswerRow = AnswerVO & { likeCount: number; commentCount: number }
+
+const mockAnswerRows: MockAnswerRow[] = [
   {
     answerId: '6001',
     questionId: '4001',
@@ -784,6 +830,24 @@ export const mockAnswers: AnswerVO[] = [
   },
 ]
 
+export const mockAnswerStats: Record<
+  string,
+  { likeCount: number; commentCount: number }
+> = Object.fromEntries(
+  mockAnswerRows.map(({ answerId, likeCount, commentCount }) => [
+    answerId,
+    { likeCount, commentCount },
+  ]),
+)
+
+export const mockAnswers: AnswerVO[] = mockAnswerRows.map((row) => ({
+  answerId: row.answerId,
+  questionId: row.questionId,
+  userId: row.userId,
+  content: row.content,
+  createTime: row.createTime,
+}))
+
 export const mockComments: CommentVO[] = [
   {
     commentId: '5001',
@@ -870,6 +934,13 @@ export const mockComments: CommentVO[] = [
   },
 ]
 
+// 评论数以 mockComments 为准（一级 + 内嵌回复），覆盖文章 1001 的占位值，避免列表/state 与评论区口径漂移
+const article1001Stats = mockArticleStats['1001']
+if (article1001Stats) {
+  const commentTotal = mockComments.reduce((sum, root) => sum + 1 + root.replies.length, 0)
+  mockArticleStats['1001'] = { ...article1001Stats, commentCount: commentTotal }
+}
+
 const MOCK_ARTICLE_HTML = `
 <h2>先看结论</h2>
 <p>缓存不是「加一层 Redis」这么简单。你需要先回答：哪些数据允许短暂不一致，哪些数据必须强一致，以及缓存失效时谁来回源。</p>
@@ -912,15 +983,16 @@ interface MockArticleReaction {
 
 const mockArticleReactions = new Map<string, MockArticleReaction>()
 
-function reactionFor(articleId: string, base: ArticleListItemVO): MockArticleReaction {
+function reactionFor(articleId: string): MockArticleReaction {
   const current = mockArticleReactions.get(articleId)
   if (current) return current
 
+  const stats = mockArticleStats[articleId]
   const created: MockArticleReaction = {
     liked: false,
     collected: false,
-    likeCount: base.likeCount,
-    favoriteCount: base.favoriteCount,
+    likeCount: stats?.likeCount ?? 0,
+    favoriteCount: stats?.favoriteCount ?? 0,
   }
   mockArticleReactions.set(articleId, created)
   return created
@@ -1158,18 +1230,13 @@ export const mockPurchasedColumns: PurchasedColumnVO[] = [
 export function mockArticleDetail(articleId: string, locked = false): ArticleDetailVO {
   const base = mockArticles.find((article) => article.articleId === articleId) ?? mockArticles[0]
   if (!base) throw new Error('mockArticles is empty')
-  const reaction = reactionFor(articleId, base)
 
   return {
     ...base,
     articleId,
-    likeCount: reaction.likeCount,
-    favoriteCount: reaction.favoriteCount,
     html: locked ? null : MOCK_ARTICLE_HTML,
     locked,
     columns: locked ? mockPaidColumns : [],
-    liked: reaction.liked,
-    collected: reaction.collected,
   }
 }
 
@@ -1181,7 +1248,7 @@ export function mockToggleArticleReaction(
   const base = mockArticles.find((article) => article.articleId === articleId) ?? mockArticles[0]
   if (!base) return 0
 
-  const reaction = reactionFor(articleId, base)
+  const reaction = reactionFor(articleId)
   if (kind === 'like') {
     if (reaction.liked !== active) {
       reaction.liked = active

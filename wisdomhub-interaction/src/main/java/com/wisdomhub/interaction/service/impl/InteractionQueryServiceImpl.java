@@ -1,15 +1,20 @@
 package com.wisdomhub.interaction.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.wisdomhub.common.core.constants.ContentTargetTypeConstants;
 import com.wisdomhub.common.core.exception.BusinessException;
 import com.wisdomhub.common.core.result.CommonErrorCode;
+import com.wisdomhub.common.core.result.PageResponse;
 import com.wisdomhub.common.security.context.UserContext;
+import com.wisdomhub.common.web.util.CurrentUserUtil;
+import com.wisdomhub.common.web.util.PageUtil;
 import com.wisdomhub.interaction.domain.dto.InteractionCountBatchDTO;
 import com.wisdomhub.interaction.domain.dto.InteractionCountQueryDTO;
 import com.wisdomhub.interaction.domain.entity.ContentFavorite;
 import com.wisdomhub.interaction.domain.entity.ContentLike;
 import com.wisdomhub.interaction.domain.entity.InteractionCount;
+import com.wisdomhub.interaction.domain.vo.FavoriteItemVO;
 import com.wisdomhub.interaction.domain.vo.InteractionCountBatchVO;
 import com.wisdomhub.interaction.domain.vo.InteractionCountVO;
 import com.wisdomhub.interaction.domain.vo.InteractionStateVO;
@@ -110,6 +115,28 @@ public class InteractionQueryServiceImpl implements InteractionQueryService {
                     .build());
         }
         return InteractionCountBatchVO.builder().items(result).build();
+    }
+
+    @Override
+    public PageResponse<FavoriteItemVO> pageFavorites(Integer targetType, Integer page, Integer pageSize) {
+        Long userId = CurrentUserUtil.id();
+        Byte type = targetType == null ? null : (byte) requireValidType(targetType);
+
+        Page<ContentFavorite> result = contentFavoriteMapper.selectPage(PageUtil.of(page, pageSize),
+                new LambdaQueryWrapper<ContentFavorite>()
+                        .eq(ContentFavorite::getUserId, userId)
+                        .eq(type != null, ContentFavorite::getTargetType, type)
+                        .orderByDesc(ContentFavorite::getCreateTime)
+                        .orderByDesc(ContentFavorite::getId));
+
+        List<FavoriteItemVO> items = result.getRecords().stream()
+                .map(row -> FavoriteItemVO.builder()
+                        .targetType(row.getTargetType().intValue())
+                        .targetId(row.getTargetId())
+                        .createTime(row.getCreateTime())
+                        .build())
+                .toList();
+        return PageUtil.toResponse(result, items);
     }
 
     private int requireValidType(Integer targetType) {

@@ -14,8 +14,10 @@ import AuthorChip from '@/components/business/AuthorChip.vue'
 import SearchHighlight from '@/components/business/SearchHighlight.vue'
 import PageContainer from '@/components/layout/PageContainer.vue'
 import { useAuthorBrief } from '@/composables/useAuthorBrief'
+import { useInteractionCounts } from '@/composables/useInteractionCounts'
 import { useSeo } from '@/composables/useSeo'
 import { useDictStore } from '@/stores'
+import { CONTENT_TARGET_TYPE } from '@/types/interaction'
 import type {
   ArticleSearchVO,
   HotWordVO,
@@ -70,6 +72,16 @@ const articleResults = ref<ArticleSearchVO[]>([])
 const questionResults = ref<QuestionSearchVO[]>([])
 const userResults = ref<UserSearchVO[]>([])
 const tagResults = ref<TagSearchVO[]>([])
+const { countsFor } = useInteractionCounts(() => [
+  ...articleResults.value.map((item) => ({
+    targetType: CONTENT_TARGET_TYPE.ARTICLE,
+    targetId: item.articleId,
+  })),
+  ...questionResults.value.map((item) => ({
+    targetType: CONTENT_TARGET_TYPE.QUESTION,
+    targetId: item.questionId,
+  })),
+])
 
 const startInput = ref(start.value)
 const endInput = ref(end.value)
@@ -399,7 +411,7 @@ useSeo({
             <div class="search-result__meta">
               <AuthorChip :author="authors[article.authorId]" size="xs" />
               <span>{{ article.viewCount }} 阅读</span>
-              <span>{{ article.likeCount }} 赞</span>
+              <span>{{ countsFor(CONTENT_TARGET_TYPE.ARTICLE, article.articleId)?.likeCount ?? '—' }} 赞</span>
             </div>
             <div v-if="article.tags.length" class="search-result__tags">
               <RouterLink
@@ -433,7 +445,10 @@ useSeo({
             <div class="search-result__meta">
               <AuthorChip :author="authors[question.userId]" size="xs" />
               <span>{{ question.answerCount }} 回答</span>
-              <span>{{ question.favoriteCount }} 收藏</span>
+              <span
+                >{{ countsFor(CONTENT_TARGET_TYPE.QUESTION, question.questionId)?.favoriteCount ?? '—' }}
+                收藏</span
+              >
             </div>
           </article>
         </template>

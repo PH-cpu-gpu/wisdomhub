@@ -21,7 +21,6 @@ export interface QuestionSearchVO {
   content: string
   highlight: Record<string, string>
   answerCount: number
-  favoriteCount: number
   acceptedAnswerId: ID | null
   createTime: string
   updateTime: string

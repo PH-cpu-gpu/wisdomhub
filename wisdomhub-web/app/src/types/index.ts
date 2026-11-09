@@ -1,6 +1,7 @@
 export * from './common'
 export * from './user'
 export * from './content'
+export * from './interaction'
 export * from './qa'
 export * from './search'
 export * from './knowledge'

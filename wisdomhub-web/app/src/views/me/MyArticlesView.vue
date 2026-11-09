@@ -11,10 +11,12 @@ import { toast } from '@/components/base/toast'
 import ArticleCard from '@/components/business/ArticleCard.vue'
 import PageContainer from '@/components/layout/PageContainer.vue'
 import { useArticleAuthors } from '@/composables/useArticleAuthors'
+import { useInteractionCounts } from '@/composables/useInteractionCounts'
 import { usePagination } from '@/composables/usePagination'
 import { useSeo } from '@/composables/useSeo'
 import { useAuthStore } from '@/stores'
 import type { ArticleListItemVO } from '@/types/content'
+import { CONTENT_TARGET_TYPE } from '@/types/interaction'
 
 const auth = useAuthStore()
 
@@ -24,6 +26,12 @@ const error = ref('')
 
 const { page, pageSize, total, setTotal } = usePagination({ pageSize: 5 })
 const { authors } = useArticleAuthors(() => articles.value)
+const { countsFor } = useInteractionCounts(() =>
+  articles.value.map((item) => ({
+    targetType: CONTENT_TARGET_TYPE.ARTICLE,
+    targetId: item.articleId,
+  })),
+)
 
 let requestId = 0
 
@@ -119,7 +127,12 @@ useSeo({
 
       <div v-else class="my-articles-list">
         <article v-for="article in articles" :key="article.articleId" class="my-article">
-          <ArticleCard :article="article" :author="authors[article.authorId]" compact />
+          <ArticleCard
+            :article="article"
+            :author="authors[article.authorId]"
+            :counts="countsFor(CONTENT_TARGET_TYPE.ARTICLE, article.articleId)"
+            compact
+          />
           <div class="my-article__actions">
             <RouterLink
               class="my-article__action"

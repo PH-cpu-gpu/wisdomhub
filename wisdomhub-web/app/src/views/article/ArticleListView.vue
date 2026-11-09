@@ -12,8 +12,10 @@ import ArticleCard from '@/components/business/ArticleCard.vue'
 import PageContainer from '@/components/layout/PageContainer.vue'
 import { useArticleAuthors } from '@/composables/useArticleAuthors'
 import { useAsyncData } from '@/composables/useAsyncData'
+import { useInteractionCounts } from '@/composables/useInteractionCounts'
 import { useSeo } from '@/composables/useSeo'
 import { useDictStore } from '@/stores'
+import { CONTENT_TARGET_TYPE } from '@/types/interaction'
 
 type Sort = 'new' | 'hot'
 
@@ -64,6 +66,12 @@ const {
 
 const { authors } = useArticleAuthors(() => articlePage.value?.items)
 const items = computed(() => articlePage.value?.items ?? [])
+const { countsFor } = useInteractionCounts(() =>
+  items.value.map((item) => ({
+    targetType: CONTENT_TARGET_TYPE.ARTICLE,
+    targetId: item.articleId,
+  })),
+)
 const total = computed(() => articlePage.value?.total ?? 0)
 const activeTag = computed(() => (tagId.value ? dict.tagMap[tagId.value] : undefined))
 const filterAuthor = computed(() => (authorId.value ? authors[authorId.value] : undefined))
@@ -229,6 +237,7 @@ useSeo({
           :key="article.articleId"
           :article="article"
           :author="authors[article.authorId]"
+          :counts="countsFor(CONTENT_TARGET_TYPE.ARTICLE, article.articleId)"
         />
       </div>
 

@@ -1,7 +1,9 @@
 import { AxiosHeaders, type AxiosResponse, type InternalAxiosRequestConfig } from 'axios'
 
 import type { PageResponse, R } from '@/types/common'
-import type { ArticleListItemVO, ColumnVO, CommentVO, TagAliasVO } from '@/types/content'
+import type { ArticleListItemVO, ColumnVO, TagAliasVO } from '@/types/content'
+import type { CommentVO } from '@/types/interaction'
+import { CONTENT_TARGET_TYPE } from '@/types/interaction'
 import type {
   GraphEdgeVO,
   GraphNodeVO,
@@ -20,6 +22,8 @@ import type { BrowseHistoryVO } from '@/types/user'
 import {
   mockArticleBriefs,
   mockArticleDetail,
+  mockArticleStats,
+  mockAnswerStats,
   mockAnswers,
   mockArticles,
   mockAuthors,
@@ -35,6 +39,7 @@ import {
   mockPurchasedColumns,
   mockQuestionContents,
   mockQuestions,
+  mockQuestionStats,
   mockRecommendations,
   mockSocialUsers,
   mockTagProposals,
@@ -48,6 +53,8 @@ import {
 const MOCK_DELAY = 180
 /** Mock 永远视为已登录的 1001 */
 const MOCK_USER_ID = '1001'
+const CONTENT_ANSWER = CONTENT_TARGET_TYPE.ANSWER
+const CONTENT_QUESTION = CONTENT_TARGET_TYPE.QUESTION
 const mockFollowing = new Set<string>()
 /** 提案 mock 是有状态的：审批后要把状态写回，刷新详情/列表才能看到变化 */
 const mockProposalState = mockTagProposals.map((proposal) => ({ ...proposal }))
@@ -73,8 +80,92 @@ const mockFavoriteArticleIds = new Set<string>([
   '1004',
   '1007',
   '1008',
-  '1013',
 ])
+/** 互动 mock：liked/collected 是用户维度状态，计数从 mockArticleStats 起步再随操作增减 */
+const mockInteractionLikes = new Set<string>()
+const mockInteractionCollects = new Set<string>(
+  [...mockFavoriteArticleIds].map((articleId) => `1:${articleId}`),
+)
+const mockInteractionCounts = new Map<
+  string,
+  { likeCount: number; commentCount: number; favoriteCount: number }
+>()
+
+function interactionKeyOf(targetType: number, targetId: string): string {
+  return `${targetType}:${targetId}`
+}
+
+function interactionCountsOf(
+  targetType: number,
+  targetId: string,
+): { likeCount: number; commentCount: number; favoriteCount: number } {
+  const key = interactionKeyOf(targetType, targetId)
+  const cached = mockInteractionCounts.get(key)
+  if (cached) return cached
+
+  const counts = { likeCount: 0, commentCount: 0, favoriteCount: 0 }
+  if (targetType === 1) {
+    Object.assign(counts, mockArticleStats[targetId] ?? {})
+  } else if (targetType === 2) {
+    Object.assign(counts, mockAnswerStats[targetId] ?? {})
+  } else if (targetType === 3) {
+    Object.assign(counts, mockQuestionStats[targetId] ?? {})
+  }
+
+  mockInteractionCounts.set(key, counts)
+  return counts
+}
+
+function toggleInteraction(
+  kind: 'like' | 'favorite',
+  targetType: number,
+  targetId: string,
+  active: boolean,
+): number {
+  const store = kind === 'like' ? mockInteractionLikes : mockInteractionCollects
+  const key = interactionKeyOf(targetType, targetId)
+  const counts = interactionCountsOf(targetType, targetId)
+
+  if (active && !store.has(key)) {
+    store.add(key)
+    if (kind === 'like') counts.likeCount += 1
+    else {
+      counts.favoriteCount += 1
+      if (targetType === 1) mockFavoriteArticleIds.add(targetId)
+      else if (targetType === 3) {
+        mockQuestionFavorites.add(targetId)
+        persistMockQuestionFavorites()
+      }
+    }
+  } else if (!active && store.has(key)) {
+    store.delete(key)
+    if (kind === 'like') counts.likeCount = Math.max(0, counts.likeCount - 1)
+    else {
+      counts.favoriteCount = Math.max(0, counts.favoriteCount - 1)
+      if (targetType === 1) mockFavoriteArticleIds.delete(targetId)
+      else if (targetType === 3) {
+        mockQuestionFavorites.delete(targetId)
+        persistMockQuestionFavorites()
+      }
+    }
+  }
+
+  return kind === 'like' ? counts.likeCount : counts.favoriteCount
+}
+
+function interactionTargetOf(config: InternalAxiosRequestConfig): {
+  targetType: number
+  targetId: string
+} {
+  const params = (config.params ?? {}) as {
+    targetType?: number | string
+    targetId?: string | number
+  }
+  return {
+    targetType: Number(params.targetType ?? 1),
+    targetId: params.targetId === undefined ? '' : String(params.targetId),
+  }
+}
 const mockHistoryEntries = [
   { articleId: '1002', updateTime: '2026-10-26T09:30:00Z' },
   { articleId: '1003', updateTime: '2026-10-26T08:10:00Z' },
@@ -390,6 +481,8 @@ function persistMockReadNotifications(): void {
 }
 
 const mockQuestionFavorites = loadMockQuestionFavorites()
+// 收藏状态以 interaction 为准：把旧的收藏集合灌进统一的状态集
+mockQuestionFavorites.forEach((questionId) => mockInteractionCollects.add(`3:${questionId}`))
 
 function persistMockQuestionFavorites(): void {
   localStorage.setItem(MOCK_QUESTION_FAVORITES_KEY, JSON.stringify([...mockQuestionFavorites]))
@@ -433,7 +526,22 @@ const mockAnswerComments: Record<string, CommentVO[]> = {
     },
   ],
 }
-const mockAnswerLikes = new Set<string>()
+/** 评论 mock 按 (targetType,targetId) 存储；文章 1001 与回答评论沿用旧 fixture */
+const mockCommentStore = new Map<string, CommentVO[]>()
+mockCommentStore.set('1:1001', mockComments)
+for (const [answerId, roots] of Object.entries(mockAnswerComments)) {
+  mockCommentStore.set(`${CONTENT_ANSWER}:${answerId}`, roots)
+}
+
+function mockCommentRootsOf(targetType: number, targetId: string): CommentVO[] {
+  const key = `${targetType}:${targetId}`
+  const existing = mockCommentStore.get(key)
+  if (existing) return existing
+  const created: CommentVO[] = []
+  mockCommentStore.set(key, created)
+  return created
+}
+
 let mockAnswerSequence = 7000
 const MOCK_CREATED_QUESTIONS_KEY = 'wisdomhub:mock.createdQuestions'
 
@@ -1107,7 +1215,6 @@ export async function handleMockRequest(
           content: highlightText(content, keyword),
         },
         answerCount: question.answerCount,
-        favoriteCount: question.favoriteCount,
         acceptedAnswerId: mockQuestionAccepted[question.questionId] ?? null,
         createTime: question.createTime,
         updateTime: question.createTime,
@@ -1332,6 +1439,77 @@ export async function handleMockRequest(
     }
   }
 
+  if (method === 'get' && path === '/api/interaction/state') {
+    if (localStorage.getItem('wisdomhub:mock.failState') === '1') {
+      return failure(config, 503, '互动状态暂不可用')
+    }
+    const { targetType, targetId } = interactionTargetOf(config)
+    const key = interactionKeyOf(targetType, targetId)
+    return response(config, {
+      liked: mockInteractionLikes.has(key),
+      collected: mockInteractionCollects.has(key),
+      ...interactionCountsOf(targetType, targetId),
+    })
+  }
+
+  if (method === 'post' && path === '/api/interaction/counts') {
+    if (localStorage.getItem('wisdomhub:mock.failCounts') === '1') {
+      return failure(config, 503, '互动计数暂不可用')
+    }
+    const body = bodyOf<{
+      items?: Array<{ targetType?: number | string; targetId?: string | number }>
+    }>(config)
+    const items = (body?.items ?? []).map((item) => {
+      const targetType = Number(item.targetType ?? 1)
+      const targetId = item.targetId === undefined ? '' : String(item.targetId)
+      return { targetType, targetId, ...interactionCountsOf(targetType, targetId) }
+    })
+    return response(config, { items })
+  }
+
+  if ((method === 'put' || method === 'delete') && path === '/api/interaction/like') {
+    if (localStorage.getItem('wisdomhub:mock.failLike') === '1') {
+      return failure(config, 500, '点赞失败，请稍后重试')
+    }
+    const { targetType, targetId } = interactionTargetOf(config)
+    return response(config, toggleInteraction('like', targetType, targetId, method === 'put'))
+  }
+
+  if (method === 'get' && path === '/api/interaction/favorite') {
+    const params = (config.params ?? {}) as {
+      targetType?: string | number
+      page?: number | string
+      pageSize?: number | string
+    }
+    const targetType = params.targetType === undefined ? null : Number(params.targetType)
+    const entries: Array<{ targetType: number; targetId: string; createTime: string }> = []
+    let sequence = 0
+    const push = (type: number, targetId: string): void => {
+      if (targetType !== null && targetType !== type) return
+      entries.push({
+        targetType: type,
+        targetId,
+        createTime: new Date(Date.UTC(2026, 9, 1) + sequence * 1000).toISOString(),
+      })
+      sequence += 1
+    }
+    mockFavoriteArticleIds.forEach((articleId) => push(CONTENT_TARGET_TYPE.ARTICLE, articleId))
+    mockQuestionFavorites.forEach((questionId) => push(CONTENT_TARGET_TYPE.QUESTION, questionId))
+    entries.sort((a, b) => b.createTime.localeCompare(a.createTime))
+    return response(config, pageOf(entries, config))
+  }
+
+  if ((method === 'put' || method === 'delete') && path === '/api/interaction/favorite') {
+    if (localStorage.getItem('wisdomhub:mock.failCollect') === '1') {
+      return failure(config, 500, '收藏失败，请稍后重试')
+    }
+    const { targetType, targetId } = interactionTargetOf(config)
+    return response(
+      config,
+      toggleInteraction('favorite', targetType, targetId, method === 'put'),
+    )
+  }
+
   if (method === 'get' && path === '/api/content/article') {
     const params = (config.params ?? {}) as {
       authorId?: string | number
@@ -1459,11 +1637,11 @@ export async function handleMockRequest(
       userId: '1001',
       title,
       answerCount: 0,
-      favoriteCount: 0,
       solved: false,
       createTime: new Date().toISOString(),
     }
     mockCreatedQuestions.unshift(question)
+    mockQuestionStats[questionId] = { favoriteCount: 0 }
     persistMockCreatedQuestions()
     localStorage.setItem('wisdomhub:mock.questionSeq', questionId)
     mockQuestionContent.set(questionId, content)
@@ -1487,6 +1665,19 @@ export async function handleMockRequest(
     return response(config, pageOf(items, config))
   }
 
+  if (method === 'get' && path === '/api/content/question/brief') {
+    const params = (config.params ?? {}) as { questionIds?: string[] | string }
+    const ids = Array.isArray(params.questionIds)
+      ? params.questionIds.map(String)
+      : params.questionIds === undefined
+        ? []
+        : [String(params.questionIds)]
+    const items = [...mockCreatedQuestions, ...mockQuestions].filter((question) =>
+      ids.includes(question.questionId),
+    )
+    return response(config, items)
+  }
+
   const questionDetailMatch = path.match(/^\/api\/content\/question\/([^/]+)$/)
   if (method === 'get' && questionDetailMatch?.[1]) {
     const questionId = decodeURIComponent(questionDetailMatch[1])
@@ -1506,10 +1697,8 @@ export async function handleMockRequest(
       title: question.title,
       content: mockQuestionContent.get(questionId) ?? mockQuestionContents[questionId] ?? '',
       answerCount: question.answerCount,
-      favoriteCount: question.favoriteCount,
       acceptedAnswerId,
       acceptedAnswer,
-      favorited: mockQuestionFavorites.has(questionId),
       createTime: question.createTime,
     })
   }
@@ -1551,10 +1740,9 @@ export async function handleMockRequest(
       questionId,
       userId: '1001',
       content,
-      likeCount: 0,
-      commentCount: 0,
       createTime: new Date().toISOString(),
     })
+    mockAnswerStats[answerId] = { likeCount: 0, commentCount: 0 }
     question.answerCount += 1
     return response(config, answerId)
   }
@@ -1566,15 +1754,7 @@ export async function handleMockRequest(
     if (!answer) return failure(config, 404, '回答不存在或已删除')
 
     const active = method === 'put'
-    const liked = mockAnswerLikes.has(answerId)
-    if (active && !liked) {
-      mockAnswerLikes.add(answerId)
-      answer.likeCount += 1
-    } else if (!active && liked) {
-      mockAnswerLikes.delete(answerId)
-      answer.likeCount = Math.max(0, answer.likeCount - 1)
-    }
-    return response(config, answer.likeCount)
+    return response(config, toggleInteraction('like', CONTENT_ANSWER, answerId, active))
   }
 
   const answerDeleteMatch = path.match(/^\/api\/content\/answer\/([^/]+)$/)
@@ -1629,27 +1809,25 @@ export async function handleMockRequest(
     persistMockQuestionFavorites()
     return response(
       config,
-      question.favoriteCount + (mockQuestionFavorites.has(questionId) ? 1 : 0),
+      toggleInteraction('favorite', CONTENT_QUESTION, questionId, method === 'put'),
     )
   }
 
-  if (method === 'get' && path === '/api/content/comment') {
+  if (method === 'get' && path === '/api/interaction/comment') {
+    if (localStorage.getItem('wisdomhub:mock.failComments') === '1') {
+      return failure(config, 503, '评论暂不可用')
+    }
     const params = (config.params ?? {}) as {
       targetId?: string | number
       targetType?: string | number
     }
-    const targetType = String(params.targetType ?? '1')
+    const targetType = Number(params.targetType ?? 1)
     const targetId = String(params.targetId ?? '')
-    const roots =
-      targetType === '2'
-        ? (mockAnswerComments[targetId] ?? [])
-        : targetType === '1' && targetId === '1001'
-          ? mockComments.filter((comment) => !comment.parentId)
-          : []
+    const roots = mockCommentRootsOf(targetType, targetId).filter((comment) => !comment.parentId)
     return response(config, pageOf(roots, config))
   }
 
-  if (method === 'post' && path === '/api/content/comment') {
+  if (method === 'post' && path === '/api/interaction/comment') {
     const body = bodyOf<{
       targetType?: number
       targetId?: string | number
@@ -1664,10 +1842,7 @@ export async function handleMockRequest(
 
     const targetType = Number(body?.targetType ?? 1)
     const targetId = String(body?.targetId ?? '')
-    if (targetType === 2 && !mockAnswerComments[targetId]) {
-      mockAnswerComments[targetId] = []
-    }
-    const roots = targetType === 2 ? mockAnswerComments[targetId]! : mockComments
+    const roots = mockCommentRootsOf(targetType, targetId)
 
     let parentId =
       body?.parentId === undefined || body?.parentId === null ? null : String(body.parentId)
@@ -1677,9 +1852,9 @@ export async function handleMockRequest(
       if (parent?.parentId) parentId = parent.parentId
     }
 
-    const comment = {
+    const comment: CommentVO = {
       commentId: String((mockCommentSequence += 1)),
-      userId: '1001',
+      userId: MOCK_USER_ID,
       parentId,
       content,
       createTime: new Date().toISOString(),
@@ -1693,42 +1868,32 @@ export async function handleMockRequest(
       roots.push(comment)
     }
 
-    if (targetType === 2) {
-      const answer = mockAnswers.find((item) => item.answerId === targetId)
-      if (answer) answer.commentCount += 1
-    }
+    interactionCountsOf(targetType, targetId).commentCount += 1
     return response(config, comment.commentId)
   }
 
-  const commentDeleteMatch = path.match(/^\/api\/content\/comment\/([^/]+)$/)
+  const commentDeleteMatch = path.match(/^\/api\/interaction\/comment\/([^/]+)$/)
   if (commentDeleteMatch?.[1] && method === 'delete') {
     const commentId = decodeURIComponent(commentDeleteMatch[1])
-    const rootIndex = mockComments.findIndex((comment) => comment.commentId === commentId)
-    if (rootIndex >= 0) {
-      mockComments.splice(rootIndex, 1)
-      return response(config, null)
-    }
-    for (const root of mockComments) {
-      const replyIndex = root.replies.findIndex((reply) => reply.commentId === commentId)
-      if (replyIndex >= 0) {
-        root.replies.splice(replyIndex, 1)
-        return response(config, null)
-      }
-    }
 
-    for (const [answerId, roots] of Object.entries(mockAnswerComments)) {
-      const answerRootIndex = roots.findIndex((comment) => comment.commentId === commentId)
-      const answer = mockAnswers.find((item) => item.answerId === answerId)
-      if (answerRootIndex >= 0) {
-        roots.splice(answerRootIndex, 1)
-        if (answer) answer.commentCount = Math.max(0, answer.commentCount - 1)
+    for (const [key, roots] of mockCommentStore) {
+      const sep = key.indexOf(':')
+      const targetType = Number(key.slice(0, sep))
+      const targetId = key.slice(sep + 1)
+      const counts = interactionCountsOf(targetType, targetId)
+
+      const rootIndex = roots.findIndex((comment) => comment.commentId === commentId)
+      if (rootIndex >= 0) {
+        const removed = 1 + roots[rootIndex].replies.length
+        roots.splice(rootIndex, 1)
+        counts.commentCount = Math.max(0, counts.commentCount - removed)
         return response(config, null)
       }
       for (const root of roots) {
         const replyIndex = root.replies.findIndex((reply) => reply.commentId === commentId)
         if (replyIndex >= 0) {
           root.replies.splice(replyIndex, 1)
-          if (answer) answer.commentCount = Math.max(0, answer.commentCount - 1)
+          counts.commentCount = Math.max(0, counts.commentCount - 1)
           return response(config, null)
         }
       }
@@ -1892,11 +2057,9 @@ export async function handleMockRequest(
         summary,
         publishTime: source.updateTime,
         viewCount: 0,
-        likeCount: 0,
-        commentCount: 0,
-        favoriteCount: 0,
       }
       mockArticles.unshift(created)
+      mockArticleStats[articleId] = { likeCount: 0, commentCount: 0, favoriteCount: 0 }
     }
 
     if (draft) {

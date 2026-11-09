@@ -86,6 +86,22 @@ public class QuestionServiceImpl implements QuestionService {
     }
 
     @Override
+    public List<QuestionListItemVO> listBrief(List<Long> questionIds) {
+        if (questionIds == null || questionIds.isEmpty()) {
+            return List.of();
+        }
+        return questionMapper.selectList(new LambdaQueryWrapper<Question>()
+                        .select(Question::getId, Question::getUserId, Question::getTitle,
+                                Question::getAnswerCount, Question::getAcceptedAnswerId,
+                                Question::getCreateTime)
+                        .in(Question::getId, questionIds)
+                        .eq(Question::getDeleted, QuestionConstants.NOT_DELETED))
+                .stream()
+                .map(this::toListItem)
+                .toList();
+    }
+
+    @Override
     public QuestionDetailVO getQuestionDetail(Long questionId) {
         Question question = requireVisibleQuestion(questionId);
         Answer accepted = question.getAcceptedAnswerId() == null

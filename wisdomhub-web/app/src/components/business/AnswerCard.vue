@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import AuthorChip from '@/components/business/AuthorChip.vue'
+import type { InteractionCountVO } from '@/types/interaction'
 import type { AnswerVO } from '@/types/qa'
 import type { UserBriefVO } from '@/types/user'
 import { formatDateTime } from '@/utils'
@@ -8,6 +9,8 @@ withDefaults(
   defineProps<{
     answer: AnswerVO
     author?: UserBriefVO | null
+    /** 点赞数/评论数由问题详情页批量取互动计数后传入 */
+    counts?: InteractionCountVO | null
     accepted?: boolean
     liked?: boolean
     likePending?: boolean
@@ -45,7 +48,7 @@ const emit = defineEmits<{
 
     <div class="answer-card__meta">
       <AuthorChip :author="author" size="xs" />
-      <span v-if="answer.commentCount">{{ answer.commentCount }} 评论</span>
+      <span v-if="counts?.commentCount">{{ counts.commentCount }} 评论</span>
     </div>
 
     <div class="answer-card__actions">
@@ -58,10 +61,10 @@ const emit = defineEmits<{
         @click="emit('like', answer)"
       >
         <span aria-hidden="true">♥</span>
-        <span>{{ liked ? '已赞' : '点赞' }} {{ answer.likeCount }}</span>
+        <span>{{ liked ? '已赞' : '点赞' }} {{ counts?.likeCount ?? '—' }}</span>
       </button>
       <button class="answer-action" type="button" @click="emit('comment', answer)">
-        {{ answer.commentCount }} 评论
+        {{ counts?.commentCount ?? '—' }} 评论
       </button>
       <button
         v-if="canAccept"

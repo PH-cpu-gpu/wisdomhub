@@ -6,6 +6,7 @@ import { isApiError } from '@/api/error'
 import { detail as fetchArticleDetail } from '@/api/modules/article'
 import {
   collect as collectArticle,
+  getState,
   like as likeArticle,
   uncollect as uncollectArticle,
   unlike as unlikeArticle,
@@ -18,13 +19,17 @@ import ArticlePaywall from '@/components/business/ArticlePaywall.vue'
 import AnalysisCard from '@/components/business/AnalysisCard.vue'
 import AuthorChip from '@/components/business/AuthorChip.vue'
 import CommentSection from '@/components/business/CommentSection.vue'
+import { toast } from '@/components/base/toast'
 import PageContainer from '@/components/layout/PageContainer.vue'
 import { useArticleAuthors } from '@/composables/useArticleAuthors'
 import { useArticleHistory } from '@/composables/useArticleHistory'
 import { useAuthorBrief } from '@/composables/useAuthorBrief'
+import { useInteractionCounts } from '@/composables/useInteractionCounts'
 import { useSeo } from '@/composables/useSeo'
 import { useAuthStore } from '@/stores'
 import type { ArticleDetailVO } from '@/types/content'
+import { CONTENT_TARGET_TYPE } from '@/types/interaction'
+import type { InteractionStateVO } from '@/types/interaction'
 import type { RecommendationItemVO } from '@/types/recommendation'
 import { formatDateTime } from '@/utils'
 import { sanitizeHtml } from '@/utils/sanitize'
@@ -52,12 +57,21 @@ const related = ref<RecommendationItemVO[]>([])
 const relatedLoading = ref(false)
 const relatedError = ref('')
 const commentTotal = ref<number | null>(null)
+/** 互动状态与计数单独持有：正文 VO 不再返回这些字段 */
+const interaction = ref<InteractionStateVO | null>(null)
 
 const likePending = ref(false)
 const collectPending = ref(false)
 
 const { authors } = useArticleAuthors(related)
 const { ensureAuthors } = useAuthorBrief()
+const relatedTargets = computed(() =>
+  related.value.map((item) => ({
+    targetType: CONTENT_TARGET_TYPE.ARTICLE,
+    targetId: item.articleId,
+  })),
+)
+const { countsFor, patchCount } = useInteractionCounts(relatedTargets)
 const detailAuthor = computed(() => (detail.value ? authors[detail.value.authorId] : undefined))
 
 let detailRequest = 0
@@ -83,6 +97,36 @@ function prepareContent(html: string | null): void {
   contentHtml.value = template.innerHTML
 }
 
+async function loadState(id: string): Promise<void> {
+  try {
+    const state = await getState(CONTENT_TARGET_TYPE.ARTICLE, id, { skipErrorToast: true })
+    if (id === articleId.value) interaction.value = state
+  } catch {
+    // 计数是可选增强：拿不到就按未点赞/未收藏渲染，不让详情页报错
+    if (id === articleId.value) {
+      interaction.value = {
+        liked: false,
+        collected: false,
+        likeCount: 0,
+        commentCount: 0,
+        favoriteCount: 0,
+      }
+    }
+  }
+}
+
+/** 把详情最新的三项计数整份回写列表缓存，避免只回写一个字段把其余写成 0 */
+function syncInteractionCache(): void {
+  const id = detail.value?.articleId
+  const state = interaction.value
+  if (!id || !state) return
+  patchCount(CONTENT_TARGET_TYPE.ARTICLE, id, {
+    likeCount: state.likeCount,
+    commentCount: state.commentCount,
+    favoriteCount: state.favoriteCount,
+  })
+}
+
 async function loadDetail(): Promise<void> {
   const id = articleId.value
   const request = (detailRequest += 1)
@@ -94,12 +138,16 @@ async function loadDetail(): Promise<void> {
   contentHtml.value = ''
   toc.value = []
   commentTotal.value = null
+  interaction.value = null
 
   if (!id) {
     detailLoading.value = false
     notFound.value = true
     return
   }
+
+  // 详情与状态各一次请求，并行发出；状态失败不阻塞正文
+  void loadState(id)
 
   try {
     const data = await fetchArticleDetail(id, { skipErrorToast: true })
@@ -151,71 +199,82 @@ function requireLogin(): boolean {
 }
 
 async function toggleLike(): Promise<void> {
-  if (!detail.value || likePending.value) return
+  const current = interaction.value
+  if (!detail.value || !current || likePending.value) return
   if (!requireLogin()) return
 
   const id = detail.value.articleId
-  const previous = { liked: detail.value.liked, count: detail.value.likeCount }
+  const previous = { liked: current.liked, count: current.likeCount }
   const nextLiked = !previous.liked
-  detail.value = {
-    ...detail.value,
+  interaction.value = {
+    ...current,
     liked: nextLiked,
     likeCount: Math.max(0, previous.count + (nextLiked ? 1 : -1)),
   }
   likePending.value = true
 
   try {
-    const count = nextLiked ? await likeArticle(id) : await unlikeArticle(id)
-    if (detail.value?.articleId === id) {
-      detail.value = {
-        ...detail.value,
-        liked: nextLiked,
-        likeCount: typeof count === 'number' ? count : detail.value.likeCount,
-      }
+    const count = nextLiked
+      ? await likeArticle(CONTENT_TARGET_TYPE.ARTICLE, id, { skipErrorToast: true })
+      : await unlikeArticle(CONTENT_TARGET_TYPE.ARTICLE, id, { skipErrorToast: true })
+    if (detail.value?.articleId === id && interaction.value) {
+      const latest = typeof count === 'number' ? count : interaction.value.likeCount
+      interaction.value = { ...interaction.value, liked: nextLiked, likeCount: latest }
+      syncInteractionCache()
     }
-  } catch {
-    if (detail.value?.articleId === id) {
-      detail.value = { ...detail.value, liked: previous.liked, likeCount: previous.count }
+  } catch (error) {
+    if (detail.value?.articleId === id && interaction.value) {
+      interaction.value = { ...interaction.value, liked: previous.liked, likeCount: previous.count }
     }
+    toast.error(isApiError(error) ? error.message : '点赞失败，请稍后重试。')
   } finally {
     likePending.value = false
   }
 }
 
 async function toggleCollect(): Promise<void> {
-  if (!detail.value || collectPending.value) return
+  const current = interaction.value
+  if (!detail.value || !current || collectPending.value) return
   if (!requireLogin()) return
 
   const id = detail.value.articleId
-  const previous = { collected: detail.value.collected, count: detail.value.favoriteCount }
+  const previous = { collected: current.collected, count: current.favoriteCount }
   const nextCollected = !previous.collected
-  detail.value = {
-    ...detail.value,
+  interaction.value = {
+    ...current,
     collected: nextCollected,
     favoriteCount: Math.max(0, previous.count + (nextCollected ? 1 : -1)),
   }
   collectPending.value = true
 
   try {
-    const count = nextCollected ? await collectArticle(id) : await uncollectArticle(id)
-    if (detail.value?.articleId === id) {
-      detail.value = {
-        ...detail.value,
-        collected: nextCollected,
-        favoriteCount: typeof count === 'number' ? count : detail.value.favoriteCount,
-      }
+    const count = nextCollected
+      ? await collectArticle(CONTENT_TARGET_TYPE.ARTICLE, id, { skipErrorToast: true })
+      : await uncollectArticle(CONTENT_TARGET_TYPE.ARTICLE, id, { skipErrorToast: true })
+    if (detail.value?.articleId === id && interaction.value) {
+      const latest = typeof count === 'number' ? count : interaction.value.favoriteCount
+      interaction.value = { ...interaction.value, collected: nextCollected, favoriteCount: latest }
+      syncInteractionCache()
     }
-  } catch {
-    if (detail.value?.articleId === id) {
-      detail.value = {
-        ...detail.value,
+  } catch (error) {
+    if (detail.value?.articleId === id && interaction.value) {
+      interaction.value = {
+        ...interaction.value,
         collected: previous.collected,
         favoriteCount: previous.count,
       }
     }
+    toast.error(isApiError(error) ? error.message : '收藏失败，请稍后重试。')
   } finally {
     collectPending.value = false
   }
+}
+
+function handleCommentTotal(total: number): void {
+  commentTotal.value = total
+  if (!interaction.value) return
+  interaction.value = { ...interaction.value, commentCount: total }
+  syncInteractionCache()
 }
 
 function scrollToSection(id: string): void {
@@ -286,7 +345,7 @@ useSeo({
                 <span class="article-meta__dot" aria-hidden="true">·</span>
                 <span>{{ detail.viewCount }} 阅读</span>
                 <span class="article-meta__dot" aria-hidden="true">·</span>
-                <span>{{ commentTotal ?? detail.commentCount }} 评论</span>
+                <span>{{ commentTotal ?? interaction?.commentCount ?? '—' }} 评论</span>
               </div>
             </header>
 
@@ -300,25 +359,28 @@ useSeo({
             <footer class="article-actions">
               <button
                 class="article-action"
-                :class="{ 'is-active': detail.liked }"
+                :class="{ 'is-active': interaction?.liked }"
                 type="button"
-                :aria-pressed="detail.liked"
+                :aria-pressed="interaction?.liked ?? false"
                 :disabled="likePending"
                 @click="toggleLike"
               >
                 <span aria-hidden="true">♥</span>
-                <span>{{ detail.liked ? '已赞' : '点赞' }} {{ detail.likeCount }}</span>
+                <span>{{ interaction?.liked ? '已赞' : '点赞' }} {{ interaction?.likeCount ?? '—' }}</span>
               </button>
               <button
                 class="article-action"
-                :class="{ 'is-active': detail.collected }"
+                :class="{ 'is-active': interaction?.collected }"
                 type="button"
-                :aria-pressed="detail.collected"
+                :aria-pressed="interaction?.collected ?? false"
                 :disabled="collectPending"
                 @click="toggleCollect"
               >
                 <span aria-hidden="true">☆</span>
-                <span>{{ detail.collected ? '已收藏' : '收藏' }} {{ detail.favoriteCount }}</span>
+                <span
+                  >{{ interaction?.collected ? '已收藏' : '收藏' }}
+                  {{ interaction?.favoriteCount ?? '—' }}</span
+                >
               </button>
               <span class="article-actions__stat">{{ detail.viewCount }} 阅读</span>
             </footer>
@@ -328,7 +390,7 @@ useSeo({
             <CommentSection
               :target-id="detail.articleId"
               :target-type="1"
-              @total-change="commentTotal = $event"
+              @total-change="handleCommentTotal"
             />
           </main>
 
@@ -388,6 +450,7 @@ useSeo({
                   :key="item.articleId"
                   :article="item"
                   :author="authors[item.authorId]"
+                  :counts="countsFor(CONTENT_TARGET_TYPE.ARTICLE, item.articleId)"
                   :tags="item.tags"
                   compact
                 />

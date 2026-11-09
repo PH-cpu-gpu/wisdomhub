@@ -3,23 +3,23 @@ import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 
 import { isApiError } from '@/api/error'
-import { listFavorites } from '@/api/modules/article'
-import { uncollect } from '@/api/modules/interaction'
-import { listFavorites as listQuestionFavorites } from '@/api/modules/question'
+import { listBrief as listArticleBriefs } from '@/api/modules/article'
+import { pageFavorites, uncollect } from '@/api/modules/interaction'
+import { listBrief as listQuestionBriefs } from '@/api/modules/question'
 import { clearHistory, deleteHistory, listHistory } from '@/api/modules/user'
 import WhButton from '@/components/base/WhButton.vue'
 import WhPagination from '@/components/base/WhPagination.vue'
 import WhTabs from '@/components/base/WhTabs.vue'
 import { confirm } from '@/components/base/confirm'
 import { toast } from '@/components/base/toast'
-import ArticleCard from '@/components/business/ArticleCard.vue'
 import QuestionCard from '@/components/business/QuestionCard.vue'
 import PageContainer from '@/components/layout/PageContainer.vue'
-import { useArticleAuthors } from '@/composables/useArticleAuthors'
 import { useAuthorBrief } from '@/composables/useAuthorBrief'
+import { useInteractionCounts } from '@/composables/useInteractionCounts'
 import { usePagination } from '@/composables/usePagination'
 import { useSeo } from '@/composables/useSeo'
-import type { ArticleListItemVO } from '@/types/content'
+import type { ArticleBriefVO } from '@/types/content'
+import { CONTENT_TARGET_TYPE } from '@/types/interaction'
 import type { QuestionListItemVO } from '@/types/qa'
 import type { BrowseHistoryVO } from '@/types/user'
 import { formatDateTime } from '@/utils'
@@ -73,7 +73,7 @@ const {
   reset: resetQuestions,
 } = usePagination({ pageSize: 5 })
 
-const favorites = ref<ArticleListItemVO[]>([])
+const favorites = ref<ArticleBriefVO[]>([])
 const favoritesLoading = ref(false)
 const favoritesError = ref('')
 
@@ -85,8 +85,19 @@ const questionFavorites = ref<QuestionListItemVO[]>([])
 const questionLoading = ref(false)
 const questionError = ref('')
 
-const { authors } = useArticleAuthors(() => favorites.value)
-const { ensureAuthors } = useAuthorBrief()
+const { authors, ensureAuthors } = useAuthorBrief()
+const { countsFor } = useInteractionCounts(() =>
+  favorites.value.map((item) => ({
+    targetType: CONTENT_TARGET_TYPE.ARTICLE,
+    targetId: item.articleId,
+  })),
+)
+const { countsFor: questionCountsFor } = useInteractionCounts(() =>
+  questionFavorites.value.map((item) => ({
+    targetType: CONTENT_TARGET_TYPE.QUESTION,
+    targetId: item.questionId,
+  })),
+)
 
 let favoriteRequest = 0
 let historyRequest = 0
@@ -98,13 +109,25 @@ async function loadFavorites(): Promise<void> {
   favoritesError.value = ''
 
   try {
-    const result = await listFavorites(
-      { page: favoritePage.value, pageSize: favoritePageSize.value },
+    const result = await pageFavorites(
+      {
+        targetType: CONTENT_TARGET_TYPE.ARTICLE,
+        page: favoritePage.value,
+        pageSize: favoritePageSize.value,
+      },
       { skipErrorToast: true },
     )
     if (request !== favoriteRequest) return
 
-    favorites.value = result.items
+    // 先拿一页 (type,id)，再按 id 批量回填摘要；摘要缺失（已删文章）直接跳过
+    const ids = result.items.map((item) => item.targetId)
+    const briefs = ids.length ? await listArticleBriefs(ids) : []
+    if (request !== favoriteRequest) return
+    const byId = new Map(briefs.map((brief) => [brief.articleId, brief]))
+    favorites.value = ids.flatMap((id) => {
+      const brief = byId.get(id)
+      return brief ? [brief] : []
+    })
     setFavoriteTotal(result.total)
   } catch (error) {
     if (request !== favoriteRequest) return
@@ -146,16 +169,28 @@ async function loadQuestionFavorites(): Promise<void> {
   questionError.value = ''
 
   try {
-    const result = await listQuestionFavorites(
-      { page: questionPage.value, pageSize: questionPageSize.value },
+    const result = await pageFavorites(
+      {
+        targetType: CONTENT_TARGET_TYPE.QUESTION,
+        page: questionPage.value,
+        pageSize: questionPageSize.value,
+      },
       { skipErrorToast: true },
     )
     if (request !== questionRequest) return
 
-    questionFavorites.value = result.items
+    const ids = result.items.map((item) => item.targetId)
+    const briefs = ids.length ? await listQuestionBriefs(ids) : []
+    if (request !== questionRequest) return
+    const byId = new Map(briefs.map((question) => [question.questionId, question]))
+    questionFavorites.value = ids.flatMap((id) => {
+      const brief = byId.get(id)
+      return brief ? [brief] : []
+    })
     setQuestionTotal(result.total)
-    if (result.items.length) {
-      void ensureAuthors([...new Set(result.items.map((question) => question.userId))])
+    if (questionFavorites.value.length) {
+      const userIds = [...new Set(questionFavorites.value.map((question) => question.userId))]
+      void ensureAuthors(userIds)
     }
   } catch (error) {
     if (request !== questionRequest) return
@@ -167,7 +202,7 @@ async function loadQuestionFavorites(): Promise<void> {
   }
 }
 
-async function removeFavorite(article: ArticleListItemVO): Promise<void> {
+async function removeFavorite(article: ArticleBriefVO): Promise<void> {
   const ok = await confirm({
     title: '取消收藏',
     message: `确定取消收藏《${article.title}》？`,
@@ -177,7 +212,7 @@ async function removeFavorite(article: ArticleListItemVO): Promise<void> {
   if (!ok) return
 
   try {
-    await uncollect(article.articleId)
+    await uncollect(CONTENT_TARGET_TYPE.ARTICLE, article.articleId)
     toast.success('已取消收藏')
     if (favorites.value.length === 1 && favoritePage.value > 1) favoritePage.value -= 1
     else await loadFavorites()
@@ -296,7 +331,30 @@ useSeo({
 
         <div v-else class="library-list">
           <div v-for="article in favorites" :key="article.articleId" class="library-favorite">
-            <ArticleCard :article="article" :author="authors[article.authorId]" compact />
+            <div class="library-brief">
+              <RouterLink class="library-brief__title" :to="`/article/${article.articleId}`">
+                {{ article.title }}
+              </RouterLink>
+              <p class="library-brief__summary">{{ article.summary }}</p>
+              <div class="library-brief__meta">
+                <span
+                  >赞
+                  {{ countsFor(CONTENT_TARGET_TYPE.ARTICLE, article.articleId)?.likeCount ?? '—' }}</span
+                >
+                <span
+                  >评论
+                  {{
+                    countsFor(CONTENT_TARGET_TYPE.ARTICLE, article.articleId)?.commentCount ?? '—'
+                  }}</span
+                >
+                <span
+                  >收藏
+                  {{
+                    countsFor(CONTENT_TARGET_TYPE.ARTICLE, article.articleId)?.favoriteCount ?? '—'
+                  }}</span
+                >
+              </div>
+            </div>
             <div class="library-favorite__actions">
               <button
                 class="library-action library-action--danger"
@@ -342,6 +400,7 @@ useSeo({
             :key="question.questionId"
             :question="question"
             :author="authors[question.userId]"
+            :counts="questionCountsFor(CONTENT_TARGET_TYPE.QUESTION, question.questionId)"
           />
         </div>
 
@@ -506,8 +565,37 @@ useSeo({
   border-top: var(--border);
 }
 
-.library-favorite :deep(.article-card) {
-  border-top: 0;
+.library-brief {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.library-brief__title {
+  font-family: var(--serif);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-snug);
+  text-decoration: none;
+  transition: color var(--dur) var(--ease);
+}
+
+.library-brief__title:hover {
+  color: var(--verm-deep);
+}
+
+.library-brief__summary {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-relaxed);
+}
+
+.library-brief__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  color: var(--text-muted);
+  font-family: var(--mono);
+  font-size: var(--text-2xs);
 }
 
 .library-favorite__actions {

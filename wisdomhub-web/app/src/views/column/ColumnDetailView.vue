@@ -23,11 +23,13 @@ import OrderCreateModal from '@/components/business/OrderCreateModal.vue'
 import PageContainer from '@/components/layout/PageContainer.vue'
 import { useArticleAuthors } from '@/composables/useArticleAuthors'
 import { useAuthorBrief } from '@/composables/useAuthorBrief'
+import { useInteractionCounts } from '@/composables/useInteractionCounts'
 import { usePagination } from '@/composables/usePagination'
 import { useSeo } from '@/composables/useSeo'
 import { useAuthStore } from '@/stores'
 import type { ID } from '@/types/common'
 import type { ArticleListItemVO, ColumnVO } from '@/types/content'
+import { CONTENT_TARGET_TYPE } from '@/types/interaction'
 import { formatDateTime, formatMoney } from '@/utils'
 
 const route = useRoute()
@@ -46,6 +48,13 @@ const articlesError = ref('')
 const { page, pageSize, total, setTotal, reset } = usePagination({ pageSize: 10 })
 const { authors, ensureAuthors } = useAuthorBrief()
 useArticleAuthors(articles)
+const columnArticleTargets = computed(() =>
+  articles.value.map((item) => ({
+    targetType: CONTENT_TARGET_TYPE.ARTICLE,
+    targetId: item.articleId,
+  })),
+)
+const { countsFor } = useInteractionCounts(columnArticleTargets)
 
 const deleting = ref(false)
 const deleteError = ref('')
@@ -445,7 +454,12 @@ useSeo({
                 {{ String((page - 1) * pageSize + index + 1).padStart(2, '0') }}
               </span>
               <div class="column-entry__body">
-                <ArticleCard :article="article" :author="authors[article.authorId]" compact />
+                <ArticleCard
+                  :article="article"
+                  :author="authors[article.authorId]"
+                  :counts="countsFor(CONTENT_TARGET_TYPE.ARTICLE, article.articleId)"
+                  compact
+                />
               </div>
               <button
                 v-if="isOwner"

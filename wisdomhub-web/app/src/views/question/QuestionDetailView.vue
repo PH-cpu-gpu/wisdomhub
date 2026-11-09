@@ -5,12 +5,16 @@ import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { isApiError } from '@/api/error'
 import {
   create as createAnswer,
-  like as likeAnswer,
   list as listAnswers,
   remove as removeAnswerApi,
-  unlike as unlikeAnswer,
 } from '@/api/modules/answer'
-import { accept, cancelAccept, detail, favorite, unfavorite } from '@/api/modules/question'
+import { accept, cancelAccept, detail } from '@/api/modules/question'
+import {
+  collect as collectQuestion,
+  like as likeAnswer,
+  uncollect as uncollectQuestion,
+  unlike as unlikeAnswer,
+} from '@/api/modules/interaction'
 import WhButton from '@/components/base/WhButton.vue'
 import WhPagination from '@/components/base/WhPagination.vue'
 import WhTextarea from '@/components/base/WhTextarea.vue'
@@ -21,8 +25,11 @@ import AuthorChip from '@/components/business/AuthorChip.vue'
 import CommentSection from '@/components/business/CommentSection.vue'
 import PageContainer from '@/components/layout/PageContainer.vue'
 import { useAuthorBrief } from '@/composables/useAuthorBrief'
+import { useInteractionCounts } from '@/composables/useInteractionCounts'
+import { useInteractionStates } from '@/composables/useInteractionStates'
 import { useSeo } from '@/composables/useSeo'
 import { useAuthStore } from '@/stores'
+import { CONTENT_TARGET_TYPE } from '@/types/interaction'
 import type { AnswerVO, QuestionDetailVO } from '@/types/qa'
 import { formatDateTime } from '@/utils'
 
@@ -46,11 +53,31 @@ const answersError = ref('')
 const favoritePending = ref(false)
 const answerContent = ref('')
 const answerSubmitting = ref(false)
-const likedAnswerIds = ref(new Set<string>())
 const likePendingId = ref('')
 const expandedAnswerId = ref('')
 
 const { authors, ensureAuthors } = useAuthorBrief()
+
+const { countsFor, patchCount } = useInteractionCounts(() =>
+  answers.value.map((item) => ({
+    targetType: CONTENT_TARGET_TYPE.ANSWER,
+    targetId: item.answerId,
+  })),
+)
+const { stateFor, patchState } = useInteractionStates(
+  () =>
+    question.value
+      ? [{ targetType: CONTENT_TARGET_TYPE.QUESTION, targetId: question.value.questionId }]
+      : [],
+  () =>
+    answers.value.map((item) => ({
+      targetType: CONTENT_TARGET_TYPE.ANSWER,
+      targetId: item.answerId,
+    })),
+)
+const questionState = computed(() =>
+  question.value ? stateFor(CONTENT_TARGET_TYPE.QUESTION, question.value.questionId) : undefined,
+)
 
 let questionRequest = 0
 let answerRequest = 0
@@ -120,33 +147,32 @@ async function toggleFavorite(): Promise<void> {
     return
   }
 
-  const previous = current.favorited
-  const previousCount = current.favoriteCount
-  question.value = {
-    ...current,
-    favorited: !previous,
-    favoriteCount: Math.max(0, previousCount + (previous ? -1 : 1)),
-  }
+  const id = current.questionId
+  const state = stateFor(CONTENT_TARGET_TYPE.QUESTION, id)
+  const previous = { collected: state?.collected ?? false, count: state?.favoriteCount ?? 0 }
+  const nextCollected = !previous.collected
+  patchState(CONTENT_TARGET_TYPE.QUESTION, id, {
+    collected: nextCollected,
+    favoriteCount: Math.max(0, previous.count + (nextCollected ? 1 : -1)),
+  })
   favoritePending.value = true
 
   try {
-    const count = previous
-      ? await unfavorite(current.questionId, { skipErrorToast: true })
-      : await favorite(current.questionId, { skipErrorToast: true })
-    if (question.value?.questionId === current.questionId) {
-      question.value = {
-        ...question.value,
-        favorited: !previous,
-        favoriteCount: count ?? question.value.favoriteCount,
-      }
+    const count = nextCollected
+      ? await collectQuestion(CONTENT_TARGET_TYPE.QUESTION, id, { skipErrorToast: true })
+      : await uncollectQuestion(CONTENT_TARGET_TYPE.QUESTION, id, { skipErrorToast: true })
+    if (question.value?.questionId === id) {
+      patchState(CONTENT_TARGET_TYPE.QUESTION, id, {
+        collected: nextCollected,
+        favoriteCount: typeof count === 'number' ? count : previous.count,
+      })
     }
   } catch (err) {
-    if (question.value?.questionId === current.questionId) {
-      question.value = {
-        ...question.value,
-        favorited: previous,
-        favoriteCount: previousCount,
-      }
+    if (question.value?.questionId === id) {
+      patchState(CONTENT_TARGET_TYPE.QUESTION, id, {
+        collected: previous.collected,
+        favoriteCount: previous.count,
+      })
     }
     toast.error(isApiError(err) ? err.message : '收藏失败，请稍后重试。')
   } finally {
@@ -199,23 +225,42 @@ async function submitAnswer(): Promise<void> {
 async function toggleLike(answer: AnswerVO): Promise<void> {
   if (!requireLogin() || likePendingId.value) return
 
-  const liked = likedAnswerIds.value.has(answer.answerId)
-  likePendingId.value = answer.answerId
+  const id = answer.answerId
+  const state = stateFor(CONTENT_TARGET_TYPE.ANSWER, id)
+  const counts = countsFor(CONTENT_TARGET_TYPE.ANSWER, id)
+  const previous = {
+    liked: state?.liked ?? false,
+    likeCount: counts?.likeCount ?? state?.likeCount ?? 0,
+  }
+  const nextLiked = !previous.liked
+  patchState(CONTENT_TARGET_TYPE.ANSWER, id, {
+    liked: nextLiked,
+    likeCount: Math.max(0, previous.likeCount + (nextLiked ? 1 : -1)),
+  })
+  likePendingId.value = id
 
   try {
-    const count = liked
-      ? await unlikeAnswer(answer.answerId, { skipErrorToast: true })
-      : await likeAnswer(answer.answerId, { skipErrorToast: true })
-
-    const target = answers.value.find((item) => item.answerId === answer.answerId)
-    if (target && typeof count === 'number') target.likeCount = count
-    if (liked) likedAnswerIds.value.delete(answer.answerId)
-    else likedAnswerIds.value.add(answer.answerId)
+    const count = nextLiked
+      ? await likeAnswer(CONTENT_TARGET_TYPE.ANSWER, id, { skipErrorToast: true })
+      : await unlikeAnswer(CONTENT_TARGET_TYPE.ANSWER, id, { skipErrorToast: true })
+    patchState(CONTENT_TARGET_TYPE.ANSWER, id, {
+      liked: nextLiked,
+      likeCount: typeof count === 'number' ? count : previous.likeCount,
+    })
   } catch (err) {
+    patchState(CONTENT_TARGET_TYPE.ANSWER, id, {
+      liked: previous.liked,
+      likeCount: previous.likeCount,
+    })
     toast.error(isApiError(err) ? err.message : '点赞失败，请稍后重试。')
   } finally {
     likePendingId.value = ''
   }
+}
+
+function handleAnswerCommentTotal(answerId: string, total: number): void {
+  patchCount(CONTENT_TARGET_TYPE.ANSWER, answerId, { commentCount: total })
+  patchState(CONTENT_TARGET_TYPE.ANSWER, answerId, { commentCount: total })
 }
 
 async function removeAnswer(answer: AnswerVO): Promise<void> {
@@ -327,7 +372,7 @@ useSeo({
           <span class="question-meta__dot" aria-hidden="true">·</span>
           <span>{{ question.answerCount }} 回答</span>
           <span class="question-meta__dot" aria-hidden="true">·</span>
-          <span>{{ question.favoriteCount }} 收藏</span>
+          <span>{{ questionState?.favoriteCount ?? '—' }} 收藏</span>
         </div>
 
         <p class="question-content">{{ question.content }}</p>
@@ -335,15 +380,15 @@ useSeo({
         <div class="question-actions">
           <button
             class="question-favorite"
-            :class="{ 'is-active': question.favorited }"
+            :class="{ 'is-active': questionState?.collected }"
             type="button"
-            :aria-pressed="question.favorited"
+            :aria-pressed="questionState?.collected ?? false"
             :disabled="favoritePending"
             @click="toggleFavorite"
           >
             <span aria-hidden="true">☆</span>
-            <span>{{ question.favorited ? '已收藏' : '收藏' }}</span>
-            <span>{{ question.favoriteCount }}</span>
+            <span>{{ questionState?.collected ? '已收藏' : '收藏' }}</span>
+            <span>{{ questionState?.favoriteCount ?? '—' }}</span>
           </button>
         </div>
       </header>
@@ -376,8 +421,9 @@ useSeo({
               <AnswerCard
                 :answer="answer"
                 :author="authors[answer.userId]"
+                :counts="countsFor(CONTENT_TARGET_TYPE.ANSWER, answer.answerId)"
                 :accepted="answer.answerId === question.acceptedAnswerId"
-                :liked="likedAnswerIds.has(answer.answerId)"
+                :liked="stateFor(CONTENT_TARGET_TYPE.ANSWER, answer.answerId)?.liked ?? false"
                 :like-pending="likePendingId === answer.answerId"
                 :can-delete="answer.userId === auth.userId"
                 :can-accept="question.userId === auth.userId"
@@ -390,7 +436,7 @@ useSeo({
                 v-if="expandedAnswerId === answer.answerId"
                 :target-id="answer.answerId"
                 :target-type="2"
-                @total-change="answer.commentCount = $event"
+                @total-change="handleAnswerCommentTotal(answer.answerId, $event)"
               />
             </div>
           </template>

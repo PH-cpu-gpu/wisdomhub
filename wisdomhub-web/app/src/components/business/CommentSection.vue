@@ -4,10 +4,10 @@ import { RouterLink, useRoute, useRouter } from 'vue-router'
 
 import { isApiError } from '@/api/error'
 import {
-  create as createComment,
-  list as listComments,
-  remove as removeComment,
-} from '@/api/modules/comment'
+  createComment,
+  listComments,
+  removeComment,
+} from '@/api/modules/interaction'
 import WhButton from '@/components/base/WhButton.vue'
 import WhPagination from '@/components/base/WhPagination.vue'
 import WhTextarea from '@/components/base/WhTextarea.vue'
@@ -17,13 +17,13 @@ import AuthorChip from '@/components/business/AuthorChip.vue'
 import { useAuthorBrief } from '@/composables/useAuthorBrief'
 import { useAuthStore } from '@/stores'
 import type { ID } from '@/types/common'
-import type { CommentVO } from '@/types/content'
+import type { CommentTargetType, CommentVO } from '@/types/interaction'
 import { formatDateTime } from '@/utils'
 
 const props = withDefaults(
   defineProps<{
     targetId: ID
-    targetType?: 1 | 2
+    targetType?: CommentTargetType
   }>(),
   {
     targetType: 1,

@@ -10,7 +10,9 @@ import WhTabs from '@/components/base/WhTabs.vue'
 import QuestionCard from '@/components/business/QuestionCard.vue'
 import PageContainer from '@/components/layout/PageContainer.vue'
 import { useAuthorBrief } from '@/composables/useAuthorBrief'
+import { useInteractionCounts } from '@/composables/useInteractionCounts'
 import { useSeo } from '@/composables/useSeo'
+import { CONTENT_TARGET_TYPE } from '@/types/interaction'
 import type { QuestionListItemVO } from '@/types/qa'
 
 const PAGE_SIZE = 5
@@ -35,6 +37,12 @@ const tabItems = [
 ]
 
 const questions = ref<QuestionListItemVO[]>([])
+const { countsFor } = useInteractionCounts(() =>
+  questions.value.map((item) => ({
+    targetType: CONTENT_TARGET_TYPE.QUESTION,
+    targetId: item.questionId,
+  })),
+)
 const loading = ref(false)
 const error = ref('')
 const total = ref(0)
@@ -128,6 +136,7 @@ useSeo({
           :key="question.questionId"
           :question="question"
           :author="authors[question.userId]"
+          :counts="countsFor(CONTENT_TARGET_TYPE.QUESTION, question.questionId)"
         />
       </div>
 

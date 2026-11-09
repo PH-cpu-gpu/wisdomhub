@@ -7,9 +7,6 @@ export interface ArticleListItemVO {
   summary: string
   publishTime: string
   viewCount: number
-  likeCount: number
-  commentCount: number
-  favoriteCount: number
 }
 
 export interface ArticleColumnVO {
@@ -26,8 +23,6 @@ export interface ArticleDetailVO extends ArticleListItemVO {
   html: string | null
   locked: boolean
   columns: ArticleColumnVO[]
-  liked: boolean
-  collected: boolean
 }
 
 export interface ArticleBriefVO {
@@ -72,28 +67,6 @@ export interface DraftBriefVO {
 export interface DraftPayload {
   title?: string
   markdown?: string
-}
-
-export interface CommentVO {
-  commentId: ID
-  userId: ID
-  parentId: ID | null
-  content: string
-  createTime: string
-  replies: CommentVO[]
-}
-
-export interface CommentCreatePayload {
-  /** 1-文章（默认） 2-回答 */
-  targetType?: 1 | 2
-  targetId: ID
-  parentId?: ID | null
-  content: string
-}
-
-export interface CommentPageQuery extends PageQuery {
-  targetType?: 1 | 2
-  targetId: ID
 }
 
 export interface ColumnVO {

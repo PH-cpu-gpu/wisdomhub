@@ -18,10 +18,12 @@ import WhPagination from '@/components/base/WhPagination.vue'
 import { toast } from '@/components/base/toast'
 import PageContainer from '@/components/layout/PageContainer.vue'
 import { useArticleAuthors } from '@/composables/useArticleAuthors'
+import { useInteractionCounts } from '@/composables/useInteractionCounts'
 import { usePagination } from '@/composables/usePagination'
 import { useSeo } from '@/composables/useSeo'
 import { useAuthStore } from '@/stores'
 import type { ArticleListItemVO } from '@/types/content'
+import { CONTENT_TARGET_TYPE } from '@/types/interaction'
 import type { UserProfileVO } from '@/types/user'
 
 const route = useRoute()
@@ -44,6 +46,12 @@ const notFound = ref(false)
 
 const articles = ref<ArticleListItemVO[]>([])
 const { authors } = useArticleAuthors(articles)
+const { countsFor } = useInteractionCounts(() =>
+  articles.value.map((item) => ({
+    targetType: CONTENT_TARGET_TYPE.ARTICLE,
+    targetId: item.articleId,
+  })),
+)
 const articlesLoading = ref(false)
 const articlesError = ref('')
 
@@ -347,6 +355,7 @@ useSeo({
               :key="article.articleId"
               :article="article"
               :author="authors[article.authorId]"
+              :counts="countsFor(CONTENT_TARGET_TYPE.ARTICLE, article.articleId)"
             />
           </div>
 

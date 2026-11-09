@@ -24,6 +24,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 @Tag(name = "问答controller")
 @Validated
 @RestController
@@ -38,6 +40,12 @@ public class QuestionController {
     @PostMapping
     public R<Long> create(@Valid @RequestBody QuestionCreateDTO questionCreateDTO) {
         return R.success(questionService.createQuestion(questionCreateDTO));
+    }
+
+    @Operation(summary = "按 ID 批量取问题摘要（收藏页回填）")
+    @GetMapping("/brief")
+    public R<List<QuestionListItemVO>> listBrief(@RequestParam("questionIds") List<Long> questionIds) {
+        return R.success(questionService.listBrief(questionIds));
     }
 
     @Operation(summary = "问题列表（sort=new|hot）")
