@@ -41,6 +41,8 @@ const {
   pause,
   retry,
   reset,
+  restore,
+  forgetPending,
 } = useVideoUpload()
 
 const title = ref('')
@@ -220,6 +222,7 @@ async function submitPublish(): Promise<void> {
       { skipErrorToast: true },
     )
     publishedId.value = id
+    forgetPending()
     toast.success('视频已发布')
   } catch (err) {
     toast.error(isApiError(err) ? err.message : '发布失败，请稍后重试。')
@@ -253,6 +256,7 @@ onBeforeRouteLeave(async () => {
 onMounted(() => {
   window.addEventListener('beforeunload', handleBeforeUnload)
   void dict.loadTags()
+  void restore()
 })
 
 onBeforeUnmount(() => {

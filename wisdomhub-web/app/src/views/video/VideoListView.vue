@@ -6,12 +6,13 @@ import { isApiError } from '@/api/error'
 import { list as listVideos } from '@/api/modules/video'
 import WhButton from '@/components/base/WhButton.vue'
 import WhPagination from '@/components/base/WhPagination.vue'
+import WhSelect from '@/components/base/WhSelect.vue'
 import PageContainer from '@/components/layout/PageContainer.vue'
 import VideoCard from '@/components/video/VideoCard.vue'
 import { useAuthorBrief } from '@/composables/useAuthorBrief'
 import { useInteractionCounts } from '@/composables/useInteractionCounts'
 import { useSeo } from '@/composables/useSeo'
-import { useAuthStore } from '@/stores'
+import { useAuthStore, useDictStore } from '@/stores'
 import { CONTENT_TARGET_TYPE } from '@/types/interaction'
 import type { VideoListItemVO } from '@/types/video'
 
@@ -20,6 +21,8 @@ const PAGE_SIZE = 8
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
+const dict = useDictStore()
+void dict.loadTags()
 
 function queryString(value: unknown): string {
   if (Array.isArray(value)) return String(value[0] ?? '').trim()
@@ -31,6 +34,19 @@ const page = computed(() => {
   return Number.isFinite(parsed) && parsed >= 1 ? Math.floor(parsed) : 1
 })
 const authorId = computed(() => queryString(route.query.authorId))
+const tagId = computed(() => queryString(route.query.tagId))
+const tagOptions = computed(() => dict.tags.map((tag) => ({ label: tag.name, value: tag.tagId })))
+const tagModel = computed({
+  get: () => tagId.value || null,
+  set: (value: string | number | null) => {
+    const query: Record<string, string> = {}
+    if (authorId.value) query.authorId = authorId.value
+    if (value !== null && value !== undefined && String(value) !== '') {
+      query.tagId = String(value)
+    }
+    void router.push({ name: 'video-list', query })
+  },
+})
 
 const items = ref<VideoListItemVO[]>([])
 const total = ref(0)
@@ -60,6 +76,7 @@ async function loadVideos(): Promise<void> {
         page: page.value,
         pageSize: PAGE_SIZE,
         authorId: authorId.value || undefined,
+        tagId: tagId.value || undefined,
       },
       { skipErrorToast: true },
     )
@@ -85,14 +102,27 @@ function setPage(value: number): void {
   const query: Record<string, string> = {}
   if (value > 1) query.page = String(value)
   if (authorId.value) query.authorId = authorId.value
+  if (tagId.value) query.tagId = tagId.value
   void router.push({ name: 'video-list', query })
 }
 
 function clearAuthor(): void {
+  const query: Record<string, string> = {}
+  if (tagId.value) query.tagId = tagId.value
+  void router.push({ name: 'video-list', query })
+}
+
+function clearTag(): void {
+  const query: Record<string, string> = {}
+  if (authorId.value) query.authorId = authorId.value
+  void router.push({ name: 'video-list', query })
+}
+
+function clearFilters(): void {
   void router.push({ name: 'video-list' })
 }
 
-watch([page, authorId], () => void loadVideos(), { immediate: true })
+watch([page, authorId, tagId], () => void loadVideos(), { immediate: true })
 
 useSeo({
   title: '视频',
@@ -117,9 +147,21 @@ useSeo({
         </div>
       </header>
 
-      <div v-if="authorId" class="video-library__filter">
-        <span>作者：{{ filterAuthor?.username ?? authorId }}</span>
-        <button type="button" @click="clearAuthor">清除筛选</button>
+      <div class="video-library__filters">
+        <WhSelect
+          v-model="tagModel"
+          :options="tagOptions"
+          clearable
+          size="sm"
+          placeholder="按标签筛选"
+        />
+        <div v-if="authorId || tagId" class="video-library__filter">
+          <span v-if="authorId">作者：{{ filterAuthor?.username ?? authorId }}</span>
+          <span v-if="tagId">标签：{{ dict.getTag(tagId)?.name ?? tagId }}</span>
+          <button v-if="authorId" type="button" @click="clearAuthor">清除作者</button>
+          <button v-if="tagId" type="button" @click="clearTag">清除标签</button>
+          <button type="button" @click="clearFilters">全部清除</button>
+        </div>
       </div>
 
       <div v-if="loading" class="video-library__grid" aria-live="polite">
@@ -132,8 +174,12 @@ useSeo({
       </div>
 
       <div v-else-if="!items.length" class="video-library__state">
-        <p>{{ authorId ? '这个作者还没有发布视频。' : '还没有视频，来发布第一个吧。' }}</p>
-        <RouterLink v-if="!authorId" class="video-library__link" :to="{ name: 'video-upload' }">
+        <p>{{ authorId || tagId ? '当前筛选下还没有视频。' : '还没有视频，来发布第一个吧。' }}</p>
+        <RouterLink
+          v-if="!authorId && !tagId"
+          class="video-library__link"
+          :to="{ name: 'video-upload' }"
+        >
           去上传视频
         </RouterLink>
       </div>
@@ -213,6 +259,17 @@ useSeo({
   font-size: var(--text-2xs);
   text-decoration: underline;
   text-underline-offset: 3px;
+}
+
+.video-library__filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.video-library__filters :deep(.wh-select) {
+  min-width: 180px;
 }
 
 .video-library__filter {

@@ -1,8 +1,5 @@
 # Nacos 配置模板
 
-`config/` 下是 WisdomHub 全部 15 个 Nacos 配置的**脱敏模板**，由本地 Nacos 导出后逐项脱敏生成，
-随仓库一起维护，保证新环境能按照 `application-*.yml` 的 `spring.config.import` 声明复现出完整配置。
-
 ## 为什么需要
 
 各服务的 `application-local.yml` 这样写：
@@ -90,20 +87,3 @@ docker/nacos/
 | `your-bucket-name-APPID` | `cos-key.yaml` | COS 存储桶名 |
 | `https://your-bucket-name-APPID.cos.ap-shanghai.myqcloud.com` | `cos-key.yaml` | COS 访问域名 |
 
-补充说明：
-
-- **JWT 公私钥都在 Nacos**：私钥只在 `user-service.yaml` 的 `jwt.private-key`，公钥只在
-  `wisdomhub-common.yaml` 的 `jwt.public-key`（gateway / notification 共读，不再各存一份）。
-  更换密钥对时必须同时更新这两处，二者成对。
-- 模板里的 `jwt.private-key` 是占位符，**真实私钥只填 Nacos，不进仓库**。
-  Nacos 明文存储且本地未开鉴权，能连 8848 的进程都能读到私钥；生产需限制访问或改用密钥管理服务。
-- `wisdomhub-env.yaml` 里的 `spring.cloud.nacos.discovery.ip: 127.0.0.1` 是本地开发值，
-  多机部署时改成实际网卡 IP。
-- 模板中所有 `localhost` 地址按本地 Docker Compose 环境填写，部署到其他环境时统一在
-  `wisdomhub-env.yaml` 的 `infra.*` 中修改。
-
-## 维护约定
-
-- **模板禁止写入任何真实凭据**。更新模板的流程：从 Nacos 导出 → 脱敏 → 覆盖 `config/*.example`。
-- Nacos 中的配置是明文存储的，生产环境应限制 Nacos 控制台与 API 的访问范围。
-- 修改模板后重新执行导入脚本即可覆盖 Nacos 中的同名 DataId。

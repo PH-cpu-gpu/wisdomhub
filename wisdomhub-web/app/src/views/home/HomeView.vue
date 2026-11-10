@@ -14,12 +14,15 @@ import WhInput from '@/components/base/WhInput.vue'
 import ArticleCard from '@/components/business/ArticleCard.vue'
 import HomeSection from '@/components/home/HomeSection.vue'
 import PageContainer from '@/components/layout/PageContainer.vue'
+import VideoCard from '@/components/video/VideoCard.vue'
 import { useAsyncData } from '@/composables/useAsyncData'
 import { useArticleAuthors } from '@/composables/useArticleAuthors'
 import { useInteractionCounts } from '@/composables/useInteractionCounts'
 import { useSeo } from '@/composables/useSeo'
 import { useAuthStore } from '@/stores'
 import { CONTENT_TARGET_TYPE } from '@/types/interaction'
+import type { RecommendationItemVO } from '@/types/recommendation'
+import type { VideoListItemVO } from '@/types/video'
 import { formatDateTime } from '@/utils'
 
 const auth = useAuthStore()
@@ -41,7 +44,7 @@ const {
   error: recommendationsError,
   execute: executeRecommendations,
   reset: resetRecommendations,
-} = useAsyncData(() => fetchHomeRecommendations(6, { skipErrorToast: true }), {
+} = useAsyncData(() => fetchHomeRecommendations(20, { skipErrorToast: true }), {
   immediate: false,
 })
 
@@ -87,11 +90,42 @@ const { authors } = useArticleAuthors(
   () => latestArticles.value?.items,
 )
 
-/** 三个文章区块 + 热门问题共用一个批取：重复 id 在 composable 里去重 */
+function isVideo(item: RecommendationItemVO): boolean {
+  return item.contentType === CONTENT_TARGET_TYPE.VIDEO
+}
+
+/** 推荐条目 → 视频卡片所需的扁平结构 */
+function toVideoItem(item: RecommendationItemVO): VideoListItemVO {
+  return {
+    videoId: item.videoId ?? item.articleId,
+    authorId: item.authorId,
+    title: item.title,
+    summary: item.summary ?? null,
+    coverKey: item.coverKey,
+    coverUrl: item.coverUrl ?? '',
+    durationMs: item.durationMs,
+    viewCount: item.viewCount,
+    publishTime: item.publishTime,
+    tags: item.tags,
+  }
+}
+
+const recommendedArticles = computed(() =>
+  (recommendations.value ?? []).filter((item) => !isVideo(item)).slice(0, 6),
+)
+const recommendedVideos = computed(() =>
+  (recommendations.value ?? []).filter(isVideo).slice(0, 6),
+)
+
+/** 三个文章区块 + 推荐视频 + 热门问题共用一个批取：重复 id 在 composable 里去重 */
 const homeInteractionTargets = computed(() => [
-  ...(recommendations.value ?? []).map((article) => ({
+  ...recommendedArticles.value.map((item) => ({
     targetType: CONTENT_TARGET_TYPE.ARTICLE,
-    targetId: article.articleId,
+    targetId: item.articleId,
+  })),
+  ...recommendedVideos.value.map((item) => ({
+    targetType: CONTENT_TARGET_TYPE.VIDEO,
+    targetId: item.videoId ?? item.articleId,
   })),
   ...(hotArticles.value ?? []).map((article) => ({
     targetType: CONTENT_TARGET_TYPE.ARTICLE,
@@ -108,9 +142,11 @@ const homeInteractionTargets = computed(() => [
 ])
 const { countsFor } = useInteractionCounts(homeInteractionTargets)
 
-const recommendationsEmpty = computed(
+const recommendedArticlesEmpty = computed(
   () =>
-    !recommendationsLoading.value && !recommendationsError.value && !recommendations.value?.length,
+    !recommendationsLoading.value &&
+    !recommendationsError.value &&
+    recommendedArticles.value.length === 0,
 )
 const hotTagsEmpty = computed(
   () => !hotTagsLoading.value && !hotTagsError.value && !hotTags.value?.length,
@@ -170,20 +206,16 @@ void loadHome()
           <p class="home-hero__eyebrow">[ WISDOMHUB / HOME ]</p>
           <h1 v-if="loggedIn">{{ greeting }}，<br />欢迎回来。</h1>
           <h1 v-else>把散落的知识，<br />连成一张图。</h1>
-          <p class="home-hero__lede">
-            {{
-              loggedIn
-                ? '根据你的兴趣，挑了几篇最近值得读的文章。'
-                : '文章、问答、搜索与 AI，共用同一张知识网络。'
-            }}
+          <p v-if="!loggedIn" class="home-hero__lede">
+            文章、问答、搜索与 AI，共用同一张知识网络。
           </p>
 
           <form class="home-search" @submit.prevent="submitSearch">
             <WhInput
               v-model="keyword"
               size="lg"
-              placeholder="搜索文章、问题或标签"
-              aria-label="搜索文章、问题或标签"
+              placeholder="搜索文章、视频、问题或标签"
+              aria-label="搜索文章、视频、问题或标签"
             />
             <WhButton type="submit" size="lg">搜索</WhButton>
           </form>
@@ -191,12 +223,7 @@ void loadHome()
           <div class="home-hero__actions">
             <template v-if="loggedIn">
               <RouterLink class="home-hero__cta" to="/editor/new">写一篇文章</RouterLink>
-              <RouterLink
-                class="home-hero__ghost"
-                :to="{ name: 'user-profile', params: { userId: auth.userId ?? '' } }"
-              >
-                我的主页
-              </RouterLink>
+              <RouterLink class="home-hero__cta" to="/videos/upload">发一段视频</RouterLink>
             </template>
             <template v-else>
               <RouterLink class="home-hero__cta" :to="{ path: '/login', query: { redirect: '/' } }">
@@ -228,7 +255,7 @@ void loadHome()
             <g class="home-graph__labels">
               <text x="65" y="81">文章</text>
               <text x="279" y="73">问答</text>
-              <text x="72" y="276">标签</text>
+              <text x="72" y="276">视频</text>
               <text x="286" y="263">AI</text>
             </g>
           </svg>
@@ -238,26 +265,45 @@ void loadHome()
       <div class="home-sections">
         <HomeSection
           v-if="loggedIn"
-          eyebrow="[ FOR YOU ]"
-          title="为你推荐"
-          action-label="去发现"
+          eyebrow="[ FOR YOU / ARTICLES ]"
+          title="推荐文章"
+          action-label="全部文章"
           :action-to="{ name: 'article-list' }"
           :loading="recommendationsLoading"
           :error="recommendationsError"
-          :empty="recommendationsEmpty"
-          empty-text="暂时没有推荐，稍后再来看看。"
+          :empty="recommendedArticlesEmpty"
+          empty-text="暂时没有推荐文章，稍后再来看看。"
           skeleton="article"
           @retry="executeRecommendations"
         >
           <div class="home-article-grid">
             <ArticleCard
-              v-for="article in recommendations"
-              :key="article.articleId"
-              :article="article"
-              :author="authors[article.authorId]"
-              :counts="countsFor(CONTENT_TARGET_TYPE.ARTICLE, article.articleId)"
+              v-for="item in recommendedArticles"
+              :key="item.articleId"
+              :article="item"
+              :author="authors[item.authorId]"
+              :counts="countsFor(CONTENT_TARGET_TYPE.ARTICLE, item.articleId)"
               compact
-              :tags="article.tags"
+              :tags="item.tags"
+            />
+          </div>
+        </HomeSection>
+
+        <HomeSection
+          v-if="loggedIn && recommendedVideos.length"
+          eyebrow="[ FOR YOU / VIDEOS ]"
+          title="推荐视频"
+          action-label="全部视频"
+          :action-to="{ name: 'video-list' }"
+          skeleton="article"
+        >
+          <div class="home-video-grid">
+            <VideoCard
+              v-for="item in recommendedVideos"
+              :key="item.videoId ?? item.articleId"
+              :video="toVideoItem(item)"
+              :author="authors[item.authorId]"
+              :counts="countsFor(CONTENT_TARGET_TYPE.VIDEO, item.videoId ?? item.articleId)"
             />
           </div>
         </HomeSection>
@@ -584,6 +630,19 @@ void loadHome()
   min-width: 0;
 }
 
+.home-video-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  column-gap: clamp(20px, 2.5vw, 32px);
+  row-gap: clamp(24px, 3vw, 36px);
+}
+
+@media (max-width: 1100px) {
+  .home-video-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 .home-tags {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
@@ -713,7 +772,8 @@ void loadHome()
 }
 
 @media (max-width: 720px) {
-  .home-article-grid {
+  .home-article-grid,
+  .home-video-grid {
     grid-template-columns: 1fr;
   }
 

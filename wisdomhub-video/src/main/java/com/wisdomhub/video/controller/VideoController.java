@@ -90,6 +90,20 @@ public class VideoController {
         return R.success();
     }
 
+    @Operation(summary = "下架视频（仅作者）")
+    @PutMapping("/{videoId}/offline")
+    public R<Void> offline(@PathVariable("videoId") Long videoId) {
+        videoService.offline(videoId);
+        return R.success();
+    }
+
+    @Operation(summary = "重新发布已下架视频（仅作者）")
+    @PutMapping("/{videoId}/online")
+    public R<Void> online(@PathVariable("videoId") Long videoId) {
+        videoService.online(videoId);
+        return R.success();
+    }
+
     @Operation(summary = "全量替换视频标签（仅作者）")
     @PutMapping("/{videoId}/tags")
     public R<List<VideoTagVO>> updateTags(@PathVariable("videoId") Long videoId,

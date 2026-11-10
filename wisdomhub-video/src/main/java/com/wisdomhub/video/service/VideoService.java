@@ -26,6 +26,12 @@ public interface VideoService {
     /** 软删除视频并级联清理互动数据，仅作者本人可操作 */
     void delete(Long videoId);
 
+    /** 下架已发布视频，仅作者本人可操作 */
+    void offline(Long videoId);
+
+    /** 重新发布已下架视频，仅作者本人可操作 */
+    void online(Long videoId);
+
     /** 全量替换视频标签，仅作者本人可操作；返回替换后的标签 */
     List<VideoTagVO> updateTags(Long videoId, List<Long> tagIds);
 }

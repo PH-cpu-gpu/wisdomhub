@@ -127,6 +127,8 @@ export interface PendingUpload {
   mimeType: string
   /** 已 PUT 成功：续传时跳过直传，只做确认与轮询 */
   uploaded: boolean
+  /** 已转码完成、等待发布；刷新后直接恢复发布表单 */
+  ready?: boolean
 }
 
 /** 与后端 VideoMimeTypes 白名单一致 */

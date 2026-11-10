@@ -478,6 +478,11 @@ const articleTagIds: string[][] = [
 
 export const mockRecommendations: RecommendationItemVO[] = mockArticles.map((article, index) => ({
   ...article,
+  contentType: 1,
+  videoId: null,
+  coverKey: null,
+  coverUrl: null,
+  durationMs: null,
   tags: mockTags
     .filter((tag) => (articleTagIds[index] ?? []).includes(tag.tagId))
     .map((tag) => ({ tagId: tag.tagId, name: tag.name, category: tag.category })),

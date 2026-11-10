@@ -7,8 +7,6 @@ WisdomHub 把 **内容社区 + 全文搜索 + 知识图谱 + 推荐系统 + AI A
 建立技术知识点之间的关联、结合行为数据做个性化推荐，并由独立的 Python Agent 提供
 智能问答、学习路线规划与文章知识抽取。
 
-> 部署与运维见 [docker/DEPLOY.md](docker/DEPLOY.md)。
-
 ## 技术栈
 
 | 层次 | 技术 |
@@ -62,8 +60,8 @@ WisdomHub/
 
 ### 1. 环境要求
 
-- JDK 21、Maven 3.9+（也可直接使用仓库自带的 `mvnw`）
-- Docker Desktop（或兼容的 Docker Engine + Compose v2）
+- JDK 21、Maven 3.9+
+- Docker Desktop
 - Node.js >= 20.19、pnpm >= 10
 - Python >= 3.13、[uv](https://github.com/astral-sh/uv)
 
@@ -103,7 +101,7 @@ bash docker/nacos/import.sh
 
 ### 4. 启动后端
 
-先全量安装一次（多模块依赖），再按依赖顺序启动：
+先全量安装一次，再按依赖顺序启动：
 
 ```bash
 ./mvnw clean install -DskipTests
@@ -127,13 +125,6 @@ bash docker/nacos/import.sh
 ./mvnw -pl wisdomhub-gateway spring-boot:run
 ```
 
-端口：user 9091、content 9092、search 9093、knowledge 9094、recommendation 9095、notification 9096、order 9097、interaction 9098、video 9099。
-
-> **本地跑视频真实链路还需两项环境配置**：
-> 1. COS bucket 配置 CORS：AllowedOrigin 填前端地址（如 `http://localhost:5173`），Methods 至少 `PUT`、`GET`、`HEAD`，AllowedHeaders 包含 `content-type`；否则浏览器直传会在预检阶段失败（服务端 curl 上传不受影响）。
-> 2. 在 XXL-JOB 启用 `videoTranscodePollHandler`（转码轮询）与
->    `videoViewCountSyncHandler`（播放量落库）；未启用时资产会停在“转码中”、播放量不增长。
-
 ### 5. 启动 AI Agent
 
 ```bash
@@ -152,39 +143,3 @@ pnpm dev                  # 默认 http://localhost:5173
 ```
 
 `pnpm dev:mock` 可启用 mock 数据（端口 5174），无需后端即可预览页面。
-
-## 生产部署（2 核 4GB 单机）
-
-全量装不进 4GB：中间件实测常驻约 1.6GB（上限 2368MB），每个 Spring Boot 服务约 250MB。
-[`docker-compose.prod.yml`](docker-compose.prod.yml) 是覆盖层，把服务分成三档，默认档只起核心链路。
-
-**完整步骤见 [`docker/DEPLOY.md`](docker/DEPLOY.md)**，下面是速览：
-
-```bash
-# 1. 宿主机：zram + 兜底 swap + 内核参数 + Docker 日志轮转
-sudo bash docker/host-init.sh
-
-# 2. 开发机打包（服务器上不跑 mvn / pnpm）
-./mvnw clean package -DskipTests
-
-# 3. 开发机构建镜像，docker save | ssh <host> docker load 传过去
-docker compose -f docker-compose.yml -f docker-compose.prod.yml build
-
-# 4. 服务器启动
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
-docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile ext up -d      # + 推荐
-docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile stage3 up -d   # + 图谱/订单/Agent
-```
-
-- Nacos 的 `wisdomhub-env.yaml` 要换成容器地址，模板见
-  [`docker/nacos/wisdomhub-env.prod.yaml.example`](docker/nacos/wisdomhub-env.prod.yaml.example)。
-- 前端 `dist/` 与 `landing/` 放宿主机，宿主机 nginx 反代 `127.0.0.1:9090`，
-  配置见 [`wisdomhub-web/deploy/`](wisdomhub-web/deploy/)。
-- 中间件端口全部只绑 `127.0.0.1`，公网只开 nginx 的 80/443。
-- 需要 Docker Compose >= 2.24（覆盖层用 `!override` 重写端口绑定）。
-
-## 开发提示
-
-- 提交前请确认 `.env`、`*.key`、构建产物没有被加入版本库；它们均已在 `.gitignore` 中忽略。
-- `docker/seata/application.yml` 与 `docker/mysql/init/` 下的脚本是中间件运行所需，修改后需重建对应容器才生效。
-- 前端生产构建：`pnpm build`；接口地址通过 `wisdomhub-web/app/.env.production` 注入。

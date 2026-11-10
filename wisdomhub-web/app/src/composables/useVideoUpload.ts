@@ -164,7 +164,10 @@ export function useVideoUpload() {
     if (status.status === MEDIA_ASSET_STATUS.READY) {
       phase.value = 'ready'
       progress.value = 100
-      clearPending()
+      // 保留 pending，刷新后还能回到发布表单
+      if (ticket && file.value) {
+        writePending({ ...buildPending(ticket, file.value, true), ready: true })
+      }
       return
     }
     if (
@@ -334,6 +337,50 @@ export function useVideoUpload() {
       fileSize: currentFile.size,
       mimeType: mimeType.value,
       uploaded: isUploaded,
+      ready: false,
+    }
+  }
+
+  function forgetPending(): void {
+    clearPending()
+  }
+
+  /** 页面刷新后恢复：已 READY 的直接进发布；转码中的继续轮询 */
+  async function restore(): Promise<void> {
+    if (file.value) return
+    const pending = readPending()
+    if (!pending) return
+    resetRuntime()
+    try {
+      const status = await getAsset(pending.assetId, { skipErrorToast: true })
+      asset.value = status
+      if (status.status === MEDIA_ASSET_STATUS.READY) {
+        phase.value = 'ready'
+        progress.value = 100
+        return
+      }
+      if (
+        status.status === MEDIA_ASSET_STATUS.FAILED ||
+        status.status === MEDIA_ASSET_STATUS.REJECTED
+      ) {
+        phase.value = 'failed'
+        error.value = status.failReason || '视频处理失败，请重新上传'
+        clearPending()
+        return
+      }
+      if (
+        status.status === MEDIA_ASSET_STATUS.TRANSCODING ||
+        status.status === MEDIA_ASSET_STATUS.REVIEWING
+      ) {
+        phase.value = 'processing'
+        progress.value = 100
+        schedulePoll(status.assetId)
+        return
+      }
+      // 待上传 / 已上传：文件对象已随刷新丢失，只能重新选文件
+      clearPending()
+    } catch {
+      clearPending()
     }
   }
 
@@ -389,5 +436,7 @@ export function useVideoUpload() {
     pause,
     retry,
     reset,
+    restore,
+    forgetPending,
   }
 }

@@ -8,6 +8,7 @@ const groups = [
     title: '内容',
     links: [
       { label: '文章', to: '/articles' },
+      { label: '视频', to: '/videos' },
       { label: '问答', to: '/questions' },
       { label: '提问', to: '/ask' },
       { label: '标签', to: '/tags' },

@@ -225,6 +225,51 @@ public class VideoServiceImpl implements VideoService {
 
     @Override
     @Transactional
+    public void offline(Long videoId) {
+        Video video = requireOwned(videoId);
+        if (!VideoConstants.PUBLISHED.equals(video.getStatus())) {
+            throw new BusinessException(CommonErrorCode.CONFLICT, "只有已发布视频可以下架");
+        }
+        int affected = videoMapper.update(null, new LambdaUpdateWrapper<Video>()
+                .set(Video::getStatus, VideoConstants.OFFLINE)
+                .set(Video::getUpdateTime, LocalDateTime.now(ZoneOffset.UTC))
+                .eq(Video::getId, videoId)
+                .eq(Video::getStatus, VideoConstants.PUBLISHED));
+        if (affected == 0) {
+            throw new BusinessException(CommonErrorCode.CONFLICT, "视频状态已变化，下架未生效");
+        }
+        sendUpdatedAfterCommit(videoId);
+    }
+
+    @Override
+    @Transactional
+    public void online(Long videoId) {
+        Video video = requireOwned(videoId);
+        if (!VideoConstants.OFFLINE.equals(video.getStatus())) {
+            throw new BusinessException(CommonErrorCode.CONFLICT, "只有已下架视频可以重新发布");
+        }
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
+        int affected = videoMapper.update(null, new LambdaUpdateWrapper<Video>()
+                .set(Video::getStatus, VideoConstants.PUBLISHED)
+                .set(Video::getPublishTime, now)
+                .set(Video::getUpdateTime, now)
+                .eq(Video::getId, videoId)
+                .eq(Video::getStatus, VideoConstants.OFFLINE));
+        if (affected == 0) {
+            throw new BusinessException(CommonErrorCode.CONFLICT, "视频状态已变化，重新发布未生效");
+        }
+        sendUpdatedAfterCommit(videoId);
+    }
+
+    private void sendUpdatedAfterCommit(Long videoId) {
+        VideoEventPayload payload = loadPayload(videoId);
+        if (payload != null) {
+            videoEventSender.updatedAfterCommit(payload);
+        }
+    }
+
+    @Override
+    @Transactional
     public List<VideoTagVO> updateTags(Long videoId, List<Long> tagIds) {
         requireOwned(videoId);
         List<Long> normalized = videoTagService.normalizeAndValidate(tagIds);

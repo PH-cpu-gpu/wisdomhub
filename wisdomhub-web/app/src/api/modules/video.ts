@@ -1,4 +1,4 @@
-import { get, post, type RequestOptions } from '@/api/http'
+import { del, get, post, put, type RequestOptions } from '@/api/http'
 import type { ID, PageQuery, PageResponse } from '@/types/common'
 import type {
   MediaAssetStatusVO,
@@ -55,4 +55,19 @@ export function detail(videoId: ID, options: RequestOptions = {}): Promise<Video
 /** 发布视频：只有 READY 的资产可以发布 */
 export function publish(payload: VideoPublishPayload, options: RequestOptions = {}): Promise<ID> {
   return post<ID>('/api/video', payload, options)
+}
+
+/** 下架已发布视频（仅作者） */
+export function offline(videoId: ID, options: RequestOptions = {}): Promise<void> {
+  return put<void>(`/api/video/${videoId}/offline`, undefined, options)
+}
+
+/** 重新发布已下架视频（仅作者） */
+export function online(videoId: ID, options: RequestOptions = {}): Promise<void> {
+  return put<void>(`/api/video/${videoId}/online`, undefined, options)
+}
+
+/** 软删除视频（仅作者） */
+export function remove(videoId: ID, options: RequestOptions = {}): Promise<void> {
+  return del<void>(`/api/video/${videoId}`, options)
 }

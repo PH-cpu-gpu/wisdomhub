@@ -3,13 +3,21 @@ import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 
 import { isApiError } from '@/api/error'
-import { mine as listMyVideos } from '@/api/modules/video'
+import {
+  mine as listMyVideos,
+  offline as offlineVideo,
+  online as onlineVideo,
+  remove as removeVideo,
+} from '@/api/modules/video'
 import WhButton from '@/components/base/WhButton.vue'
 import WhPagination from '@/components/base/WhPagination.vue'
+import { confirm } from '@/components/base/confirm'
+import { toast } from '@/components/base/toast'
 import PageContainer from '@/components/layout/PageContainer.vue'
 import VideoCard from '@/components/video/VideoCard.vue'
 import { useInteractionCounts } from '@/composables/useInteractionCounts'
 import { useSeo } from '@/composables/useSeo'
+import type { ID } from '@/types/common'
 import { CONTENT_TARGET_TYPE } from '@/types/interaction'
 import type { MyVideoVO } from '@/types/video'
 
@@ -32,6 +40,7 @@ const items = ref<MyVideoVO[]>([])
 const total = ref(0)
 const loading = ref(false)
 const error = ref('')
+const actingId = ref<ID | null>(null)
 
 const { countsFor } = useInteractionCounts(() =>
   items.value.map((item) => ({
@@ -74,6 +83,75 @@ function setPage(value: number): void {
   })
 }
 
+async function afterChange(): Promise<void> {
+  if (items.value.length === 1 && page.value > 1) {
+    setPage(page.value - 1)
+    return
+  }
+  await loadVideos()
+}
+
+async function handleOffline(item: MyVideoVO): Promise<void> {
+  if (actingId.value) return
+  const ok = await confirm({
+    title: '下架视频',
+    message: `确定下架「${item.title}」？下架后会从列表和搜索中消失，可随时重新发布。`,
+    confirmText: '下架',
+  })
+  if (!ok) return
+  actingId.value = item.videoId
+  try {
+    await offlineVideo(item.videoId, { skipErrorToast: true })
+    toast.success('视频已下架')
+    await afterChange()
+  } catch (err) {
+    toast.error(isApiError(err) ? err.message : '下架失败，请稍后重试。')
+  } finally {
+    actingId.value = null
+  }
+}
+
+async function handleOnline(item: MyVideoVO): Promise<void> {
+  if (actingId.value) return
+  const ok = await confirm({
+    title: '重新发布',
+    message: `确定重新发布「${item.title}」？`,
+    confirmText: '重新发布',
+  })
+  if (!ok) return
+  actingId.value = item.videoId
+  try {
+    await onlineVideo(item.videoId, { skipErrorToast: true })
+    toast.success('视频已重新发布')
+    await afterChange()
+  } catch (err) {
+    toast.error(isApiError(err) ? err.message : '重新发布失败，请稍后重试。')
+  } finally {
+    actingId.value = null
+  }
+}
+
+async function handleDelete(item: MyVideoVO): Promise<void> {
+  if (actingId.value) return
+  const ok = await confirm({
+    title: '删除视频',
+    message: `确定删除「${item.title}」？删除后评论、点赞和收藏会一并清理，且不可恢复。`,
+    confirmText: '删除',
+    danger: true,
+  })
+  if (!ok) return
+  actingId.value = item.videoId
+  try {
+    await removeVideo(item.videoId, { skipErrorToast: true })
+    toast.success('视频已删除')
+    await afterChange()
+  } catch (err) {
+    toast.error(isApiError(err) ? err.message : '删除失败，请稍后重试。')
+  } finally {
+    actingId.value = null
+  }
+}
+
 watch(page, () => void loadVideos(), { immediate: true })
 
 useSeo({
@@ -112,14 +190,45 @@ useSeo({
       </div>
 
       <div v-else class="my-videos__grid">
-        <VideoCard
-          v-for="item in items"
-          :key="item.videoId"
-          :video="item"
-          :counts="countsFor(CONTENT_TARGET_TYPE.VIDEO, item.videoId)"
-          :show-author="false"
-          show-status
-        />
+        <div v-for="item in items" :key="item.videoId" class="my-videos__item">
+          <VideoCard
+            :video="item"
+            :counts="countsFor(CONTENT_TARGET_TYPE.VIDEO, item.videoId)"
+            :show-author="false"
+            show-status
+          />
+          <div class="my-videos__item-actions">
+            <WhButton
+              v-if="item.status === 1"
+              size="sm"
+              variant="ghost"
+              :loading="actingId === item.videoId"
+              :disabled="actingId !== null && actingId !== item.videoId"
+              @click="handleOffline(item)"
+            >
+              下架
+            </WhButton>
+            <WhButton
+              v-if="item.status === 2"
+              size="sm"
+              variant="ghost"
+              :loading="actingId === item.videoId"
+              :disabled="actingId !== null && actingId !== item.videoId"
+              @click="handleOnline(item)"
+            >
+              重新发布
+            </WhButton>
+            <WhButton
+              size="sm"
+              variant="danger"
+              :loading="actingId === item.videoId"
+              :disabled="actingId !== null && actingId !== item.videoId"
+              @click="handleDelete(item)"
+            >
+              删除
+            </WhButton>
+          </div>
+        </div>
       </div>
 
       <div v-if="total > PAGE_SIZE" class="my-videos__pagination">
@@ -187,6 +296,19 @@ useSeo({
   font-size: var(--text-2xs);
   text-decoration: underline;
   text-underline-offset: 3px;
+}
+
+.my-videos__item {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.my-videos__item-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
 }
 
 .my-videos__grid {
