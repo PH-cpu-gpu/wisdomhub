@@ -20,6 +20,7 @@ public final class MqRoutingKeyConstants {
     public static final String VIDEO_CREATED = "video.created";
     public static final String VIDEO_UPDATED = "video.updated";
     public static final String VIDEO_DELETED = "video.deleted";
+    public static final String VIDEO_LIKED = "video.liked";
 
     /** 互动目标删除级联：content/video → interaction */
     public static final String TARGET_DELETED = "target.deleted";

@@ -17,12 +17,14 @@ import com.wisdomhub.video.service.CosObjectService;
 import com.wisdomhub.video.service.CosPresignService;
 import com.wisdomhub.video.service.MediaAssetService;
 import com.wisdomhub.video.service.MpsTranscodeService;
+import com.wisdomhub.video.service.VideoQuotaService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.Map;
@@ -42,6 +44,7 @@ public class MediaAssetServiceImpl implements MediaAssetService {
     private final CosObjectService cosObjectService;
     private final MpsTranscodeService mpsTranscodeService;
     private final UploadProperties uploadProperties;
+    private final VideoQuotaService videoQuotaService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -55,6 +58,7 @@ public class MediaAssetServiceImpl implements MediaAssetService {
         if (dto.getFileSize() > uploadProperties.getMaxSizeBytes()) {
             throw new BusinessException(CommonErrorCode.BAD_REQUEST, "视频大小超过上限");
         }
+        videoQuotaService.checkDailyUpload(ownerId);
 
         String objectKey = buildObjectKey(ownerId, mimeType);
         CosPresignService.PresignedUpload presigned =
@@ -138,6 +142,7 @@ public class MediaAssetServiceImpl implements MediaAssetService {
     }
 
     private MediaAssetStatusVO startTranscode(MediaAsset asset) {
+        enforceDuration(asset);
         int claimed = mediaAssetMapper.update(MediaAsset.builder()
                         .status(MediaAssetConstants.TRANSCODING)
                         .build(),
@@ -228,13 +233,37 @@ public class MediaAssetServiceImpl implements MediaAssetService {
         return VideoMimeTypes.normalize(base);
     }
 
+    private void enforceDuration(MediaAsset asset) {
+        Long durationMs = mpsTranscodeService.probeDurationMs(asset);
+        String violation = videoQuotaService.durationViolation(durationMs);
+        if (violation == null) {
+            return;
+        }
+        if (!markFailedFromUploaded(asset, violation)) {
+            throw new BusinessException(CommonErrorCode.CONFLICT, "资产状态已变化，请刷新后重试");
+        }
+        cosObjectService.deleteQuietly(asset.getObjectKey());
+        throw new BusinessException(CommonErrorCode.BAD_REQUEST, violation);
+    }
+
+    private boolean markFailedFromUploaded(MediaAsset asset, String reason) {
+        int affected = mediaAssetMapper.update(null, new LambdaUpdateWrapper<MediaAsset>()
+                .set(MediaAsset::getStatus, MediaAssetConstants.FAILED)
+                .set(MediaAsset::getFailReason, truncateReason(reason, "处理失败"))
+                .set(MediaAsset::getUpdateTime, LocalDateTime.now(ZoneOffset.UTC))
+                .eq(MediaAsset::getId, asset.getId())
+                .eq(MediaAsset::getStatus, MediaAssetConstants.UPLOADED));
+        if (affected == 0) {
+            log.warn("资产状态已变化，跳过时长超限标记, assetId={}", asset.getId());
+            return false;
+        }
+        return true;
+    }
+
     private boolean markFailed(MediaAsset asset, String reason) {
-        String failReason = reason.length() > FAIL_REASON_MAX_LENGTH
-                ? reason.substring(0, FAIL_REASON_MAX_LENGTH)
-                : reason;
         MediaAsset update = MediaAsset.builder()
                 .status(MediaAssetConstants.FAILED)
-                .failReason(failReason)
+                .failReason(truncateReason(reason, "处理失败"))
                 .build();
         int affected = mediaAssetMapper.update(update, new LambdaUpdateWrapper<MediaAsset>()
                 .eq(MediaAsset::getId, asset.getId())
@@ -244,6 +273,15 @@ public class MediaAssetServiceImpl implements MediaAssetService {
             return false;
         }
         return true;
+    }
+
+    private String truncateReason(String reason, String fallback) {
+        if (reason == null || reason.isBlank()) {
+            return fallback;
+        }
+        return reason.length() > FAIL_REASON_MAX_LENGTH
+                ? reason.substring(0, FAIL_REASON_MAX_LENGTH)
+                : reason;
     }
 
     private MediaAssetStatusVO toStatusVO(MediaAsset asset) {

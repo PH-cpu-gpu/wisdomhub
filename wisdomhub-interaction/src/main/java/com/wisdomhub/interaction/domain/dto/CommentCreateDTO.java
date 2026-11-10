@@ -8,7 +8,7 @@ import lombok.Data;
 @Data
 public class CommentCreateDTO {
 
-    /** 1-文章 2-回答 3-问题；为空按 1-文章，其他值 → 400 */
+    /** 1-文章 2-回答 3-问题 7-视频；为空按 1-文章，其他值 → 400 */
     private Integer targetType;
 
     @NotNull(message = "评论目标不能为空")

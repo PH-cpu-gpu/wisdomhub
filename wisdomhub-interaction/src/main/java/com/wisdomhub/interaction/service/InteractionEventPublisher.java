@@ -5,10 +5,12 @@ import com.wisdomhub.common.mq.event.ArticleLikedEvent;
 import com.wisdomhub.common.mq.event.AnswerLikedEvent;
 import com.wisdomhub.common.mq.event.BehaviorRecordedEvent;
 import com.wisdomhub.common.mq.event.CommentCreatedEvent;
+import com.wisdomhub.common.mq.event.VideoLikedEvent;
 import com.wisdomhub.common.mq.event.payload.ArticleLikedPayload;
 import com.wisdomhub.common.mq.event.payload.AnswerLikedPayload;
 import com.wisdomhub.common.mq.event.payload.BehaviorRecordedPayload;
 import com.wisdomhub.common.mq.event.payload.CommentCreatedPayload;
+import com.wisdomhub.common.mq.event.payload.VideoLikedPayload;
 import com.wisdomhub.common.mq.util.EventPublisher;
 import com.wisdomhub.interaction.api.ArticleTagFeign;
 import com.wisdomhub.interaction.api.VideoTagFeign;
@@ -57,6 +59,22 @@ public class InteractionEventPublisher {
                     .build()));
         } catch (Exception e) {
             log.error("回答点赞事件发送失败, answerId={}, userId={}", answerId, userId, e);
+        }
+    }
+
+    public void videoLiked(Long videoId, Long userId, Long authorId) {
+        if (authorId == null) {
+            log.warn("视频点赞事件缺少作者, videoId={}, userId={}", videoId, userId);
+            return;
+        }
+        try {
+            eventPublisher.send(new VideoLikedEvent(VideoLikedPayload.builder()
+                    .videoId(videoId)
+                    .userId(userId)
+                    .authorId(authorId)
+                    .build()));
+        } catch (Exception e) {
+            log.error("视频点赞事件发送失败, videoId={}, userId={}", videoId, userId, e);
         }
     }
 

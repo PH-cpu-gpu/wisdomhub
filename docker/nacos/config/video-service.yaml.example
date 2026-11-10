@@ -41,6 +41,12 @@ wisdomhub:
     upload:
       max-size-bytes: 2147483648   # 2 GiB，B6.13 再按用户收紧
       ticket-ttl-seconds: 900      # 预签名 URL 有效期
+    quota:
+      daily-upload-limit: 10       # 每个用户每日上传凭证数
+      max-duration-seconds: 1800   # 单个视频时长上限（30 分钟）
+    audit:
+      provider: auto               # auto-自动通过；接入数据万象后改为 cos
+      timeout-minutes: 10          # 审核中超过该时长置失败
     mps:
       transcode-template-id: 1851084
       snapshot-template-id: 191268

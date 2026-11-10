@@ -80,6 +80,7 @@ public class LikeServiceImpl implements LikeService {
         } else if (type == ContentTargetTypeConstants.ANSWER) {
             eventPublisher.answerLiked(targetId, userId, target.getOwnerId());
         } else if (type == ContentTargetTypeConstants.VIDEO) {
+            eventPublisher.videoLiked(targetId, userId, target.getOwnerId());
             eventPublisher.behaviorRecorded(type, targetId, userId, BehaviorTypeConstants.LIKE);
         }
         return readLikeCount(type, targetId);

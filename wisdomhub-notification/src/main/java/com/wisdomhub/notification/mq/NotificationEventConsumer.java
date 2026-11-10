@@ -11,6 +11,7 @@ import com.wisdomhub.common.mq.event.payload.CommentCreatedPayload;
 import com.wisdomhub.common.mq.event.payload.OrderPaidPayload;
 import com.wisdomhub.common.mq.event.payload.TagProposalSubmittedPayload;
 import com.wisdomhub.common.mq.event.payload.UserFollowedPayload;
+import com.wisdomhub.common.mq.event.payload.VideoLikedPayload;
 import com.wisdomhub.common.security.config.AdminProperties;
 import com.wisdomhub.notification.config.NotificationMqConfiguration;
 import com.wisdomhub.notification.constants.NotificationRedisConstants;
@@ -93,6 +94,14 @@ public class NotificationEventConsumer {
                 createAndPush(payload.getAuthorId(), payload.getUserId(),
                         NotificationTypeConstants.LIKE, ContentTargetTypeConstants.ANSWER, payload.getAnswerId());
             }
+            case MqRoutingKeyConstants.VIDEO_LIKED -> {
+                VideoLikedPayload payload = payload(event, VideoLikedPayload.class);
+                requireId(payload.getVideoId(), "videoId");
+                requireId(payload.getUserId(), "userId");
+                requireId(payload.getAuthorId(), "authorId");
+                createAndPush(payload.getAuthorId(), payload.getUserId(),
+                        NotificationTypeConstants.LIKE, ContentTargetTypeConstants.VIDEO, payload.getVideoId());
+            }
             case MqRoutingKeyConstants.COMMENT_CREATED -> {
                 CommentCreatedPayload payload = payload(event, CommentCreatedPayload.class);
                 requireId(payload.getTargetType(), "targetType");
@@ -170,6 +179,7 @@ public class NotificationEventConsumer {
     private boolean handled(String eventType) {
         return MqRoutingKeyConstants.ARTICLE_LIKED.equals(eventType)
                 || MqRoutingKeyConstants.ANSWER_LIKED.equals(eventType)
+                || MqRoutingKeyConstants.VIDEO_LIKED.equals(eventType)
                 || MqRoutingKeyConstants.COMMENT_CREATED.equals(eventType)
                 || MqRoutingKeyConstants.ANSWER_CREATED.equals(eventType)
                 || MqRoutingKeyConstants.USER_FOLLOWED.equals(eventType)

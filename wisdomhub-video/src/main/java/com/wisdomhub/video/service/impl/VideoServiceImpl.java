@@ -69,6 +69,15 @@ public class VideoServiceImpl implements VideoService {
         if (!authorId.equals(asset.getOwnerId())) {
             throw new BusinessException(CommonErrorCode.FORBIDDEN, "无权发布他人的视频");
         }
+        if (MediaAssetConstants.REJECTED.equals(asset.getStatus())) {
+            throw new BusinessException(CommonErrorCode.CONFLICT, "视频审核未通过");
+        }
+        if (MediaAssetConstants.FAILED.equals(asset.getStatus())) {
+            throw new BusinessException(CommonErrorCode.CONFLICT, "视频处理失败");
+        }
+        if (MediaAssetConstants.REVIEWING.equals(asset.getStatus())) {
+            throw new BusinessException(CommonErrorCode.CONFLICT, "视频审核中，请稍后再试");
+        }
         if (!MediaAssetConstants.READY.equals(asset.getStatus())) {
             throw new BusinessException(CommonErrorCode.CONFLICT, "视频尚未就绪");
         }

@@ -4,8 +4,11 @@ import com.tencentcloudapi.common.exception.TencentCloudSDKException;
 import com.tencentcloudapi.mps.v20190612.MpsClient;
 import com.tencentcloudapi.mps.v20190612.models.CosInputInfo;
 import com.tencentcloudapi.mps.v20190612.models.CosOutputStorage;
+import com.tencentcloudapi.mps.v20190612.models.DescribeMediaMetaDataRequest;
+import com.tencentcloudapi.mps.v20190612.models.DescribeMediaMetaDataResponse;
 import com.tencentcloudapi.mps.v20190612.models.DescribeTaskDetailRequest;
 import com.tencentcloudapi.mps.v20190612.models.DescribeTaskDetailResponse;
+import com.tencentcloudapi.mps.v20190612.models.MediaMetaData;
 import com.tencentcloudapi.mps.v20190612.models.MediaInputInfo;
 import com.tencentcloudapi.mps.v20190612.models.MediaProcessTaskInput;
 import com.tencentcloudapi.mps.v20190612.models.MediaProcessTaskResult;
@@ -60,6 +63,24 @@ public class MpsTranscodeService {
             log.error("MPS 转码任务提交失败, assetId={}, code={}, message={}",
                     asset.getId(), e.getErrorCode(), e.getMessage(), e);
             throw new BusinessException(CommonErrorCode.SERVICE_UNAVAILABLE, "转码任务提交失败");
+        }
+    }
+
+    /** 转码前探测时长；探测失败返回 null，由转码后兜底。 */
+    public Long probeDurationMs(MediaAsset asset) {
+        DescribeMediaMetaDataRequest request = new DescribeMediaMetaDataRequest();
+        request.setInputInfo(buildInputInfo(asset));
+        try {
+            DescribeMediaMetaDataResponse response = mpsClient.DescribeMediaMetaData(request);
+            MediaMetaData metadata = response.getMetaData();
+            if (metadata == null || metadata.getDuration() == null) {
+                return null;
+            }
+            return (long) Math.round(metadata.getDuration() * 1000);
+        } catch (Exception e) {
+            log.warn("MPS 媒体信息探测失败，转码后再校验时长, assetId={}, message={}",
+                    asset.getId(), e.getMessage());
+            return null;
         }
     }
 
