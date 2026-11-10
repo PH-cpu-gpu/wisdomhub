@@ -2,6 +2,7 @@
 import { computed, ref, useId } from 'vue'
 
 import { useDismissibleLayer } from '@/composables/useDismissibleLayer'
+import { useMotionEnabled } from '@/composables/useMotionEnabled'
 
 const props = withDefaults(
   defineProps<{
@@ -31,6 +32,7 @@ const emit = defineEmits<{
 const panelRef = ref<HTMLElement | null>(null)
 const titleId = useId()
 const isOpen = computed(() => props.modelValue)
+const motionEnabled = useMotionEnabled()
 
 function close(): void {
   emit('update:modelValue', false)
@@ -51,7 +53,12 @@ useDismissibleLayer({
 
 <template>
   <Teleport to="body">
-    <Transition name="wh-modal" @after-enter="emit('opened')" @after-leave="emit('closed')">
+    <Transition
+      name="wh-modal"
+      :css="motionEnabled"
+      @after-enter="emit('opened')"
+      @after-leave="emit('closed')"
+    >
       <div v-if="modelValue" class="wh-modal" role="presentation" @mousedown.self="onOverlay">
         <div
           ref="panelRef"

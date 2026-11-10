@@ -974,30 +974,6 @@ export const MOCK_ARTICLE_MARKDOWN = `## 先看结论
 把一致性边界写清楚，再谈缓存策略，很多线上问题会提前消失。
 `
 
-interface MockArticleReaction {
-  liked: boolean
-  collected: boolean
-  likeCount: number
-  favoriteCount: number
-}
-
-const mockArticleReactions = new Map<string, MockArticleReaction>()
-
-function reactionFor(articleId: string): MockArticleReaction {
-  const current = mockArticleReactions.get(articleId)
-  if (current) return current
-
-  const stats = mockArticleStats[articleId]
-  const created: MockArticleReaction = {
-    liked: false,
-    collected: false,
-    likeCount: stats?.likeCount ?? 0,
-    favoriteCount: stats?.favoriteCount ?? 0,
-  }
-  mockArticleReactions.set(articleId, created)
-  return created
-}
-
 export const mockPaidColumns: ArticleColumnVO[] = [
   {
     columnId: '7001',
@@ -1238,30 +1214,6 @@ export function mockArticleDetail(articleId: string, locked = false): ArticleDet
     locked,
     columns: locked ? mockPaidColumns : [],
   }
-}
-
-export function mockToggleArticleReaction(
-  articleId: string,
-  kind: 'like' | 'collect',
-  active: boolean,
-): number {
-  const base = mockArticles.find((article) => article.articleId === articleId) ?? mockArticles[0]
-  if (!base) return 0
-
-  const reaction = reactionFor(articleId)
-  if (kind === 'like') {
-    if (reaction.liked !== active) {
-      reaction.liked = active
-      reaction.likeCount = Math.max(0, reaction.likeCount + (active ? 1 : -1))
-    }
-    return reaction.likeCount
-  }
-
-  if (reaction.collected !== active) {
-    reaction.collected = active
-    reaction.favoriteCount = Math.max(0, reaction.favoriteCount + (active ? 1 : -1))
-  }
-  return reaction.favoriteCount
 }
 
 export function mockArticleBriefs(articleIds?: string[]): ArticleBriefVO[] {

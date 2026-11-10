@@ -281,6 +281,12 @@ export function request<T>(config: RequestOptions): Promise<T> {
     .then((response) => response.data as T)
 }
 
+/** 把后端返回的相对路径拼到 API 基址上；播放列表、封面这类非 axios 业务请求要用 */
+export function resolveApiUrl(path: string): string {
+  if (/^[a-z][a-z0-9+.-]*:/i.test(path)) return path
+  return `${BASE_URL}${path}`
+}
+
 export function get<T>(url: string, params?: object, config?: RequestOptions): Promise<T> {
   return request<T>({ ...config, method: 'GET', url, params })
 }

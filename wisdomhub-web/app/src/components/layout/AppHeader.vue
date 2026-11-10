@@ -44,6 +44,7 @@ const navItems = [
   { key: 'home', label: '首页', to: '/home' },
   { key: 'articles', label: '文章', to: '/articles' },
   { key: 'questions', label: '问答', to: '/questions' },
+  { key: 'videos', label: '视频', to: '/videos' },
   { key: 'tech', label: '技术', to: '/tags' },
   { key: 'graph', label: '图谱', to: '/graph' },
   { key: 'ai', label: 'AI', to: '/ai' },
@@ -205,6 +206,7 @@ onBeforeUnmount(() => {
         </RouterLink>
 
         <RouterLink class="cta" to="/editor/new">写文章</RouterLink>
+        <RouterLink class="cta cta--ghost" to="/videos/upload">发视频</RouterLink>
 
         <RouterLink v-if="showAdminEntry" class="admin" to="/admin/tag-proposals">
           提案
@@ -291,6 +293,17 @@ onBeforeUnmount(() => {
           <div class="mobile-menu__actions">
             <RouterLink class="mobile-menu__cta" to="/editor/new" @click="closeMenu">
               写文章
+            </RouterLink>
+            <RouterLink class="mobile-menu__ghost" to="/videos/upload" @click="closeMenu">
+              发视频
+            </RouterLink>
+            <RouterLink
+              v-if="accountTarget"
+              class="mobile-menu__ghost"
+              to="/videos/mine"
+              @click="closeMenu"
+            >
+              我的视频
             </RouterLink>
             <RouterLink
               class="mobile-menu__ghost"
@@ -490,6 +503,16 @@ onBeforeUnmount(() => {
   color: var(--ink);
   box-shadow: var(--shadow-hard-sm);
   transform: translate(-1px, -1px);
+}
+
+.cta--ghost {
+  background: transparent;
+  color: var(--ink);
+}
+
+.cta--ghost:hover {
+  background: var(--ink);
+  color: var(--acid);
 }
 
 .register {

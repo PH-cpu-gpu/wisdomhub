@@ -8,10 +8,13 @@ const props = withDefaults(
     name?: string
     size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | number
     shape?: 'square' | 'circle'
+    /** 装饰性头像：旁边已有可见名字时置 true，避免读屏重名 */
+    decorative?: boolean
   }>(),
   {
     size: 'md',
     shape: 'square',
+    decorative: false,
   },
 )
 
@@ -20,7 +23,9 @@ const sizeMap = { xs: 24, sm: 32, md: 40, lg: 48, xl: 64 } as const
 const imageFailed = ref(false)
 const sizePx = computed(() => (typeof props.size === 'number' ? props.size : sizeMap[props.size]))
 const initials = computed(() => props.name?.trim().slice(0, 1).toUpperCase() || 'W')
-const label = computed(() => props.alt ?? props.name ?? '用户头像')
+const label = computed(() =>
+  props.decorative ? '' : (props.alt ?? props.name ?? '用户头像'),
+)
 
 watch(
   () => props.src,
@@ -48,7 +53,7 @@ watch(
       @error="imageFailed = true"
     />
     <span v-else class="wh-avatar__fallback" aria-hidden="true">{{ initials }}</span>
-    <span v-if="!src || imageFailed" class="wh-sr-only">{{ label }}</span>
+    <span v-if="!decorative && (!src || imageFailed)" class="wh-sr-only">{{ label }}</span>
   </span>
 </template>
 

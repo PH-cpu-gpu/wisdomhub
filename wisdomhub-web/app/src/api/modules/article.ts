@@ -1,5 +1,5 @@
 import { del, get, post, type RequestOptions } from '@/api/http'
-import type { ID, PageQuery, PageResponse } from '@/types/common'
+import type { ID, PageResponse } from '@/types/common'
 import type {
   ArticleBriefVO,
   ArticleDetailVO,
@@ -26,13 +26,6 @@ export function list(
 
 export function detail(articleId: ID, options: RequestOptions = {}): Promise<ArticleDetailVO> {
   return get<ArticleDetailVO>(`/api/content/article/${articleId}`, undefined, options)
-}
-
-export function listFavorites(
-  params: PageQuery = {},
-  options: RequestOptions = {},
-): Promise<PageResponse<ArticleListItemVO>> {
-  return get<PageResponse<ArticleListItemVO>>('/api/content/article/collect', params, options)
 }
 
 export function listBrief(articleIds: ID[]): Promise<ArticleBriefVO[]> {

@@ -187,6 +187,9 @@ importers:
       highlight.js:
         specifier: ^11.12.0
         version: 11.12.0
+      hls.js:
+        specifier: ^1.7.4
+        version: 1.7.4
       markdown-it:
         specifier: ^14.3.3
         version: 14.3.3
@@ -1172,6 +1175,9 @@ packages:
   highlight.js@11.12.0:
     resolution: {integrity: sha512-nbfWpyRMcMrPMmDwJB+dhX/eiaPKtc2RB+0QZskqJ3WjRA/FDS0e9hZrx8EC/lbEv8gXy98FcDbNa/dspAaJMg==}
     engines: {node: '>=12.0.0'}
+
+  hls.js@1.7.4:
+    resolution: {integrity: sha512-3GlxGdPvT2YHvQYOt+yOzT/DEior/qJVNIylHA77kgeoBTdQQqi70GwefNEUmHQeNGyjC8U62+bruqW/Tpm+tg==}
 
   hookable@5.5.3:
     resolution: {integrity: sha512-Yc+BQe8SvoXH1643Qez1zqLRmbA5rCL+sSmk6TVos0LWVfNIB7PGncdlId77WzLGSIB5KaWgTaNTs2lNVEI6VQ==}
@@ -2455,6 +2461,8 @@ snapshots:
       function-bind: 1.1.2
 
   highlight.js@11.12.0: {}
+
+  hls.js@1.7.4: {}
 
   hookable@5.5.3: {}
 

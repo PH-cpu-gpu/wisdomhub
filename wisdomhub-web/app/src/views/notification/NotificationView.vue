@@ -29,6 +29,7 @@ const TARGET_LABELS: Record<number, string> = {
   3: '问题',
   4: '专栏',
   5: '用户',
+  7: '视频',
 }
 
 const notification = useNotificationStore()
@@ -59,6 +60,12 @@ function targetRoute(item: NotificationVO): Record<string, unknown> | null {
   if (item.targetType === 5) {
     const userId = item.senderId ?? item.targetId
     return userId ? { name: 'user-profile', params: { userId } } : null
+  }
+  if (item.targetType === 7) {
+    // 视频详情路由要到 F7.2 才注册，模板先存在但不提前跳空路由
+    return router.hasRoute('video-detail')
+      ? { name: 'video-detail', params: { videoId: item.targetId } }
+      : null
   }
   return null
 }

@@ -9,6 +9,10 @@ const home = () => import('@/views/home/HomeView.vue')
 const articleList = () => import('@/views/article/ArticleListView.vue')
 const articleDetail = () => import('@/views/article/ArticleDetailView.vue')
 const editor = () => import('@/views/editor/EditorView.vue')
+const videoUpload = () => import('@/views/video/VideoUploadView.vue')
+const videoList = () => import('@/views/video/VideoListView.vue')
+const myVideos = () => import('@/views/video/MyVideosView.vue')
+const videoDetail = () => import('@/views/video/VideoDetailView.vue')
 const columnDetail = () => import('@/views/column/ColumnDetailView.vue')
 const login = () => import('@/views/auth/LoginView.vue')
 const register = () => import('@/views/auth/RegisterView.vue')
@@ -128,6 +132,54 @@ const routes: RouteRecordRaw[] = [
           task: 'F3.2',
           requiresAuth: true,
           description: '读取 /source，恢复草稿或覆盖发布。',
+        },
+      },
+      {
+        path: 'videos/upload',
+        name: 'video-upload',
+        component: videoUpload,
+        meta: {
+          title: '上传视频',
+          section: 'VIDEO',
+          task: 'F7.1',
+          requiresAuth: true,
+          description: '选文件直传对象存储，轮询转码与审核状态，完成后发布视频。',
+        },
+      },
+      {
+        path: 'videos',
+        name: 'video-list',
+        component: videoList,
+        meta: {
+          title: '视频',
+          section: 'VIDEO',
+          task: 'F7.3',
+          nav: 'videos',
+          description: '已发布视频列表，按发布时间倒序，支持按作者筛选。',
+        },
+      },
+      {
+        path: 'videos/mine',
+        name: 'video-mine',
+        component: myVideos,
+        meta: {
+          title: '我的视频',
+          section: 'VIDEO',
+          task: 'F7.3',
+          nav: 'videos',
+          requiresAuth: true,
+          description: '自己发布的视频：状态、播放数与详情。',
+        },
+      },
+      {
+        path: 'video/:videoId',
+        name: 'video-detail',
+        component: videoDetail,
+        meta: {
+          title: '视频详情',
+          section: 'VIDEO',
+          task: 'F7.2',
+          description: 'HLS 播放、作者、标签、评论、点赞与收藏。',
         },
       },
       {

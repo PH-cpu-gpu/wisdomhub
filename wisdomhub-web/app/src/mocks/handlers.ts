@@ -46,7 +46,6 @@ import {
   mockTagRelations,
   mockTags,
   MOCK_ARTICLE_MARKDOWN,
-  mockToggleArticleReaction,
   type MockColumn,
 } from './fixtures'
 
@@ -54,7 +53,6 @@ const MOCK_DELAY = 180
 /** Mock 永远视为已登录的 1001 */
 const MOCK_USER_ID = '1001'
 const CONTENT_ANSWER = CONTENT_TARGET_TYPE.ANSWER
-const CONTENT_QUESTION = CONTENT_TARGET_TYPE.QUESTION
 const mockFollowing = new Set<string>()
 /** 提案 mock 是有状态的：审批后要把状态写回，刷新详情/列表才能看到变化 */
 const mockProposalState = mockTagProposals.map((proposal) => ({ ...proposal }))
@@ -166,6 +164,182 @@ function interactionTargetOf(config: InternalAxiosRequestConfig): {
     targetId: params.targetId === undefined ? '' : String(params.targetId),
   }
 }
+/** 视频资产 mock：ticket → complete → 轮询推进状态；发布后记录一条 video */
+interface MockVideoAsset {
+  assetId: string
+  ownerId: string
+  objectKey: string
+  fileSize: number
+  mimeType: string
+  status: number
+  durationMs: number | null
+  width: number | null
+  height: number | null
+  coverKey: string | null
+  failReason: string | null
+  polls: number
+}
+
+const MOCK_VIDEO_MIME_TYPES = [
+  'video/mp4',
+  'video/quicktime',
+  'video/webm',
+  'video/x-matroska',
+]
+const MOCK_VIDEO_MAX_SIZE = 2 * 1024 * 1024 * 1024
+const mockVideoAssets = new Map<string, MockVideoAsset>()
+const mockPublishedVideos: Array<{
+  videoId: string
+  assetId: string
+  title: string
+  summary: string
+  tagIds: string[]
+  authorId: string
+  publishTime: string
+  /** 1-已发布 2-已下架 */
+  status: number
+}> = []
+let mockAssetSequence = 8800
+let mockVideoSequence = 7700
+
+/** mock 封面：data URI，避免依赖 /api/video/default-cover.svg 被 Vite 拦截 */
+const MOCK_VIDEO_COVER = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720"><rect width="1280" height="720" fill="#1f2430"/><circle cx="640" cy="360" r="96" fill="#2d6cdf"/><path d="M610 300 L740 360 L610 420 Z" fill="#ffffff"/><text x="640" y="540" fill="#9aa4b2" font-family="monospace" font-size="28" text-anchor="middle">WisdomHub Video</text></svg>',
+)}`
+
+// 预置一批视频：足够验证分页、作者筛选与我的视频状态徽标
+mockPublishedVideos.push(
+  {
+    videoId: '7001',
+    assetId: '8701',
+    title: '用 Redis 做缓存之前，先搞清楚这四件事',
+    summary: '缓存不是「加一层 Redis」这么简单：一致性边界、失效策略、回源保护、热点分布，四个问题没想清楚就不要上线。',
+    tagIds: ['4', '2'],
+    authorId: '2001',
+    publishTime: '2026-11-06T09:00:00Z',
+    status: 1,
+  },
+  {
+    videoId: '7002',
+    assetId: '8702',
+    title: 'Vue 3 响应式到底在追踪什么',
+    summary: '从 ref / reactive 到 effect 依赖收集，用一段最小实现拆开响应式系统的黑盒。',
+    tagIds: ['3'],
+    authorId: '2002',
+    publishTime: '2026-11-05T07:30:00Z',
+    status: 1,
+  },
+  {
+    videoId: '7003',
+    assetId: '8703',
+    title: '数据库连接池耗尽的十个排查步骤',
+    summary: '从连接泄漏到慢查询，按链路定位连接池耗尽的真正原因。',
+    tagIds: ['11'],
+    authorId: '2001',
+    publishTime: '2026-11-04T06:20:00Z',
+    status: 1,
+  },
+  {
+    videoId: '7004',
+    assetId: '8704',
+    title: '前端性能优化：从 LCP 到 INP',
+    summary: '指标换了，优化手段也要换；先量后调，不要背结论。',
+    tagIds: ['3'],
+    authorId: '2002',
+    publishTime: '2026-11-03T08:10:00Z',
+    status: 1,
+  },
+  {
+    videoId: '7005',
+    assetId: '8705',
+    title: 'Kafka 顺序消息到底怎么保证',
+    summary: '分区键、单分区消费与重试策略，顺序语义的边界在哪里。',
+    tagIds: ['10', '4'],
+    authorId: '2001',
+    publishTime: '2026-11-02T05:40:00Z',
+    status: 1,
+  },
+  {
+    videoId: '7006',
+    assetId: '8706',
+    title: 'TypeScript 类型体操入门',
+    summary: '条件类型、映射类型与推断，用几个真实场景讲清类型编程。',
+    tagIds: ['8'],
+    authorId: '2002',
+    publishTime: '2026-11-01T09:50:00Z',
+    status: 1,
+  },
+  {
+    videoId: '7007',
+    assetId: '8707',
+    title: '我的第一个技术视频：从录屏到发布',
+    summary: '录制、剪辑、转码、封面的最小工作流，先发出来再优化。',
+    tagIds: ['9'],
+    authorId: '1001',
+    publishTime: '2026-10-30T03:15:00Z',
+    status: 1,
+  },
+  {
+    videoId: '7008',
+    assetId: '8708',
+    title: '分布式锁的三种实现与失效场景',
+    summary: 'Redis、ZooKeeper 与数据库锁的边界。',
+    tagIds: ['4', '12'],
+    authorId: '2001',
+    publishTime: '2026-10-29T07:05:00Z',
+    status: 1,
+  },
+  {
+    videoId: '7009',
+    assetId: '8709',
+    title: 'CSS Grid 实战：从布局到自适应',
+    summary: '用 grid 与容器查询重写一个响应式列表页。',
+    tagIds: ['3'],
+    authorId: '2002',
+    publishTime: '2026-10-28T02:30:00Z',
+    status: 1,
+  },
+  {
+    videoId: '7010',
+    assetId: '8710',
+    title: '旧版上传演示（已下架）',
+    summary: '这条视频用于验证「已下架」状态徽标。',
+    tagIds: [],
+    authorId: '1001',
+    publishTime: '2026-10-20T04:00:00Z',
+    status: 2,
+  },
+)
+
+function mockVideoDurationOf(video: { assetId: string }): number | null {
+  return mockVideoAssets.get(video.assetId)?.durationMs ?? 65000
+}
+
+function mockVideoViewCount(videoId: string): number {
+  const views = Number(localStorage.getItem(`wisdomhub:mock.videoViews.${videoId}`) ?? '0')
+  return 300 + views
+}
+
+function mockVideoTagsOf(tagIds: string[]): Array<{ tagId: string; name: string; category: string }> {
+  return tagIds
+    .map((tagId) => mockTags.find((tag) => tag.tagId === tagId))
+    .filter((tag): tag is (typeof mockTags)[number] => Boolean(tag))
+    .map((tag) => ({ tagId: tag.tagId, name: tag.name, category: tag.category }))
+}
+
+function mockAssetVO(asset: MockVideoAsset): Record<string, unknown> {
+  return {
+    assetId: asset.assetId,
+    status: asset.status,
+    fileSize: asset.fileSize,
+    durationMs: asset.durationMs,
+    width: asset.width,
+    height: asset.height,
+    coverKey: asset.coverKey,
+    failReason: asset.failReason,
+  }
+}
+
 const mockHistoryEntries = [
   { articleId: '1002', updateTime: '2026-10-26T09:30:00Z' },
   { articleId: '1003', updateTime: '2026-10-26T08:10:00Z' },
@@ -1167,6 +1341,59 @@ export async function handleMockRequest(
     return response(config, pageOf(results, config))
   }
 
+  if (method === 'get' && path === '/api/search/video') {
+    const params = (config.params ?? {}) as {
+      keyword?: string
+      tagId?: string | number
+      sort?: string
+      startTime?: string
+      endTime?: string
+    }
+    const keyword = String(params.keyword ?? '').trim()
+    const lowerKeyword = keyword.toLowerCase()
+    const tagId = params.tagId === undefined ? '' : String(params.tagId)
+    const startTime = String(params.startTime ?? '')
+    const endTime = String(params.endTime ?? '')
+
+    const items = mockPublishedVideos
+      .filter((video) => video.status === 1)
+      .filter((video) => {
+        if (!keyword) return true
+        return (
+          video.title.toLowerCase().includes(lowerKeyword) ||
+          video.summary.toLowerCase().includes(lowerKeyword)
+        )
+      })
+      .filter((video) => !tagId || video.tagIds.includes(tagId))
+      .filter((video) => !startTime || video.publishTime >= startTime)
+      .filter((video) => !endTime || video.publishTime <= endTime)
+
+    const sort = params.sort ?? 'relevance'
+    if (sort === 'hot') {
+      items.sort((a, b) => mockVideoViewCount(b.videoId) - mockVideoViewCount(a.videoId))
+    } else {
+      items.sort((a, b) => b.publishTime.localeCompare(a.publishTime))
+    }
+
+    const results = items.map((video) => ({
+      videoId: video.videoId,
+      authorId: video.authorId,
+      title: video.title,
+      summary: video.summary || null,
+      highlight: {
+        title: highlightText(video.title, keyword),
+        summary: highlightText(video.summary, keyword),
+      },
+      tags: mockVideoTagsOf(video.tagIds),
+      coverKey: mockVideoAssets.get(video.assetId)?.coverKey ?? null,
+      coverUrl: MOCK_VIDEO_COVER,
+      durationMs: mockVideoDurationOf(video),
+      publishTime: video.publishTime,
+      viewCount: mockVideoViewCount(video.videoId),
+    }))
+    return response(config, pageOf(results, config))
+  }
+
   if (method === 'get' && path === '/api/search/question') {
     const params = (config.params ?? {}) as {
       keyword?: string
@@ -1510,6 +1737,206 @@ export async function handleMockRequest(
     )
   }
 
+  if (method === 'post' && path === '/api/video/upload-ticket') {
+    if (localStorage.getItem('wisdomhub:mock.videoQuota') === '1') {
+      return failure(config, 429, '今日上传次数已达上限（10 次）')
+    }
+    const body = bodyOf<{ fileSize?: number; mimeType?: string }>(config)
+    const mimeType = (body?.mimeType ?? '').toLowerCase()
+    const fileSize = Number(body?.fileSize ?? 0)
+    if (!MOCK_VIDEO_MIME_TYPES.includes(mimeType)) {
+      return failure(config, 400, '不支持的视频格式')
+    }
+    if (!Number.isFinite(fileSize) || fileSize <= 0) {
+      return failure(config, 400, '文件大小不合法')
+    }
+    if (fileSize > MOCK_VIDEO_MAX_SIZE) {
+      return failure(config, 400, '视频大小超过上限')
+    }
+
+    const assetId = String((mockAssetSequence += 1))
+    const extension = mimeType.split('/')[1] ?? 'mp4'
+    const objectKey = `video/${MOCK_USER_ID}/202611/${assetId}.${extension}`
+    mockVideoAssets.set(assetId, {
+      assetId,
+      ownerId: MOCK_USER_ID,
+      objectKey,
+      fileSize,
+      mimeType,
+      status: 1,
+      durationMs: null,
+      width: null,
+      height: null,
+      coverKey: null,
+      failReason: null,
+      polls: 0,
+    })
+    return response(config, {
+      assetId,
+      objectKey,
+      uploadUrl: `https://mock-cos.local/${objectKey}`,
+      method: 'PUT',
+      headers: { 'Content-Type': mimeType },
+      expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+    })
+  }
+
+  const videoCompleteMatch = path.match(/^\/api\/video\/assets\/([^/]+)\/complete$/)
+  if (method === 'post' && videoCompleteMatch?.[1]) {
+    const assetId = decodeURIComponent(videoCompleteMatch[1])
+    const asset = mockVideoAssets.get(assetId)
+    if (!asset) return failure(config, 404, '资产不存在')
+
+    if (localStorage.getItem('wisdomhub:mock.videoDuration') === '1') {
+      asset.status = 4
+      asset.failReason = '视频时长超过上限（最长 30 分钟）'
+      return failure(config, 400, asset.failReason)
+    }
+
+    asset.status = 3
+    asset.durationMs = 65000
+    asset.width = 1280
+    asset.height = 720
+    asset.polls = 0
+    return response(config, mockAssetVO(asset))
+  }
+
+  const videoAssetMatch = path.match(/^\/api\/video\/assets\/([^/]+)$/)
+  if (method === 'get' && videoAssetMatch?.[1]) {
+    const assetId = decodeURIComponent(videoAssetMatch[1])
+    const asset = mockVideoAssets.get(assetId)
+    if (!asset) return failure(config, 404, '资产不存在')
+
+    if (asset.status === 3) {
+      asset.polls += 1
+      if (asset.polls >= 2) {
+        if (localStorage.getItem('wisdomhub:mock.videoReject') === '1') {
+          asset.status = 6
+          asset.failReason = '内容审核未通过'
+        } else if (localStorage.getItem('wisdomhub:mock.failTranscode') === '1') {
+          asset.status = 4
+          asset.failReason = '转码失败：视频编码不受支持'
+        } else {
+          asset.status = 7
+          asset.coverKey = `video/${MOCK_USER_ID}/202611/${assetId}/cover.jpg`
+        }
+      }
+    }
+    return response(config, mockAssetVO(asset))
+  }
+
+  if (method === 'post' && path === '/api/video') {
+    const body = bodyOf<{
+      assetId?: string | number
+      title?: string
+      summary?: string
+      tagIds?: Array<string | number>
+    }>(config)
+    const assetId = String(body?.assetId ?? '')
+    const asset = mockVideoAssets.get(assetId)
+    if (!asset) return failure(config, 404, '视频资产不存在')
+    if (asset.status !== 7) return failure(config, 409, '视频尚未就绪')
+
+    const title = body?.title?.trim() ?? ''
+    if (!title) return failure(config, 400, '标题不能为空')
+    if (title.length > 100) return failure(config, 400, '标题不能超过100个字符')
+    const tagIds = (body?.tagIds ?? []).map(String)
+    if (tagIds.length > 10) return failure(config, 400, '一个视频最多选择10个标签')
+
+    const videoId = String((mockVideoSequence += 1))
+    mockPublishedVideos.unshift({
+      videoId,
+      assetId,
+      title,
+      summary: body?.summary?.trim() ?? '',
+      tagIds,
+      authorId: MOCK_USER_ID,
+      publishTime: new Date().toISOString(),
+      status: 1,
+    })
+    return response(config, videoId)
+  }
+
+  if (method === 'get' && path === '/api/video') {
+    const params = (config.params ?? {}) as {
+      authorId?: string | number
+      tagId?: string | number
+    }
+    const authorId = params.authorId === undefined ? '' : String(params.authorId)
+    const tagId = params.tagId === undefined ? '' : String(params.tagId)
+    const items = mockPublishedVideos
+      .filter((video) => video.status === 1)
+      .filter((video) => !authorId || video.authorId === authorId)
+      .filter((video) => !tagId || video.tagIds.includes(tagId))
+      .sort((a, b) => b.publishTime.localeCompare(a.publishTime))
+      .map((video) => ({
+        videoId: video.videoId,
+        authorId: video.authorId,
+        title: video.title,
+        summary: video.summary || null,
+        coverKey: mockVideoAssets.get(video.assetId)?.coverKey ?? null,
+        coverUrl: MOCK_VIDEO_COVER,
+        durationMs: mockVideoDurationOf(video),
+        viewCount: mockVideoViewCount(video.videoId),
+        publishTime: video.publishTime,
+        tags: mockVideoTagsOf(video.tagIds),
+      }))
+    return response(config, pageOf(items, config))
+  }
+
+  if (method === 'get' && path === '/api/video/mine') {
+    const items = mockPublishedVideos
+      .filter((video) => video.authorId === MOCK_USER_ID && video.status !== 3)
+      .sort((a, b) => b.publishTime.localeCompare(a.publishTime))
+      .map((video) => ({
+        videoId: video.videoId,
+        title: video.title,
+        summary: video.summary || null,
+        coverKey: mockVideoAssets.get(video.assetId)?.coverKey ?? null,
+        coverUrl: MOCK_VIDEO_COVER,
+        durationMs: mockVideoDurationOf(video),
+        viewCount: mockVideoViewCount(video.videoId),
+        status: video.status,
+        publishTime: video.publishTime,
+        createTime: video.publishTime,
+        tags: mockVideoTagsOf(video.tagIds),
+      }))
+    return response(config, pageOf(items, config))
+  }
+
+  const videoDetailMatch = path.match(/^\/api\/video\/(\d+)$/)
+  if (method === 'get' && videoDetailMatch?.[1]) {
+    const videoId = decodeURIComponent(videoDetailMatch[1])
+    const video = mockPublishedVideos.find((item) => item.videoId === videoId)
+    if (!video) return failure(config, 404, '视频不存在')
+    if (video.status !== 1 && video.authorId !== MOCK_USER_ID) {
+      return failure(config, 404, '视频不存在')
+    }
+
+    const viewKey = `wisdomhub:mock.videoViews.${videoId}`
+    const views = Number(localStorage.getItem(viewKey) ?? '0') + 1
+    localStorage.setItem(viewKey, String(views))
+
+    const asset = mockVideoAssets.get(video.assetId)
+
+    return response(config, {
+      videoId: video.videoId,
+      authorId: video.authorId,
+      title: video.title,
+      summary: video.summary || null,
+      coverKey: asset?.coverKey ?? null,
+      coverUrl: MOCK_VIDEO_COVER,
+      playlistUrl: `/api/video/${video.videoId}/playlist`,
+      durationMs: mockVideoDurationOf(video),
+      width: asset?.width ?? 1280,
+      height: asset?.height ?? 720,
+      viewCount: 300 + views,
+      status: video.status,
+      publishTime: video.publishTime,
+      tags: mockVideoTagsOf(video.tagIds),
+    })
+  }
+
   if (method === 'get' && path === '/api/content/article') {
     const params = (config.params ?? {}) as {
       authorId?: string | number
@@ -1608,13 +2035,6 @@ export async function handleMockRequest(
     return response(config, pageOf(items, config))
   }
 
-  if (method === 'get' && path === '/api/content/article/collect') {
-    const items = [...mockFavoriteArticleIds]
-      .map((articleId) => mockArticles.find((article) => article.articleId === articleId))
-      .filter((article): article is ArticleListItemVO => Boolean(article))
-    return response(config, pageOf(items, config))
-  }
-
   if (method === 'post' && path === '/api/content/question') {
     if (localStorage.getItem('wisdomhub:mock.failQuestion') === '1') {
       return failure(config, 500, '提问失败，请稍后重试')
@@ -1646,13 +2066,6 @@ export async function handleMockRequest(
     localStorage.setItem('wisdomhub:mock.questionSeq', questionId)
     mockQuestionContent.set(questionId, content)
     return response(config, questionId)
-  }
-
-  if (method === 'get' && path === '/api/content/question/favorite') {
-    const items = [...mockCreatedQuestions, ...mockQuestions]
-      .filter((question) => mockQuestionFavorites.has(question.questionId))
-      .sort((a, b) => b.createTime.localeCompare(a.createTime))
-    return response(config, pageOf(items, config))
   }
 
   if (method === 'get' && path === '/api/content/question') {
@@ -1747,16 +2160,6 @@ export async function handleMockRequest(
     return response(config, answerId)
   }
 
-  const answerLikeMatch = path.match(/^\/api\/content\/answer\/([^/]+)\/like$/)
-  if (answerLikeMatch?.[1] && (method === 'put' || method === 'delete')) {
-    const answerId = decodeURIComponent(answerLikeMatch[1])
-    const answer = mockAnswers.find((item) => item.answerId === answerId)
-    if (!answer) return failure(config, 404, '回答不存在或已删除')
-
-    const active = method === 'put'
-    return response(config, toggleInteraction('like', CONTENT_ANSWER, answerId, active))
-  }
-
   const answerDeleteMatch = path.match(/^\/api\/content\/answer\/([^/]+)$/)
   if (method === 'delete' && answerDeleteMatch?.[1]) {
     const answerId = decodeURIComponent(answerDeleteMatch[1])
@@ -1794,23 +2197,6 @@ export async function handleMockRequest(
 
     mockQuestionAccepted[questionId] = method === 'put' ? answerId : null
     return response(config, null)
-  }
-
-  const favoriteMatch = path.match(/^\/api\/content\/question\/([^/]+)\/favorite$/)
-  if (favoriteMatch?.[1] && (method === 'put' || method === 'delete')) {
-    const questionId = decodeURIComponent(favoriteMatch[1])
-    const question = [...mockCreatedQuestions, ...mockQuestions].find(
-      (item) => item.questionId === questionId,
-    )
-    if (!question) return failure(config, 404, '问题不存在或已删除')
-
-    if (method === 'put') mockQuestionFavorites.add(questionId)
-    else mockQuestionFavorites.delete(questionId)
-    persistMockQuestionFavorites()
-    return response(
-      config,
-      toggleInteraction('favorite', CONTENT_QUESTION, questionId, method === 'put'),
-    )
   }
 
   if (method === 'get' && path === '/api/interaction/comment') {
@@ -1899,28 +2285,6 @@ export async function handleMockRequest(
       }
     }
     return failure(config, 404, '评论不存在')
-  }
-
-  const likeMatch = path.match(/^\/api\/content\/article\/([^/]+)\/like$/)
-  if (likeMatch?.[1] && (method === 'put' || method === 'delete')) {
-    const articleId = decodeURIComponent(likeMatch[1])
-    if (localStorage.getItem('wisdomhub:mock.failLike') === '1') {
-      return failure(config, 500, '点赞失败，请稍后重试')
-    }
-    return response(config, mockToggleArticleReaction(articleId, 'like', method === 'put'))
-  }
-
-  const collectMatch = path.match(/^\/api\/content\/article\/([^/]+)\/collect$/)
-  if (collectMatch?.[1] && (method === 'put' || method === 'delete')) {
-    const articleId = decodeURIComponent(collectMatch[1])
-    if (localStorage.getItem('wisdomhub:mock.failCollect') === '1') {
-      return failure(config, 500, '收藏失败，请稍后重试')
-    }
-    const active = method === 'put'
-    const count = mockToggleArticleReaction(articleId, 'collect', active)
-    if (active) mockFavoriteArticleIds.add(articleId)
-    else mockFavoriteArticleIds.delete(articleId)
-    return response(config, count)
   }
 
   const sourceMatch = path.match(/^\/api\/content\/article\/([^/]+)\/source$/)

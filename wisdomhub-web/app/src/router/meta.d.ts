@@ -14,7 +14,7 @@ declare module 'vue-router' {
     /** 仅管理员可进；身份由后端 @RequireAdmin 接口探测 */
     requiresAdmin?: boolean
     /** 顶部导航高亮项 */
-    nav?: 'home' | 'articles' | 'questions' | 'tech' | 'graph' | 'ai'
+    nav?: 'home' | 'articles' | 'questions' | 'videos' | 'tech' | 'graph' | 'ai'
   }
 }
 

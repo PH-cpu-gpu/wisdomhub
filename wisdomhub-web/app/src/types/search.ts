@@ -14,6 +14,30 @@ export interface ArticleSearchVO extends ArticleListItemVO {
   tags: SearchTagBriefVO[]
 }
 
+export interface VideoSearchVO {
+  videoId: ID
+  authorId: ID
+  title: string
+  summary: string | null
+  /** key 取 title / summary，value 是带 <em> 的已转义片段 */
+  highlight: Record<string, string>
+  tags: SearchTagBriefVO[]
+  coverKey: string | null
+  /** 稳定入口，302 到签名 URL */
+  coverUrl: string
+  durationMs: number | null
+  publishTime: string
+  viewCount: number
+}
+
+export interface VideoSearchQuery extends PageQuery {
+  keyword?: string
+  sort?: 'relevance' | 'new' | 'hot'
+  tagId?: ID
+  startTime?: string
+  endTime?: string
+}
+
 export interface QuestionSearchVO {
   questionId: ID
   userId: ID

@@ -28,6 +28,7 @@ withDefaults(
       :name="author.username"
       :size="size"
       shape="circle"
+      decorative
     />
     <span class="author-chip__name">{{ author.username }}</span>
   </RouterLink>
@@ -38,6 +39,7 @@ withDefaults(
       :name="author?.username ?? '作者'"
       :size="size"
       shape="circle"
+      decorative
     />
     <span class="author-chip__name">{{ author?.username ?? '未知作者' }}</span>
   </span>

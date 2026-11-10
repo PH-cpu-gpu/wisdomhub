@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { dismissToast, toasts, type ToastType } from './toast'
+import { useMotionEnabled } from '@/composables/useMotionEnabled'
+
+const motionEnabled = useMotionEnabled()
 
 const iconMap: Record<ToastType, string> = {
   success: '✓',
@@ -12,7 +15,7 @@ const iconMap: Record<ToastType, string> = {
 <template>
   <Teleport to="body">
     <div class="wh-toast-host" aria-live="polite" aria-atomic="false">
-      <TransitionGroup name="wh-toast">
+      <TransitionGroup name="wh-toast" :css="motionEnabled">
         <div
           v-for="item in toasts"
           :key="item.id"

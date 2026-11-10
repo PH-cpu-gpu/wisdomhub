@@ -12,6 +12,8 @@ import type {
   TagSearchVO,
   UserSearchQuery,
   UserSearchVO,
+  VideoSearchQuery,
+  VideoSearchVO,
 } from '@/types/search'
 
 export function articles(
@@ -19,6 +21,13 @@ export function articles(
   options: RequestOptions = {},
 ): Promise<PageResponse<ArticleSearchVO>> {
   return get<PageResponse<ArticleSearchVO>>('/api/search/article', params, options)
+}
+
+export function videos(
+  params: VideoSearchQuery = {},
+  options: RequestOptions = {},
+): Promise<PageResponse<VideoSearchVO>> {
+  return get<PageResponse<VideoSearchVO>>('/api/search/video', params, options)
 }
 
 export function questions(

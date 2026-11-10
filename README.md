@@ -3,9 +3,11 @@
 面向开发者的智能技术知识社区与知识图谱平台。
 
 WisdomHub 把 **内容社区 + 全文搜索 + 知识图谱 + 推荐系统 + AI Agent** 组合在一起：
-用户在这里发布技术文章、提问与讨论，平台通过 Elasticsearch 提供全文检索、通过 Neo4j
+用户在这里发布技术文章、视频、提问与讨论，平台通过 Elasticsearch 提供全文检索、通过 Neo4j
 建立技术知识点之间的关联、结合行为数据做个性化推荐，并由独立的 Python Agent 提供
 智能问答、学习路线规划与文章知识抽取。
+
+> 部署与运维见 [docker/DEPLOY.md](docker/DEPLOY.md)。
 
 ## 技术栈
 
@@ -13,7 +15,7 @@ WisdomHub 把 **内容社区 + 全文搜索 + 知识图谱 + 推荐系统 + AI A
 | --- | --- |
 | 后端 | Java 21、Spring Boot 3.5、Spring Cloud 2025.0、Spring Cloud Alibaba 2025.0、MyBatis-Plus、JJWT、SpringDoc |
 | AI Agent | Python 3.13、FastAPI、LangChain、SQLAlchemy 2（async）、aio-pika、Nacos SDK |
-| 前端 | Vue 3.5、Vite 7、TypeScript 5.9、Pinia、Vue Router、pnpm |
+| 前端 | Vue 3.5、Vite 7、TypeScript 5.9、Pinia、Vue Router、hls.js、pnpm |
 | 数据与搜索 | MySQL 8.4、Redis 7.4、MongoDB 6.0、Neo4j 5.26、Elasticsearch 8.18（IK 分词）、PostgreSQL 17 |
 | 基础设施 | RabbitMQ 4.1、Nacos 3.0、Seata 2.5、XXL-JOB 3.4、Docker Compose |
 
@@ -23,14 +25,14 @@ WisdomHub 把 **内容社区 + 全文搜索 + 知识图谱 + 推荐系统 + AI A
 | --- | --- | --- |
 | `wisdomhub-gateway` | 9090 | 统一入口、路由与鉴权过滤 |
 | `wisdomhub-user` | 9091 | 用户、认证、关注关系 |
-| `wisdomhub-content` | 9092 | 文章、问答、评论、点赞收藏 |
+| `wisdomhub-content` | 9092 | 文章、问答、标签、专栏与正文存储 |
 | `wisdomhub-search` | 9093 | Elasticsearch 全文检索与高亮 |
 | `wisdomhub-knowledge` | 9094 | 知识图谱与学习路线 |
 | `wisdomhub-recommendation` | 9095 | 个性化内容推荐 |
 | `wisdomhub-notification` | 9096 | 站内通知与 WebSocket 推送 |
 | `wisdomhub-order` | 9097 | 付费技术专栏订单 |
-| `wisdomhub-interaction` | 9098 | 评论、点赞、收藏与互动计数 |
-| `wisdomhub-video` | 9099 | 视频上传、转码状态与播放元数据 |
+| `wisdomhub-interaction` | 9098 | 评论、点赞、收藏与互动计数（唯一权威） |
+| `wisdomhub-video` | 9099 | 视频直传、MPS 转码、HLS 播放与标签 |
 | `wisdomhub-agent-engine` | 8000 | Python AI Agent（问答 / 学习规划 / 文章分析） |
 | `wisdomhub-common` | — | 公共模块：core、cache、feign、job、mq、security、web |
 | `wisdomhub-web` | 5173 | 前端：`landing` 静态着陆页 + `app` Vue 应用 |
@@ -101,13 +103,36 @@ bash docker/nacos/import.sh
 
 ### 4. 启动后端
 
+先全量安装一次（多模块依赖），再按依赖顺序启动：
+
 ```bash
 ./mvnw clean install -DskipTests
+
+# 基础域
+./mvnw -pl wisdomhub-user spring-boot:run
+./mvnw -pl wisdomhub-content spring-boot:run
+./mvnw -pl wisdomhub-search spring-boot:run
+
+# 互动与视频
+./mvnw -pl wisdomhub-interaction spring-boot:run
+./mvnw -pl wisdomhub-video spring-boot:run
+
+# 其余服务按需启动
+./mvnw -pl wisdomhub-knowledge spring-boot:run
+./mvnw -pl wisdomhub-recommendation spring-boot:run
+./mvnw -pl wisdomhub-notification spring-boot:run
+./mvnw -pl wisdomhub-order spring-boot:run
+
+# 网关最后启动，统一入口 9090
 ./mvnw -pl wisdomhub-gateway spring-boot:run
 ```
 
-其余服务按同样方式启动（如 `-pl wisdomhub-user spring-boot:run`）。服务通过 Nacos 注册发现，
-网关默认监听 9090。
+端口：user 9091、content 9092、search 9093、knowledge 9094、recommendation 9095、notification 9096、order 9097、interaction 9098、video 9099。
+
+> **本地跑视频真实链路还需两项环境配置**：
+> 1. COS bucket 配置 CORS：AllowedOrigin 填前端地址（如 `http://localhost:5173`），Methods 至少 `PUT`、`GET`、`HEAD`，AllowedHeaders 包含 `content-type`；否则浏览器直传会在预检阶段失败（服务端 curl 上传不受影响）。
+> 2. 在 XXL-JOB 启用 `videoTranscodePollHandler`（转码轮询）与
+>    `videoViewCountSyncHandler`（播放量落库）；未启用时资产会停在“转码中”、播放量不增长。
 
 ### 5. 启动 AI Agent
 

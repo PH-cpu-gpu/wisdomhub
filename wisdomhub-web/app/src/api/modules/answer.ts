@@ -1,4 +1,4 @@
-import { del, get, post, put, type RequestOptions } from '@/api/http'
+import { del, get, post, type RequestOptions } from '@/api/http'
 import type { ID, PageQuery, PageResponse } from '@/types/common'
 import type { AnswerCreatePayload, AnswerVO } from '@/types/qa'
 
@@ -16,14 +16,6 @@ export function list(
   options: RequestOptions = {},
 ): Promise<PageResponse<AnswerVO>> {
   return get<PageResponse<AnswerVO>>(`/api/content/question/${questionId}/answer`, params, options)
-}
-
-export function like(answerId: ID, options: RequestOptions = {}): Promise<number> {
-  return put<number>(`/api/content/answer/${answerId}/like`, undefined, options)
-}
-
-export function unlike(answerId: ID, options: RequestOptions = {}): Promise<number> {
-  return del<number>(`/api/content/answer/${answerId}/like`, options)
 }
 
 export function remove(answerId: ID, options: RequestOptions = {}): Promise<void> {

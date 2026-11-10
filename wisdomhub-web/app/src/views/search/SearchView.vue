@@ -3,7 +3,8 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 
 import { isApiError } from '@/api/error'
-import { articles, hotWords, questions, tags, users } from '@/api/modules/search'
+import { resolveApiUrl } from '@/api/http'
+import { articles, hotWords, questions, tags, users, videos } from '@/api/modules/search'
 import WhAvatar from '@/components/base/WhAvatar.vue'
 import WhButton from '@/components/base/WhButton.vue'
 import WhInput from '@/components/base/WhInput.vue'
@@ -24,13 +25,15 @@ import type {
   QuestionSearchVO,
   TagSearchVO,
   UserSearchVO,
+  VideoSearchVO,
 } from '@/types/search'
-import { toBackendDateTime } from '@/utils'
+import { formatDateTime, toBackendDateTime } from '@/utils'
+import { formatVideoDuration } from '@/utils/video'
 
-type SearchType = 'article' | 'question' | 'user' | 'tag'
+type SearchType = 'article' | 'video' | 'question' | 'user' | 'tag'
 
 const PAGE_SIZE = 10
-const TYPES: SearchType[] = ['article', 'question', 'user', 'tag']
+const TYPES: SearchType[] = ['article', 'video', 'question', 'user', 'tag']
 
 const route = useRoute()
 const router = useRouter()
@@ -69,6 +72,7 @@ const error = ref('')
 const total = ref(0)
 
 const articleResults = ref<ArticleSearchVO[]>([])
+const videoResults = ref<VideoSearchVO[]>([])
 const questionResults = ref<QuestionSearchVO[]>([])
 const userResults = ref<UserSearchVO[]>([])
 const tagResults = ref<TagSearchVO[]>([])
@@ -76,6 +80,10 @@ const { countsFor } = useInteractionCounts(() => [
   ...articleResults.value.map((item) => ({
     targetType: CONTENT_TARGET_TYPE.ARTICLE,
     targetId: item.articleId,
+  })),
+  ...videoResults.value.map((item) => ({
+    targetType: CONTENT_TARGET_TYPE.VIDEO,
+    targetId: item.videoId,
   })),
   ...questionResults.value.map((item) => ({
     targetType: CONTENT_TARGET_TYPE.QUESTION,
@@ -90,6 +98,7 @@ let requestId = 0
 
 const tabItems = [
   { label: '文章', value: 'article' },
+  { label: '视频', value: 'video' },
   { label: '问题', value: 'question' },
   { label: '用户', value: 'user' },
   { label: '标签', value: 'tag' },
@@ -149,6 +158,7 @@ const hasFilters = computed(
 const hasResults = computed(
   () =>
     articleResults.value.length > 0 ||
+    videoResults.value.length > 0 ||
     questionResults.value.length > 0 ||
     userResults.value.length > 0 ||
     tagResults.value.length > 0,
@@ -210,6 +220,7 @@ async function loadResults(): Promise<void> {
   error.value = ''
   total.value = 0
   articleResults.value = []
+  videoResults.value = []
   questionResults.value = []
   userResults.value = []
   tagResults.value = []
@@ -233,6 +244,25 @@ async function loadResults(): Promise<void> {
       )
       if (request !== requestId) return
       articleResults.value = result.items
+      total.value = result.total
+      if (result.items.length) {
+        void ensureAuthors([...new Set(result.items.map((item) => item.authorId))])
+      }
+    } else if (type.value === 'video') {
+      const result = await videos(
+        {
+          keyword: keyword.value || undefined,
+          sort: sort.value as 'relevance' | 'new' | 'hot',
+          tagId: tagId.value || undefined,
+          startTime,
+          endTime,
+          page: page.value,
+          pageSize: PAGE_SIZE,
+        },
+        { skipErrorToast: true },
+      )
+      if (request !== requestId) return
+      videoResults.value = result.items
       total.value = result.total
       if (result.items.length) {
         void ensureAuthors([...new Set(result.items.map((item) => item.authorId))])
@@ -354,7 +384,7 @@ useSeo({
       <section class="search-filters" aria-label="搜索筛选">
         <WhSelect v-model="sortModel" :options="sortOptions" size="sm" aria-label="排序" />
         <WhSelect
-          v-if="type === 'article'"
+          v-if="type === 'article' || type === 'video'"
           v-model="tagModel"
           :options="tagOptions"
           placeholder="全部标签"
@@ -362,7 +392,7 @@ useSeo({
           clearable
           aria-label="标签筛选"
         />
-        <template v-if="type === 'article' || type === 'question'">
+        <template v-if="type === 'article' || type === 'video' || type === 'question'">
           <input
             v-model="startInput"
             class="search-date"
@@ -421,6 +451,65 @@ useSeo({
               >
                 {{ tag.name }}
               </RouterLink>
+            </div>
+          </article>
+        </template>
+
+        <template v-else-if="type === 'video'">
+          <article
+            v-for="video in videoResults"
+            :key="video.videoId"
+            class="search-result search-video"
+          >
+            <RouterLink class="search-video__cover" :to="`/video/${video.videoId}`">
+              <img
+                v-if="video.coverUrl"
+                :src="resolveApiUrl(video.coverUrl)"
+                :alt="video.title"
+                loading="lazy"
+              />
+              <span class="search-video__duration">{{ formatVideoDuration(video.durationMs) }}</span>
+            </RouterLink>
+            <div class="search-video__body">
+              <p class="search-result__eyebrow">[ VIDEO ]</p>
+              <h2 class="search-result__title">
+                <RouterLink :to="`/video/${video.videoId}`">
+                  <SearchHighlight :html="video.highlight.title" :fallback="video.title" />
+                </RouterLink>
+              </h2>
+              <p class="search-result__summary">
+                <SearchHighlight :html="video.highlight.summary" :fallback="video.summary ?? ''" />
+              </p>
+              <div class="search-result__meta">
+                <AuthorChip :author="authors[video.authorId]" size="xs" />
+                <span>{{ video.viewCount }} 次播放</span>
+                <span>{{ formatDateTime(video.publishTime, 'YYYY-MM-DD') }}</span>
+                <span
+                  >赞
+                  {{ countsFor(CONTENT_TARGET_TYPE.VIDEO, video.videoId)?.likeCount ?? '—' }}</span
+                >
+                <span
+                  >评论
+                  {{
+                    countsFor(CONTENT_TARGET_TYPE.VIDEO, video.videoId)?.commentCount ?? '—'
+                  }}</span
+                >
+                <span
+                  >收藏
+                  {{
+                    countsFor(CONTENT_TARGET_TYPE.VIDEO, video.videoId)?.favoriteCount ?? '—'
+                  }}</span
+                >
+              </div>
+              <div v-if="video.tags.length" class="search-result__tags">
+                <RouterLink
+                  v-for="tag in video.tags"
+                  :key="tag.tagId"
+                  :to="{ name: 'search', query: { keyword: tag.name, type: 'video' } }"
+                >
+                  {{ tag.name }}
+                </RouterLink>
+              </div>
             </div>
           </article>
         </template>
@@ -749,6 +838,48 @@ useSeo({
 
   .search-filters {
     align-items: flex-start;
+  }
+}
+.search-video {
+  grid-template-columns: minmax(180px, 240px) minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-4);
+}
+
+.search-video__cover {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 16 / 9;
+  border: var(--border);
+  background: #14161c;
+}
+
+.search-video__cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.search-video__duration {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  padding: 1px 6px;
+  background: rgb(11 11 14 / 78%);
+  color: #fff;
+  font-family: var(--mono);
+  font-size: var(--text-2xs);
+}
+
+.search-video__body {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+@media (max-width: 640px) {
+  .search-video {
+    grid-template-columns: 1fr;
   }
 }
 </style>
