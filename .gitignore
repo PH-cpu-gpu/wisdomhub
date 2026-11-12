@@ -67,3 +67,6 @@ docker-compose.override.yml
 hs_err_pid*
 *.hprof
 .DS_Store
+
+### 视觉 QA 截图与生成候选（仅本地验收用）###
+vibe_images/

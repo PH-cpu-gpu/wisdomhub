@@ -13,6 +13,176 @@ const onScroll = () => nav.classList.toggle("is-scrolled", window.scrollY > 16);
 onScroll();
 window.addEventListener("scroll", onScroll, { passive: true });
 
+/* ── Scroll progress bar ───────────────────────────────── */
+
+(function initScrollProgress() {
+  const progressBar = document.querySelector(".scroll-progress");
+  if (!progressBar) return;
+  
+  function updateProgress() {
+    const scrollTop = window.scrollY;
+    const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+    const progress = docHeight > 0 ? (scrollTop / docHeight) * 100 : 0;
+    progressBar.style.width = `${progress}%`;
+  }
+  
+  window.addEventListener("scroll", updateProgress, { passive: true });
+  updateProgress();
+})();
+
+/* ── Custom cursor ─────────────────────────────────────── */
+
+(function initCustomCursor() {
+  // Only enable on desktop with fine pointer
+  if (!window.matchMedia("(hover: hover) and (pointer: fine)").matches) return;
+  
+  const cursor = document.querySelector(".custom-cursor");
+  const cursorDot = document.querySelector(".custom-cursor-dot");
+  const cursorGlow = document.querySelector(".cursor-glow");
+  if (!cursor || !cursorDot) return;
+  
+  let mouseX = 0, mouseY = 0;
+  let cursorX = 0, cursorY = 0;
+  let dotX = 0, dotY = 0;
+  let glowX = 0, glowY = 0;
+  let isVisible = false;
+  let trailThrottle = 0;
+  
+  // Smooth cursor follow
+  function animateCursor() {
+    // Outer ring - slower follow
+    cursorX += (mouseX - cursorX) * 0.12;
+    cursorY += (mouseY - cursorY) * 0.12;
+    cursor.style.left = `${cursorX}px`;
+    cursor.style.top = `${cursorY}px`;
+    
+    // Inner dot - faster follow
+    dotX += (mouseX - dotX) * 0.25;
+    dotY += (mouseY - dotY) * 0.25;
+    cursorDot.style.left = `${dotX}px`;
+    cursorDot.style.top = `${dotY}px`;
+    
+    // Glow - slowest follow
+    if (cursorGlow) {
+      glowX += (mouseX - glowX) * 0.08;
+      glowY += (mouseY - glowY) * 0.08;
+      cursorGlow.style.left = `${glowX}px`;
+      cursorGlow.style.top = `${glowY}px`;
+    }
+    
+    requestAnimationFrame(animateCursor);
+  }
+  
+  // Mouse move handler
+  document.addEventListener("mousemove", (e) => {
+    mouseX = e.clientX;
+    mouseY = e.clientY;
+    
+    if (!isVisible) {
+      isVisible = true;
+      cursor.classList.add("is-visible");
+      cursorDot.classList.add("is-visible");
+      if (cursorGlow) cursorGlow.classList.add("is-visible");
+    }
+    
+    // Create trail particles (throttled)
+    trailThrottle++;
+    if (trailThrottle % 3 === 0) {
+      createTrail(e.clientX, e.clientY);
+    }
+  });
+  
+  // Mouse leave
+  document.addEventListener("mouseleave", () => {
+    isVisible = false;
+    cursor.classList.remove("is-visible");
+    cursorDot.classList.remove("is-visible");
+    if (cursorGlow) cursorGlow.classList.remove("is-visible");
+  });
+  
+  // Hover effects on interactive elements
+  const hoverTargets = document.querySelectorAll("a, button, [role='button'], input, .fcard, .gnode, .cell");
+  hoverTargets.forEach(target => {
+    target.addEventListener("mouseenter", () => {
+      cursor.classList.add("is-hovering");
+      if (cursorGlow) cursorGlow.classList.add("is-hovering");
+    });
+    target.addEventListener("mouseleave", () => {
+      cursor.classList.remove("is-hovering");
+      if (cursorGlow) cursorGlow.classList.remove("is-hovering");
+    });
+  });
+  
+  // Click effect
+  document.addEventListener("mousedown", () => {
+    cursor.classList.add("is-clicking");
+  });
+  document.addEventListener("mouseup", () => {
+    cursor.classList.remove("is-clicking");
+  });
+  
+  // Create trail particle
+  function createTrail(x, y) {
+    const trail = document.createElement("div");
+    trail.className = "cursor-trail";
+    trail.style.left = `${x}px`;
+    trail.style.top = `${y}px`;
+    document.body.appendChild(trail);
+    
+    setTimeout(() => trail.remove(), 500);
+  }
+  
+  // Start animation loop
+  animateCursor();
+})();
+
+/* ── Hero title character animation ────────────────────── */
+
+(function initHeroTitleAnimation() {
+  const title = document.querySelector("[data-split-text]");
+  if (!title) return;
+  
+  // Skip animation if user prefers reduced motion
+  if (reduceMotion) return;
+  
+  const lines = title.querySelectorAll(".line");
+  let globalCharIndex = 0;
+  
+  lines.forEach((line, lineIndex) => {
+    // Get all text nodes and wrap each character
+    function wrapTextNodes(element) {
+      const childNodes = Array.from(element.childNodes);
+      
+      childNodes.forEach(node => {
+        if (node.nodeType === Node.TEXT_NODE) {
+          const text = node.textContent;
+          if (text.trim() === '') return;
+          
+          const fragment = document.createDocumentFragment();
+          [...text].forEach(char => {
+            if (char === ' ') {
+              fragment.appendChild(document.createTextNode(' '));
+            } else {
+              const span = document.createElement('span');
+              span.className = 'char';
+              span.style.setProperty('--char-index', globalCharIndex);
+              span.textContent = char;
+              fragment.appendChild(span);
+            }
+            globalCharIndex++;
+          });
+          
+          element.replaceChild(fragment, node);
+        } else if (node.nodeType === Node.ELEMENT_NODE) {
+          wrapTextNodes(node);
+        }
+      });
+    }
+    
+    wrapTextNodes(line);
+  });
+})();
+
 /* ── mobile menu ─────────────────────────────────────────── */
 
 const menu = document.getElementById("mobileMenu");
@@ -164,6 +334,19 @@ const kg = document.getElementById("kg");
 const kgNodes = [...kg.querySelectorAll(".gnode")];
 const kgEdges = [...kg.querySelectorAll(".gedge")];
 const kgLabels = [...kg.querySelectorAll(".gedge-label")];
+const kgTooltip = document.getElementById("gnodeTooltip");
+
+// Node metadata for tooltips
+const nodeMetadata = {
+  article: { title: "Redis 为什么使用跳表？", meta: "ARTICLE · 12 connections · 8 min read" },
+  boot: { title: "Spring Boot", meta: "HUB · BASED_ON Spring · USES MyBatis, Redis" },
+  spring: { title: "Spring", meta: "CORE · 8 relations · Prerequisite for Boot" },
+  mybatis: { title: "MyBatis", meta: "ORM · USES MySQL · 5 relations" },
+  mysql: { title: "MySQL", meta: "DATABASE · 6 relations · Storage engine" },
+  redis: { title: "Redis", meta: "CACHE · HOT NODE · 11 connections" },
+  cache: { title: "缓存", meta: "CONCEPT · PREREQUISITE for Redis" },
+  lock: { title: "分布式锁", meta: "PATTERN · PREREQUISITE for Redis" },
+};
 
 for (const node of kgNodes) {
   const label = node.querySelector("text:not(.gnode__kind)");
@@ -179,8 +362,11 @@ function kgFocus(id) {
     const hit = edge.dataset.a === id || edge.dataset.b === id;
     edge.classList.toggle("is-active", hit);
     if (hit) {
+      edge.classList.add("gedge--animated");
       linked.add(edge.dataset.a);
       linked.add(edge.dataset.b);
+    } else {
+      edge.classList.remove("gedge--animated");
     }
   }
   for (const label of kgLabels) {
@@ -190,14 +376,59 @@ function kgFocus(id) {
     );
   }
   for (const node of kgNodes) {
-    node.classList.toggle("is-active", linked.has(node.dataset.id));
+    const isActive = linked.has(node.dataset.id);
+    node.classList.toggle("is-active", isActive);
+    if (isActive && node.dataset.id !== id) {
+      node.classList.add("is-related");
+    } else {
+      node.classList.remove("is-related");
+    }
   }
+  
+  showKgTooltip(id);
 }
 
 function kgClear() {
   kg.classList.remove("has-focus");
   for (const el of [...kgNodes, ...kgEdges, ...kgLabels]) {
     el.classList.remove("is-active");
+  }
+  for (const edge of kgEdges) {
+    edge.classList.remove("gedge--animated");
+  }
+  for (const node of kgNodes) {
+    node.classList.remove("is-related");
+  }
+  hideKgTooltip();
+}
+
+function showKgTooltip(nodeId) {
+  const node = kgNodes.find(n => n.dataset.id === nodeId);
+  const meta = nodeMetadata[nodeId];
+  if (!node || !meta || !kgTooltip) return;
+  
+  const tooltipTitle = kgTooltip.querySelector(".gnode-tooltip__title");
+  const tooltipMeta = kgTooltip.querySelector(".gnode-tooltip__meta");
+  
+  tooltipTitle.textContent = meta.title;
+  tooltipMeta.textContent = meta.meta;
+  
+  const nodeRect = node.getBoundingClientRect();
+  const graphStage = document.querySelector(".graph__stage");
+  if (!graphStage) return;
+  const stageRect = graphStage.getBoundingClientRect();
+  
+  const left = nodeRect.left - stageRect.left + nodeRect.width / 2;
+  const top = nodeRect.bottom - stageRect.top + 12;
+  
+  kgTooltip.style.left = `${left}px`;
+  kgTooltip.style.top = `${top}px`;
+  kgTooltip.classList.add("is-visible");
+}
+
+function hideKgTooltip() {
+  if (kgTooltip) {
+    kgTooltip.classList.remove("is-visible");
   }
 }
 
@@ -207,11 +438,16 @@ for (const node of kgNodes) {
   node.addEventListener("focus", () => kgFocus(id));
   node.addEventListener("pointerleave", kgClear);
   node.addEventListener("blur", kgClear);
+  
+  node.addEventListener("click", () => {
+    node.classList.add("is-expanding");
+    setTimeout(() => node.classList.remove("is-expanding"), 500);
+  });
 }
 
 /* ── reveal on scroll ────────────────────────────────────── */
 
-const revealItems = document.querySelectorAll(".reveal");
+const revealItems = document.querySelectorAll(".reveal, .reveal-scale, .reveal-left, .reveal-right");
 if ("IntersectionObserver" in window && !reduceMotion) {
   const io = new IntersectionObserver(
     (entries) => {
@@ -230,7 +466,7 @@ if ("IntersectionObserver" in window && !reduceMotion) {
 }
 
 window.setTimeout(() => {
-  document.querySelectorAll(".reveal:not(.is-in)").forEach((el) => {
+  document.querySelectorAll(".reveal:not(.is-in), .reveal-scale:not(.is-in), .reveal-left:not(.is-in), .reveal-right:not(.is-in)").forEach((el) => {
     el.classList.add("is-in");
   });
 }, 2000);
@@ -278,10 +514,38 @@ const tabs = [...document.querySelectorAll(".term-tab")];
 const termPrompt = document.getElementById("termPrompt");
 const termOut = document.getElementById("termOut");
 const termFoot = document.getElementById("termFoot");
-const footText = termFoot.querySelector(".is-on");
+const termThinking = document.getElementById("termThinking");
+const termElement = document.querySelector(".term");
+const footText = termFoot?.querySelector(".is-on");
 let typingToken = 0;
 let demoChosen = false;
 let demoStarted = false;
+
+// Simple syntax highlighting for code-like content
+function highlightSyntax(text) {
+  return text
+    // Highlight code blocks (text between backticks)
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    // Highlight arrows and special chars
+    .replace(/(→)/g, '<span style="color: var(--acid)">$1</span>')
+    // Highlight numbers like O(log n)
+    .replace(/(O\([^)]+\))/g, '<span style="color: var(--verm)">$1</span>');
+}
+
+function showThinking() {
+  if (termThinking) {
+    termThinking.classList.add("is-active");
+  }
+  if (termElement) {
+    termElement.classList.add("is-active");
+  }
+}
+
+function hideThinking() {
+  if (termThinking) {
+    termThinking.classList.remove("is-active");
+  }
+}
 
 function typeDemo(key) {
   const demo = DEMOS[key];
@@ -289,28 +553,78 @@ function typeDemo(key) {
 
   demoStarted = true;
   const token = ++typingToken;
-  termPrompt.textContent = demo.prompt;
-  termOut.textContent = "";
-  footText.textContent = "STREAMING ···";
-
-  if (reduceMotion) {
-    termOut.textContent = demo.text;
-    footText.textContent = demo.foot;
-    return;
+  
+  // Show prompt with typing effect
+  if (termPrompt) {
+    termPrompt.textContent = "";
+    const promptLine = termPrompt.parentElement;
+    promptLine?.classList.add("is-typing");
+    
+    let promptIndex = 0;
+    const typePrompt = () => {
+      if (token !== typingToken) return;
+      if (promptIndex < demo.prompt.length) {
+        termPrompt.textContent += demo.prompt[promptIndex];
+        promptIndex++;
+        setTimeout(typePrompt, 30 + Math.random() * 20);
+      } else {
+        promptLine?.classList.remove("is-typing");
+        // Start thinking phase
+        setTimeout(() => {
+          if (token !== typingToken) return;
+          showThinking();
+          setTimeout(() => {
+            if (token !== typingToken) return;
+            hideThinking();
+            startStreaming();
+          }, 800 + Math.random() * 400);
+        }, 300);
+      }
+    };
+    typePrompt();
   }
-
-  let i = 0;
-  const tick = () => {
-    if (token !== typingToken) return;
-    i = Math.min(i + 2, demo.text.length);
-    termOut.textContent = demo.text.slice(0, i);
-    if (i < demo.text.length) {
-      window.setTimeout(tick, 12 + Math.random() * 16);
-    } else {
-      footText.textContent = demo.foot;
+  
+  function startStreaming() {
+    if (termOut) {
+      termOut.textContent = "";
+      termOut.classList.add("is-streaming");
+      termOut.classList.remove("has-response");
     }
-  };
-  window.setTimeout(tick, 220);
+    if (footText) {
+      footText.textContent = "STREAMING ···";
+    }
+
+    if (reduceMotion) {
+      if (termOut) {
+        termOut.innerHTML = highlightSyntax(demo.text);
+        termOut.classList.remove("is-streaming");
+      }
+      if (footText) footText.textContent = demo.foot;
+      return;
+    }
+
+    let i = 0;
+    const tick = () => {
+      if (token !== typingToken) return;
+      i = Math.min(i + 2, demo.text.length);
+      if (termOut) {
+        termOut.innerHTML = highlightSyntax(demo.text.slice(0, i));
+      }
+      if (i < demo.text.length) {
+        window.setTimeout(tick, 10 + Math.random() * 14);
+      } else {
+        if (termOut) {
+          termOut.classList.remove("is-streaming");
+          termOut.classList.add("has-response");
+        }
+        if (footText) footText.textContent = demo.foot;
+        if (termElement) {
+          setTimeout(() => termElement.classList.remove("is-active"), 1000);
+        }
+      }
+    };
+    window.setTimeout(tick, 100);
+  }
 }
 
 function activateTab(key) {
@@ -346,3 +660,411 @@ if ("IntersectionObserver" in window) {
 window.setTimeout(() => {
   if (!demoStarted) typeDemo("qa");
 }, 2200);
+
+/* ── Particle background ─────────────────────────────────── */
+
+(function initParticles() {
+  const canvas = document.getElementById("heroParticles");
+  if (!canvas) return;
+  
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+  
+  let particles = [];
+  let animationId;
+  let running = false;
+  let mouse = { x: -1000, y: -1000 };
+  
+  const CONFIG = {
+    particleCount: 50,
+    connectionDistance: 120,
+    mouseRadius: 150,
+    speed: 0.4,
+    color: "#c9ff2e",
+  };
+  
+  function resize() {
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.scale(dpr, dpr);
+  }
+  
+  function createParticles() {
+    particles = [];
+    const rect = canvas.getBoundingClientRect();
+    for (let i = 0; i < CONFIG.particleCount; i++) {
+      particles.push({
+        x: Math.random() * rect.width,
+        y: Math.random() * rect.height,
+        vx: (Math.random() - 0.5) * CONFIG.speed,
+        vy: (Math.random() - 0.5) * CONFIG.speed,
+        radius: Math.random() * 2 + 1,
+        opacity: Math.random() * 0.5 + 0.2,
+      });
+    }
+  }
+  
+  function drawParticle(p) {
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+    ctx.fillStyle = CONFIG.color;
+    ctx.globalAlpha = p.opacity;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+  
+  function drawConnections() {
+    for (let i = 0; i < particles.length; i++) {
+      for (let j = i + 1; j < particles.length; j++) {
+        const pi = particles[i];
+        const pj = particles[j];
+        const dx = pi.x - pj.x;
+        const dy = pi.y - pj.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        
+        if (dist < CONFIG.connectionDistance) {
+          const opacity = 1 - dist / CONFIG.connectionDistance;
+          ctx.beginPath();
+          ctx.moveTo(pi.x, pi.y);
+          ctx.lineTo(pj.x, pj.y);
+          ctx.strokeStyle = CONFIG.color;
+          ctx.globalAlpha = opacity * 0.3;
+          ctx.lineWidth = 0.5;
+          ctx.stroke();
+          ctx.globalAlpha = 1;
+        }
+      }
+      
+      // Mouse connections
+      const p = particles[i];
+      const mdx = p.x - mouse.x;
+      const mdy = p.y - mouse.y;
+      const mDist = Math.sqrt(mdx * mdx + mdy * mdy);
+      if (mDist < CONFIG.mouseRadius) {
+        const opacity = 1 - mDist / CONFIG.mouseRadius;
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y);
+        ctx.lineTo(mouse.x, mouse.y);
+        ctx.strokeStyle = CONFIG.color;
+        ctx.globalAlpha = opacity * 0.5;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
+    }
+  }
+  
+  function update() {
+    const rect = canvas.getBoundingClientRect();
+    
+    for (const p of particles) {
+      p.x += p.vx;
+      p.y += p.vy;
+      
+      // Bounce off edges
+      if (p.x < 0 || p.x > rect.width) p.vx *= -1;
+      if (p.y < 0 || p.y > rect.height) p.vy *= -1;
+      
+      // Mouse repulsion
+      const dx = p.x - mouse.x;
+      const dy = p.y - mouse.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < CONFIG.mouseRadius && dist > 0) {
+        const force = (CONFIG.mouseRadius - dist) / CONFIG.mouseRadius;
+        p.vx += (dx / dist) * force * 0.02;
+        p.vy += (dy / dist) * force * 0.02;
+      }
+      
+      // Damping
+      p.vx *= 0.99;
+      p.vy *= 0.99;
+    }
+  }
+  
+  function animate() {
+    if (!running) return;
+    const rect = canvas.getBoundingClientRect();
+    ctx.clearRect(0, 0, rect.width, rect.height);
+    
+    update();
+    for (const p of particles) drawParticle(p);
+    drawConnections();
+    
+    animationId = requestAnimationFrame(animate);
+  }
+
+  function playParticles() {
+    if (running) return;
+    running = true;
+    animationId = requestAnimationFrame(animate);
+  }
+
+  function pauseParticles() {
+    running = false;
+    cancelAnimationFrame(animationId);
+  }
+  
+  function onMouseMove(e) {
+    const rect = canvas.getBoundingClientRect();
+    mouse.x = e.clientX - rect.left;
+    mouse.y = e.clientY - rect.top;
+  }
+  
+  function onMouseLeave() {
+    mouse.x = -1000;
+    mouse.y = -1000;
+  }
+  
+  // Initialize
+  resize();
+  createParticles();
+
+  if ("IntersectionObserver" in window) {
+    const visibility = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && !document.hidden) playParticles();
+        else pauseParticles();
+      },
+      { rootMargin: "80px" }
+    );
+    visibility.observe(canvas);
+  } else {
+    playParticles();
+  }
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) pauseParticles();
+    else if (canvas.getBoundingClientRect().bottom > 0) playParticles();
+  });
+  
+  window.addEventListener("resize", () => {
+    resize();
+    createParticles();
+  });
+  canvas.addEventListener("mousemove", onMouseMove);
+  canvas.addEventListener("mouseleave", onMouseLeave);
+})();
+
+/* ── 3D Tilt effect for feature cards ────────────────────── */
+
+(function initTiltCards() {
+  const cards = document.querySelectorAll(".fcard");
+  const MAX_TILT = 8;
+  
+  cards.forEach((card) => {
+    card.addEventListener("mousemove", (e) => {
+      const rect = card.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      const centerX = rect.width / 2;
+      const centerY = rect.height / 2;
+      
+      const rotateX = ((y - centerY) / centerY) * -MAX_TILT;
+      const rotateY = ((x - centerX) / centerX) * MAX_TILT;
+      
+      card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) translateY(-8px)`;
+      
+      // Update CSS variables for glow effect
+      card.style.setProperty("--mouse-x", `${(x / rect.width) * 100}%`);
+      card.style.setProperty("--mouse-y", `${(y / rect.height) * 100}%`);
+    });
+    
+    card.addEventListener("mouseleave", () => {
+      card.style.transform = "";
+    });
+  });
+})();
+
+/* ── Stagger reveal for lists ────────────────────────────── */
+
+(function initStaggerReveal() {
+  const lists = document.querySelectorAll(".problem-list, .feature-grid");
+  
+  if ("IntersectionObserver" in window && !reduceMotion) {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("is-visible");
+            observer.unobserve(entry.target);
+          }
+        });
+      },
+      { threshold: 0.2 }
+    );
+    
+    lists.forEach((list) => observer.observe(list));
+  } else {
+    lists.forEach((list) => list.classList.add("is-visible"));
+  }
+})();
+
+/* ── Feature card internal animations ──────────────────── */
+
+(function initFeatureCardAnimations() {
+  const cards = document.querySelectorAll(".fcard");
+  
+  if ("IntersectionObserver" in window && !reduceMotion) {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("is-visible");
+            // Don't unobserve - keep watching for re-entry if needed
+          }
+        });
+      },
+      { threshold: 0.3, rootMargin: "0px 0px -10% 0px" }
+    );
+    
+    cards.forEach((card) => observer.observe(card));
+  } else {
+    cards.forEach((card) => card.classList.add("is-visible"));
+  }
+})();
+
+/* ── Section reveal animation ────────────────────────────── */
+
+(function initSectionReveal() {
+  const sections = document.querySelectorAll(".section");
+  
+  if ("IntersectionObserver" in window && !reduceMotion) {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("is-visible");
+          }
+        });
+      },
+      { threshold: 0.1, rootMargin: "0px 0px -10% 0px" }
+    );
+    
+    sections.forEach((section) => observer.observe(section));
+  } else {
+    sections.forEach((section) => section.classList.add("is-visible"));
+  }
+})();
+
+/* ── CTA section reveal ──────────────────────────────────── */
+
+(function initCtaReveal() {
+  const cta = document.querySelector(".cta");
+  if (!cta) return;
+  
+  if ("IntersectionObserver" in window && !reduceMotion) {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            cta.classList.add("is-visible");
+            observer.unobserve(cta);
+          }
+        });
+      },
+      { threshold: 0.3 }
+    );
+    
+    observer.observe(cta);
+  } else {
+    cta.classList.add("is-visible");
+  }
+})();
+
+/* ── Button ripple effect ────────────────────────────────── */
+
+(function initButtonRipple() {
+  const buttons = document.querySelectorAll(".btn--ink, .btn--primary");
+  
+  buttons.forEach(btn => {
+    btn.addEventListener("mousemove", (e) => {
+      const rect = btn.getBoundingClientRect();
+      const x = ((e.clientX - rect.left) / rect.width) * 100;
+      const y = ((e.clientY - rect.top) / rect.height) * 100;
+      btn.style.setProperty("--ripple-x", `${x}%`);
+      btn.style.setProperty("--ripple-y", `${y}%`);
+    });
+  });
+})();
+
+/* ── Parallax scrolling ───────────────────────────────────── */
+
+(function initParallax() {
+  if (reduceMotion) return;
+  
+  const parallaxElements = document.querySelectorAll("[data-parallax]");
+  if (!parallaxElements.length) return;
+  
+  let ticking = false;
+  
+  function updateParallax() {
+    const scrollY = window.scrollY;
+    
+    parallaxElements.forEach(el => {
+      const speed = parseFloat(el.dataset.parallax) || 0.5;
+      const yOffset = scrollY * speed;
+      el.style.transform = `translate3d(0, ${yOffset}px, 0)`;
+    });
+    
+    ticking = false;
+  }
+  
+  function onScroll() {
+    if (!ticking) {
+      requestAnimationFrame(updateParallax);
+      ticking = true;
+    }
+  }
+  
+  window.addEventListener("scroll", onScroll, { passive: true });
+})();
+
+/* ── Animated counter for stats ──────────────────────────── */
+
+(function initCounters() {
+  const counters = document.querySelectorAll(".graph__stats b");
+  
+  function animateCounter(el) {
+    const target = parseInt(el.textContent, 10);
+    if (isNaN(target)) return;
+    
+    const duration = 1500;
+    const startTime = performance.now();
+    const startValue = 0;
+    
+    function update(currentTime) {
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      const current = Math.round(startValue + (target - startValue) * eased);
+      
+      el.textContent = current;
+      
+      if (progress < 1) {
+        requestAnimationFrame(update);
+      }
+    }
+    
+    requestAnimationFrame(update);
+  }
+  
+  if ("IntersectionObserver" in window) {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            const counters = entry.target.querySelectorAll(".graph__stats b");
+            counters.forEach(animateCounter);
+            observer.unobserve(entry.target);
+          }
+        });
+      },
+      { threshold: 0.5 }
+    );
+    
+    const statsSection = document.querySelector(".graph__stats");
+    if (statsSection) observer.observe(statsSection);
+  }
+})();
