@@ -371,15 +371,18 @@ onBeforeUnmount(() => {
   position: sticky;
   top: 0;
   z-index: var(--z-header);
-  background: color-mix(in srgb, var(--bone) 93%, transparent);
+  background: color-mix(in srgb, var(--bone) 85%, transparent);
   border-bottom: 1px solid var(--line);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  transition: box-shadow var(--dur) var(--ease);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  transition:
+    box-shadow var(--dur) var(--ease),
+    background var(--dur) var(--ease);
 }
 
 .app-header.is-scrolled {
-  box-shadow: var(--shadow-sm);
+  box-shadow: 0 4px 30px rgb(11 11 14 / 8%);
+  background: color-mix(in srgb, var(--bone) 95%, transparent);
 }
 
 .app-header__inner {
@@ -402,7 +405,9 @@ onBeforeUnmount(() => {
   color: color-mix(in srgb, var(--ink) 68%, transparent);
   font-size: var(--text-sm);
   letter-spacing: 0.05em;
-  transition: color var(--dur) var(--ease);
+  transition:
+    color var(--dur) var(--ease),
+    transform var(--dur) var(--ease);
 }
 
 .nav__link::after {
@@ -412,15 +417,19 @@ onBeforeUnmount(() => {
   bottom: 0;
   left: 0;
   height: 2px;
-  background: var(--verm);
+  background: linear-gradient(90deg, var(--verm), var(--acid));
   transform: scaleX(0);
   transform-origin: left;
-  transition: transform var(--dur) var(--ease);
+  transition: transform var(--dur-slow) var(--ease-out);
 }
 
 .nav__link:hover,
 .nav__link.is-active {
   color: var(--ink);
+}
+
+.nav__link:hover {
+  transform: translateY(-1px);
 }
 
 .nav__link.is-active::after {
@@ -496,13 +505,28 @@ onBeforeUnmount(() => {
 .cta {
   background: var(--ink);
   color: var(--acid);
+  position: relative;
+  overflow: hidden;
+}
+
+.cta::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--acid);
+  transform: translateX(-100%);
+  transition: transform var(--dur-slow) var(--ease-out);
+  z-index: -1;
 }
 
 .cta:hover {
-  background: var(--acid);
   color: var(--ink);
-  box-shadow: var(--shadow-hard-sm);
-  transform: translate(-1px, -1px);
+  box-shadow: 0 4px 16px rgb(201 255 46 / 30%);
+  transform: translate(-1px, -2px);
+}
+
+.cta:hover::before {
+  transform: translateX(0);
 }
 
 .cta--ghost {

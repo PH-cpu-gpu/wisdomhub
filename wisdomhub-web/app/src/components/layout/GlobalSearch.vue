@@ -199,6 +199,7 @@ onBeforeUnmount(clearDebounce)
               :key="item.keyword"
               class="global-search__hot-item"
               type="button"
+              :style="{ '--i': index }"
               @click="submit(item.keyword)"
             >
               <span class="global-search__hot-index">
@@ -218,6 +219,7 @@ onBeforeUnmount(clearDebounce)
               v-for="(item, index) in suggestions"
               :id="`global-search-option-${index}`"
               :key="item"
+              :style="{ '--i': index }"
             >
               <button
                 class="global-search__suggestion"
@@ -239,6 +241,17 @@ onBeforeUnmount(clearDebounce)
 </template>
 
 <style scoped>
+@keyframes search-item-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 .global-search__trigger {
   display: inline-flex;
   align-items: center;
@@ -321,6 +334,8 @@ onBeforeUnmount(clearDebounce)
   font-size: var(--text-sm);
   text-align: left;
   cursor: pointer;
+  animation: search-item-in 300ms var(--anim-ease-out) both;
+  animation-delay: calc(var(--i, 0) * 30ms);
   transition: background var(--dur) var(--ease);
 }
 
@@ -350,6 +365,8 @@ onBeforeUnmount(clearDebounce)
   font-size: var(--text-sm);
   text-align: left;
   cursor: pointer;
+  animation: search-item-in 300ms var(--anim-ease-out) both;
+  animation-delay: calc(var(--i, 0) * 30ms);
 }
 
 .global-search__suggestion.is-active,
@@ -370,6 +387,13 @@ onBeforeUnmount(clearDebounce)
 
   .global-search__panel {
     gap: var(--space-3);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .global-search__hot-item,
+  .global-search__suggestion {
+    animation: none;
   }
 }
 </style>

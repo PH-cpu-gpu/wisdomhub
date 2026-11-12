@@ -3,12 +3,14 @@ import { createApp } from 'vue'
 import { AUTH_TOKEN_KEY, REFRESH_TOKEN_KEY } from '@/api/auth-token'
 import { setTokensUpdatedHandler, setUnauthorizedHandler } from '@/api/http'
 import App from '@/App.vue'
+import { vReveal } from '@/directives/vReveal'
 import router from '@/router'
 import { pinia, useAuthStore } from '@/stores'
 import { storageKey } from '@/utils/storage'
 import '@/styles/tokens.css'
 import '@/styles/base.css'
 import '@/styles/utilities.css'
+import '@/styles/animations.css'
 
 const auth = useAuthStore(pinia)
 
@@ -50,4 +52,7 @@ window.addEventListener('storage', (event) => {
   }
 })
 
-createApp(App).use(pinia).use(router).mount('#app')
+const app = createApp(App)
+
+app.directive('reveal', vReveal)
+app.use(pinia).use(router).mount('#app')

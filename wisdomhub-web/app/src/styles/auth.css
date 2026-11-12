@@ -170,6 +170,20 @@
   gap: 6px;
 }
 
+.auth-form .wh-input:focus-within {
+  border-color: var(--ink);
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--acid) 55%, transparent),
+    0 10px 26px color-mix(in srgb, var(--verm) 12%, transparent);
+}
+
+.auth-form .wh-input.is-invalid:focus-within {
+  border-color: var(--verm);
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--verm) 32%, transparent),
+    0 10px 26px color-mix(in srgb, var(--verm) 16%, transparent);
+}
+
 .auth-label {
   color: var(--text-muted);
   font-size: var(--text-2xs);
@@ -184,6 +198,42 @@
 
 .auth-code-button {
   min-width: 116px;
+}
+
+.auth-code-send {
+  position: relative;
+  display: inline-flex;
+}
+
+.auth-code-button.has-ring {
+  padding-left: 42px;
+}
+
+.auth-code-ring {
+  position: absolute;
+  top: 50%;
+  left: 13px;
+  width: 20px;
+  height: 20px;
+  margin-top: -10px;
+  pointer-events: none;
+  transform: rotate(-90deg);
+}
+
+.auth-code-ring circle {
+  fill: none;
+  stroke-width: 2.5;
+}
+
+.auth-code-ring__track {
+  stroke: var(--line-strong);
+}
+
+.auth-code-ring__value {
+  stroke: var(--verm);
+  stroke-linecap: round;
+  stroke-dasharray: 50.27;
+  transition: stroke-dashoffset 1s linear;
 }
 
 .auth-hint {
@@ -298,6 +348,10 @@
   .auth-panel {
     padding: clamp(24px, 5vw, 40px);
   }
+
+  .auth-aside__fluid {
+    display: none;
+  }
 }
 
 @media (max-width: 640px) {
@@ -315,5 +369,11 @@
 
   .auth-code-button {
     min-width: 104px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-code-ring__value {
+    transition: none;
   }
 }

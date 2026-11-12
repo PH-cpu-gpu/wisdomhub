@@ -16,6 +16,8 @@ withDefaults(
     likePending?: boolean
     canDelete?: boolean
     canAccept?: boolean
+    /** 刚被采纳时播放一次性庆祝反馈 */
+    celebrating?: boolean
   }>(),
   {
     accepted: false,
@@ -23,6 +25,7 @@ withDefaults(
     likePending: false,
     canDelete: false,
     canAccept: false,
+    celebrating: false,
   },
 )
 
@@ -35,7 +38,11 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <article class="answer-card" :class="{ 'is-accepted': accepted }">
+  <article
+    class="answer-card"
+    :class="{ 'is-accepted': accepted, 'is-celebrating': celebrating }"
+  >
+    <span v-if="celebrating" class="answer-card__burst" aria-hidden="true"></span>
     <div class="answer-card__head">
       <span v-if="accepted" class="answer-card__accepted">已采纳答案</span>
       <span v-else class="answer-card__label">回答</span>
@@ -88,7 +95,46 @@ const emit = defineEmits<{
 </template>
 
 <style scoped>
+@keyframes accept-burst {
+  0% {
+    opacity: 0.9;
+    transform: scale(0.97);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.04);
+  }
+}
+
+@keyframes accept-stamp {
+  0% {
+    opacity: 0;
+    transform: scale(1.5);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(0.94);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes accept-lift {
+  0% {
+    transform: translateY(6px);
+  }
+  55% {
+    transform: translateY(-2px);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
 .answer-card {
+  position: relative;
   display: grid;
   gap: var(--space-2);
   padding: var(--space-4);
@@ -99,6 +145,22 @@ const emit = defineEmits<{
 .answer-card.is-accepted {
   border-color: var(--ink);
   box-shadow: inset 3px 0 0 var(--acid);
+}
+
+.answer-card.is-celebrating {
+  animation: accept-lift 620ms var(--anim-ease-out) both;
+}
+
+.answer-card__burst {
+  position: absolute;
+  inset: -1px;
+  border: 2px solid var(--acid);
+  animation: accept-burst 900ms var(--anim-ease-out) both;
+  pointer-events: none;
+}
+
+.answer-card.is-celebrating .answer-card__accepted {
+  animation: accept-stamp 600ms var(--anim-bounce) both;
 }
 
 .answer-card__head {
@@ -113,6 +175,7 @@ const emit = defineEmits<{
 }
 
 .answer-card__accepted {
+  display: inline-block;
   padding: 2px 7px;
   border: 1px solid var(--acid);
   background: var(--acid);
@@ -182,5 +245,17 @@ const emit = defineEmits<{
 .answer-action:disabled {
   opacity: 0.55;
   cursor: wait;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .answer-card.is-celebrating,
+  .answer-card__burst,
+  .answer-card.is-celebrating .answer-card__accepted {
+    animation: none;
+  }
+
+  .answer-card__burst {
+    display: none;
+  }
 }
 </style>

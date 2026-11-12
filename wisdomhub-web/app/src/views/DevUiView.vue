@@ -24,6 +24,9 @@ import WhTabs from '@/components/base/WhTabs.vue'
 import WhTag from '@/components/base/WhTag.vue'
 import WhTextarea from '@/components/base/WhTextarea.vue'
 import WhTooltip from '@/components/base/WhTooltip.vue'
+import MagneticButton from '@/components/effects/MagneticButton.vue'
+import PageTransition from '@/components/effects/PageTransition.vue'
+import StaggerReveal from '@/components/effects/StaggerReveal.vue'
 import { confirm } from '@/components/base/confirm'
 import { toast } from '@/components/base/toast'
 
@@ -51,6 +54,7 @@ const modalTitle = ref('')
 const modalDescription = ref('')
 const drawerOpen = ref(false)
 const tags = ref(['Vue 3', 'Spring Boot', 'Redis'])
+const motionKey = ref(0)
 
 const authStore = useAuthStore()
 const mockEnabled = import.meta.env.VITE_USE_MOCK === 'true'
@@ -90,6 +94,7 @@ const sections = [
   { id: 'display', label: '展示' },
   { id: 'tabs', label: '标签页' },
   { id: 'pagination', label: '分页' },
+  { id: 'motion', label: '动效' },
   { id: 'http', label: '请求层' },
   { id: 'mock', label: 'Mock' },
   { id: 'tools', label: '工具' },
@@ -589,6 +594,40 @@ const markdownHtml = renderMarkdown(markdownSample)
         </div>
       </section>
 
+      <section id="motion" class="dev-section">
+        <header class="dev-section__head">
+          <h2>Motion</h2>
+          <code>v-reveal · StaggerReveal · MagneticButton · PageTransition</code>
+        </header>
+        <div class="dev-grid">
+          <div class="dev-card">
+            <h3>StaggerReveal · 滚动到此处依次入场</h3>
+            <StaggerReveal :stagger="90">
+              <div v-for="index in 4" :key="index" class="dev-motion-item">
+                <strong>节点 {{ index }}</strong>
+                <span>延迟 {{ (index - 1) * 90 }}ms</span>
+              </div>
+            </StaggerReveal>
+          </div>
+
+          <div class="dev-card">
+            <h3>MagneticButton · 指针靠近</h3>
+            <MagneticButton class="dev-motion-cta" :strength="0.35">靠近我</MagneticButton>
+            <p class="dev-note">按钮向指针方向轻微偏移，离开后回位。</p>
+          </div>
+
+          <div class="dev-card">
+            <h3>PageTransition · 切换内容</h3>
+            <WhButton size="sm" variant="ghost" @click="motionKey += 1">切换</WhButton>
+            <div class="dev-motion-stage">
+              <PageTransition mode="out-in">
+                <div :key="motionKey" class="dev-motion-panel">第 {{ motionKey + 1 }} 屏</div>
+              </PageTransition>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section id="http" class="dev-section">
         <header class="dev-section__head">
           <h2>HTTP 请求层</h2>
@@ -966,5 +1005,49 @@ const markdownHtml = renderMarkdown(markdownSample)
 
 .dev-markdown :deep(h2) {
   font-size: var(--text-lg);
+}
+
+.dev-motion-item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 10px 12px;
+  border: var(--border);
+  background: var(--surface-strong);
+  font-family: var(--mono);
+  font-size: var(--text-xs);
+}
+
+.dev-motion-item span {
+  color: var(--text-muted);
+  font-size: var(--text-2xs);
+}
+
+.dev-motion-cta {
+  min-height: 40px;
+  padding: 0 20px;
+  border: 1px solid var(--ink);
+  background: var(--acid);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.04em;
+}
+
+.dev-motion-stage {
+  margin-top: var(--space-3);
+  padding: var(--space-4);
+  border: 1px dashed var(--line-strong);
+}
+
+.dev-motion-panel {
+  padding: var(--space-4);
+  background: var(--ink);
+  color: var(--acid);
+  font-family: var(--mono);
+  font-size: var(--text-sm);
+  text-align: center;
 }
 </style>

@@ -119,6 +119,11 @@ const durationLabel = computed(() => {
 })
 const speedLabel = computed(() => (speedBps.value > 0 ? `${formatBytes(speedBps.value)}/s` : ''))
 
+const PROGRESS_RING_LENGTH = 2 * Math.PI * 52
+const ringOffset = computed(
+  () => PROGRESS_RING_LENGTH * (1 - Math.min(100, Math.max(0, progress.value)) / 100),
+)
+
 const assetDurationLabel = computed(() => formatVideoDuration(asset.value?.durationMs))
 const assetResolutionLabel = computed(() =>
   asset.value?.width && asset.value?.height ? `${asset.value.width}×${asset.value.height}` : '—',
@@ -287,6 +292,7 @@ useSeo({
           class="video-step"
           :class="{ 'is-active': index === stepIndex, 'is-done': index < stepIndex }"
         >
+          <span class="video-step__dot" aria-hidden="true"></span>
           <span class="video-step__index">{{ String(index + 1).padStart(2, '0') }}</span>
           <span class="video-step__label">{{ step }}</span>
         </li>
@@ -371,12 +377,24 @@ useSeo({
           :aria-valuenow="progress"
           aria-valuemin="0"
           aria-valuemax="100"
+          :aria-label="`上传进度 ${progress}%`"
         >
-          <span class="video-progress__bar" :style="{ width: `${progress}%` }"></span>
-        </div>
-        <div class="video-progress__meta">
-          <span>{{ progress }}%</span>
-          <span v-if="speedLabel">{{ speedLabel }}</span>
+          <div class="video-progress__dial">
+            <svg viewBox="0 0 120 120" aria-hidden="true">
+              <circle class="video-progress__track" cx="60" cy="60" r="52" />
+              <circle
+                class="video-progress__value"
+                cx="60"
+                cy="60"
+                r="52"
+                :style="{ strokeDashoffset: ringOffset }"
+              />
+            </svg>
+            <div class="video-progress__center">
+              <span class="video-progress__percent">{{ progress }}%</span>
+              <span v-if="speedLabel" class="video-progress__speed">{{ speedLabel }}</span>
+            </div>
+          </div>
         </div>
         <p v-if="phase === 'paused'" class="video-note">
           已暂停。凭证过期前点「重试」会重新传输文件，不会重新申请额度。
@@ -556,6 +574,41 @@ useSeo({
   border-bottom: 2px solid transparent;
 }
 
+.video-step__dot {
+  align-self: center;
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  transition:
+    background var(--dur) var(--ease),
+    border-color var(--dur) var(--ease);
+}
+
+.video-step.is-active .video-step__dot {
+  border-color: var(--ink);
+  background: var(--ink);
+  animation: step-pulse 1.8s var(--anim-ease-out) infinite;
+}
+
+.video-step.is-done .video-step__dot {
+  border-color: var(--verm);
+  background: var(--verm);
+}
+
+@keyframes step-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.35);
+    opacity: 0.6;
+  }
+}
+
 .video-step__index {
   color: var(--line-strong);
 }
@@ -693,24 +746,68 @@ useSeo({
 }
 
 .video-progress {
+  display: grid;
+  justify-items: center;
+}
+
+.video-progress__dial {
   position: relative;
-  height: 8px;
-  border: 1px solid var(--ink);
-  background: transparent;
+  display: grid;
+  place-items: center;
+  width: clamp(132px, 22vw, 168px);
+  aspect-ratio: 1;
+  animation: dial-in 420ms var(--anim-ease-out) both;
 }
 
-.video-progress__bar {
-  display: block;
+@keyframes dial-in {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.video-progress__dial svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
   height: 100%;
-  background: var(--ink);
-  transition: width 180ms linear;
+  transform: rotate(-90deg);
 }
 
-.video-progress__meta {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: var(--space-2);
+.video-progress__track {
+  fill: none;
+  stroke: var(--line);
+  stroke-width: 6;
+}
+
+.video-progress__value {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 6;
+  stroke-linecap: round;
+  stroke-dasharray: 326.73;
+  transition: stroke-dashoffset 180ms linear;
+}
+
+.video-progress__center {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  text-align: center;
+}
+
+.video-progress__percent {
+  font-family: var(--mono);
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-black);
+  line-height: 1;
+}
+
+.video-progress__speed {
   color: var(--text-muted);
   font-family: var(--mono);
   font-size: var(--text-2xs);
@@ -843,6 +940,20 @@ useSeo({
 
   .video-file__actions {
     width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .video-step.is-active .video-step__dot {
+    animation: none;
+  }
+
+  .video-progress__dial {
+    animation: none;
+  }
+
+  .video-progress__value {
+    transition: none;
   }
 }
 </style>

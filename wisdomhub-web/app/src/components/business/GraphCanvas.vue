@@ -47,10 +47,70 @@ const emit = defineEmits<{
 }>()
 
 const chartRef = ref<HTMLElement | null>(null)
+const rippleLayer = ref<HTMLElement | null>(null)
+const bloomKey = ref(0)
+const motionOK =
+  typeof window === 'undefined' ||
+  !window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
 let chart: ECharts | null = null
 let observer: ResizeObserver | null = null
+let entrancePlayed = false
+
+const DASH_FRAME_MS = 60
+let dashFrame = 0
+let dashPhase = 0
+let dashLast = 0
 
 const showLabels = computed(() => props.data.nodes.length <= 300)
+
+function spawnRipple(x: number, y: number): void {
+  if (!motionOK || !rippleLayer.value) return
+
+  const ripple = document.createElement('span')
+  ripple.className = 'graph-ripple'
+  ripple.style.left = `${x}px`
+  ripple.style.top = `${y}px`
+  rippleLayer.value.appendChild(ripple)
+  window.setTimeout(() => ripple.remove(), 900)
+}
+
+/** 待审关系虚线缓慢流动：直接改 zrender displayable 的 dashOffset，避免整图 setOption 重置力导向布局 */
+function flowDashes(timestamp: number): void {
+  dashFrame = window.requestAnimationFrame(flowDashes)
+
+  const zr = chart?.getZr() as unknown as
+    | {
+        storage?: { getDisplayList: () => Array<{ style?: Record<string, unknown>; dirty?: () => void }> }
+        refresh?: () => void
+      }
+    | undefined
+  if (!zr?.storage || document.visibilityState === 'hidden') return
+  if (timestamp - dashLast < DASH_FRAME_MS) return
+  dashLast = timestamp
+  dashPhase = (dashPhase + 1.6) % 100
+
+  let touched = false
+  for (const element of zr.storage.getDisplayList()) {
+    const style = element.style
+    if (!style || style.stroke !== PENDING_COLOR) continue
+    style.lineDashOffset = -dashPhase
+    element.dirty?.()
+    touched = true
+  }
+  if (touched) zr.refresh?.()
+}
+
+function syncDashAnimation(): void {
+  const shouldRun = motionOK && props.pendingEdges.length > 0
+  if (shouldRun && !dashFrame) {
+    dashLast = 0
+    dashFrame = window.requestAnimationFrame(flowDashes)
+  } else if (!shouldRun && dashFrame) {
+    window.cancelAnimationFrame(dashFrame)
+    dashFrame = 0
+  }
+}
 
 function buildOption(): EChartsCoreOption {
   const pendingTagIds = new Set(props.pendingTagIds)
@@ -178,12 +238,25 @@ function buildOption(): EChartsCoreOption {
 function render(): void {
   if (!chart) return
   chart.setOption(buildOption(), true)
+  if (!entrancePlayed) {
+    entrancePlayed = true
+    bloomKey.value += 1
+  }
+  syncDashAnimation()
 }
 
-function onClick(params: { dataType?: string; data?: unknown }): void {
+function onClick(params: {
+  dataType?: string
+  data?: unknown
+  event?: { offsetX?: number; offsetY?: number; zrX?: number; zrY?: number }
+}): void {
   if (params.dataType !== 'node' || !params.data || typeof params.data !== 'object') return
 
   const data = params.data as Record<string, unknown>
+  const x = params.event?.offsetX ?? params.event?.zrX
+  const y = params.event?.offsetY ?? params.event?.zrY
+  if (typeof x === 'number' && typeof y === 'number') spawnRipple(x, y)
+
   emit('nodeClick', {
     id: String(data.id ?? ''),
     type: data.nodeType === 'ARTICLE' ? 'ARTICLE' : 'TAG',
@@ -196,6 +269,9 @@ function onBackgroundClick(event: { target?: unknown }): void {
 }
 
 function emitNode(node: GraphNodeVO): void {
+  if (chartRef.value) {
+    spawnRipple(chartRef.value.clientWidth / 2, chartRef.value.clientHeight / 2)
+  }
   emit('nodeClick', { id: node.id, type: node.type, label: node.label })
 }
 
@@ -215,6 +291,10 @@ onMounted(initChart)
 onBeforeUnmount(() => {
   observer?.disconnect()
   observer = null
+  if (dashFrame) {
+    window.cancelAnimationFrame(dashFrame)
+    dashFrame = 0
+  }
   chart?.getZr().off('click', onBackgroundClick)
   chart?.dispose()
   chart = null
@@ -231,6 +311,13 @@ watch(() => [props.data, props.pendingEdges, props.pendingTagIds], render, { dee
     :data-pending-nodes="pendingTagIds.length"
   >
     <div ref="chartRef" class="graph-chart__canvas" role="img" aria-label="知识图谱力导向图"></div>
+    <span
+      v-if="motionOK && bloomKey > 0"
+      :key="bloomKey"
+      class="graph-chart__bloom"
+      aria-hidden="true"
+    ></span>
+    <div ref="rippleLayer" class="graph-chart__ripples" aria-hidden="true"></div>
     <ul class="graph-chart__nodes" aria-label="图谱节点">
       <li v-for="node in data.nodes" :key="node.id">
         <button
@@ -246,6 +333,37 @@ watch(() => [props.data, props.pendingEdges, props.pendingTagIds], render, { dee
 </template>
 
 <style scoped>
+@keyframes graph-canvas-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes graph-bloom {
+  0% {
+    opacity: 0.75;
+    transform: scale(0.3);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(16);
+  }
+}
+
+@keyframes graph-ripple {
+  from {
+    opacity: 0.9;
+    transform: scale(0.4);
+  }
+  to {
+    opacity: 0;
+    transform: scale(9);
+  }
+}
+
 .graph-chart {
   position: absolute;
   inset: 0;
@@ -254,6 +372,59 @@ watch(() => [props.data, props.pendingEdges, props.pendingTagIds], render, { dee
 .graph-chart__canvas {
   position: absolute;
   inset: 0;
+  animation: graph-canvas-in 520ms var(--anim-ease-out) both;
+}
+
+.graph-chart__bloom {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 32px;
+  height: 32px;
+  margin: -16px 0 0 -16px;
+  border: 1px solid var(--verm);
+  border-radius: 50%;
+  pointer-events: none;
+  animation: graph-bloom 900ms var(--anim-ease-out) both;
+}
+
+.graph-chart__bloom::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border: 1px solid var(--acid);
+  border-radius: 50%;
+  animation: graph-bloom 900ms var(--anim-ease-out) 140ms both;
+}
+
+.graph-chart__ripples {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.graph-ripple {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  pointer-events: none;
+}
+
+.graph-ripple::before,
+.graph-ripple::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 1px solid var(--verm);
+  border-radius: 50%;
+  animation: graph-ripple 760ms var(--anim-ease-out) both;
+}
+
+.graph-ripple::after {
+  border-color: var(--acid);
+  animation-delay: 140ms;
 }
 
 .graph-chart__nodes {
@@ -266,5 +437,16 @@ watch(() => [props.data, props.pendingEdges, props.pendingTagIds], render, { dee
   clip: rect(0 0 0 0);
   white-space: nowrap;
   border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .graph-chart__canvas {
+    animation: none;
+  }
+
+  .graph-chart__bloom,
+  .graph-chart__ripples {
+    display: none;
+  }
 }
 </style>

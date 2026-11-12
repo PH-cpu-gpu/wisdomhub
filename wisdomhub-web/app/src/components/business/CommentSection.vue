@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { onBeforeUnmount, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 
 import { isApiError } from '@/api/error'
@@ -56,7 +56,29 @@ const replyContent = ref('')
 const replyError = ref('')
 const replySubmitting = ref(false)
 
+/** 刚发布的评论/回复：短暂高亮并滑入，提示插入位置 */
+const freshCommentId = ref('')
+let freshTimer: number | undefined
+
 let requestId = 0
+
+function isFresh(id: ID): boolean {
+  return freshCommentId.value !== '' && freshCommentId.value === String(id)
+}
+
+function scheduleFreshClear(): void {
+  if (freshTimer) window.clearTimeout(freshTimer)
+  freshTimer = window.setTimeout(() => {
+    freshCommentId.value = ''
+    freshTimer = undefined
+  }, 2400)
+}
+
+function clearFresh(): void {
+  if (freshTimer) window.clearTimeout(freshTimer)
+  freshTimer = undefined
+  freshCommentId.value = ''
+}
 
 function ensureCommentAuthors(): void {
   const ids = new Set<ID>()
@@ -120,13 +142,18 @@ async function submitComment(): Promise<void> {
 
   newSubmitting.value = true
   try {
-    await createComment(
+    const commentId = await createComment(
       { targetType: props.targetType, targetId: props.targetId, content },
       { skipErrorToast: true },
     )
     newContent.value = ''
     toast.success('评论已发布')
-    await loadComments()
+    freshCommentId.value = String(commentId)
+    // 后端按时间正序分页，新评论落在最后一页
+    const lastPage = Math.max(1, Math.ceil((total.value + 1) / PAGE_SIZE))
+    if (page.value !== lastPage) page.value = lastPage
+    else await loadComments()
+    scheduleFreshClear()
   } catch (err) {
     newError.value = isApiError(err) ? err.message : '评论发布失败，请稍后重试。'
   } finally {
@@ -165,7 +192,7 @@ async function submitReply(): Promise<void> {
   const root = replyTarget.value
   replySubmitting.value = true
   try {
-    await createComment(
+    const replyId = await createComment(
       {
         targetType: props.targetType,
         targetId: props.targetId,
@@ -176,7 +203,9 @@ async function submitReply(): Promise<void> {
     )
     cancelReply()
     toast.success('回复已发布')
+    freshCommentId.value = String(replyId)
     await loadComments()
+    scheduleFreshClear()
   } catch (err) {
     replyError.value = isApiError(err) ? err.message : '回复发布失败，请稍后重试。'
   } finally {
@@ -208,6 +237,7 @@ async function deleteComment(comment: CommentVO, isRoot: boolean): Promise<void>
 
 function changePage(value: number): void {
   if (value === page.value) return
+  clearFresh()
   page.value = value
 }
 
@@ -219,6 +249,7 @@ watch(
     replyContent.value = ''
     newContent.value = ''
     newError.value = ''
+    clearFresh()
     void loadComments()
   },
   { immediate: true },
@@ -229,6 +260,8 @@ watch(page, (value, previous) => {
 })
 
 watch(comments, ensureCommentAuthors, { immediate: true })
+
+onBeforeUnmount(clearFresh)
 </script>
 
 <template>
@@ -283,7 +316,12 @@ watch(comments, ensureCommentAuthors, { immediate: true })
     <div v-else-if="!comments.length" class="comment-state">还没有评论，来写下第一条吧。</div>
 
     <div v-else class="comment-list">
-      <article v-for="comment in comments" :key="comment.commentId" class="comment-item">
+      <article
+        v-for="comment in comments"
+        :key="comment.commentId"
+        class="comment-item"
+        :class="{ 'is-fresh': isFresh(comment.commentId) }"
+      >
         <div class="comment-item__head">
           <AuthorChip :author="authors[comment.userId]" />
           <time class="comment-item__time" :datetime="comment.createTime">
@@ -305,7 +343,12 @@ watch(comments, ensureCommentAuthors, { immediate: true })
         <p class="comment-item__content">{{ comment.content }}</p>
 
         <div v-if="comment.replies.length" class="comment-replies">
-          <div v-for="reply in comment.replies" :key="reply.commentId" class="comment-reply">
+          <div
+            v-for="reply in comment.replies"
+            :key="reply.commentId"
+            class="comment-reply"
+            :class="{ 'is-fresh': isFresh(reply.commentId) }"
+          >
             <div class="comment-reply__head">
               <AuthorChip :author="authors[reply.userId]" />
               <time class="comment-item__time" :datetime="reply.createTime">
@@ -359,6 +402,17 @@ watch(comments, ensureCommentAuthors, { immediate: true })
 </template>
 
 <style scoped>
+@keyframes comment-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 .comment-section {
   display: grid;
   gap: var(--space-5);
@@ -470,6 +524,19 @@ watch(comments, ensureCommentAuthors, { immediate: true })
 
 .comment-item:first-child {
   border-top: 0;
+}
+
+.comment-item.is-fresh,
+.comment-reply.is-fresh {
+  animation: comment-arrive 480ms var(--anim-ease-out) both;
+}
+
+.comment-item.is-fresh {
+  box-shadow: inset 3px 0 0 var(--verm);
+}
+
+.comment-reply.is-fresh {
+  background: color-mix(in srgb, var(--acid) 12%, transparent);
 }
 
 .comment-item__head {
@@ -588,6 +655,13 @@ watch(comments, ensureCommentAuthors, { immediate: true })
   .comment-item__actions {
     width: 100%;
     margin-left: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .comment-item.is-fresh,
+  .comment-reply.is-fresh {
+    animation: none;
   }
 }
 </style>

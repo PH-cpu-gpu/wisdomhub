@@ -72,6 +72,15 @@ withDefaults(
   gap: var(--space-2);
   padding-block: var(--space-5);
   border-top: var(--border);
+  transition: all var(--dur) var(--ease);
+}
+
+.article-card:hover {
+  transform: translateX(4px);
+}
+
+.article-card:hover .article-card__title a {
+  color: var(--verm-deep);
 }
 
 .article-card__author {

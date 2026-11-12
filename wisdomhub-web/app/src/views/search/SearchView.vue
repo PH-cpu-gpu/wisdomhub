@@ -428,7 +428,12 @@ useSeo({
 
       <div v-else class="search-results">
         <template v-if="type === 'article'">
-          <article v-for="article in articleResults" :key="article.articleId" class="search-result">
+          <article
+            v-for="(article, index) in articleResults"
+            :key="article.articleId"
+            class="search-result"
+            :style="{ '--i': Math.min(index, 8) }"
+          >
             <p class="search-result__eyebrow">[ ARTICLE ]</p>
             <h2 class="search-result__title">
               <RouterLink :to="`/article/${article.articleId}`">
@@ -457,9 +462,10 @@ useSeo({
 
         <template v-else-if="type === 'video'">
           <article
-            v-for="video in videoResults"
+            v-for="(video, index) in videoResults"
             :key="video.videoId"
             class="search-result search-video"
+            :style="{ '--i': Math.min(index, 8) }"
           >
             <RouterLink class="search-video__cover" :to="`/video/${video.videoId}`">
               <img
@@ -516,9 +522,10 @@ useSeo({
 
         <template v-else-if="type === 'question'">
           <article
-            v-for="question in questionResults"
+            v-for="(question, index) in questionResults"
             :key="question.questionId"
             class="search-result"
+            :style="{ '--i': Math.min(index, 8) }"
           >
             <p class="search-result__eyebrow">[ QUESTION ]</p>
             <h2 class="search-result__title">
@@ -544,9 +551,10 @@ useSeo({
 
         <template v-else-if="type === 'user'">
           <RouterLink
-            v-for="user in userResults"
+            v-for="(user, index) in userResults"
             :key="user.userId"
             class="search-result search-result--user"
+            :style="{ '--i': Math.min(index, 8) }"
             :to="{ name: 'user-profile', params: { userId: user.userId } }"
           >
             <WhAvatar :src="user.avatar ?? undefined" :name="user.username" size="md" />
@@ -563,9 +571,10 @@ useSeo({
 
         <template v-else>
           <RouterLink
-            v-for="tag in tagResults"
+            v-for="(tag, index) in tagResults"
             :key="tag.tagId"
             class="search-result search-result--tag"
+            :style="{ '--i': Math.min(index, 8) }"
             :to="{ name: 'tech-detail', params: { tagId: tag.tagId } }"
           >
             <p class="search-result__eyebrow">[ TAG / {{ tag.category }} ]</p>
@@ -587,6 +596,17 @@ useSeo({
 </template>
 
 <style scoped>
+@keyframes result-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 .search-page {
   display: grid;
   gap: var(--space-3);
@@ -719,6 +739,8 @@ useSeo({
   border-bottom: var(--border);
   color: inherit;
   text-decoration: none;
+  animation: result-in 360ms var(--anim-ease-out) both;
+  animation-delay: calc(var(--i, 0) * 40ms);
 }
 
 .search-result__eyebrow {
@@ -880,6 +902,12 @@ useSeo({
 @media (max-width: 640px) {
   .search-video {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .search-result {
+    animation: none;
   }
 }
 </style>

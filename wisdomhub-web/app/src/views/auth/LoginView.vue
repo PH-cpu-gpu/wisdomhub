@@ -8,6 +8,7 @@ import WhButton from '@/components/base/WhButton.vue'
 import WhInput from '@/components/base/WhInput.vue'
 import WhTabs from '@/components/base/WhTabs.vue'
 import { toast } from '@/components/base/toast'
+import FluidBackground from '@/components/effects/FluidBackground.vue'
 import { useSeo } from '@/composables/useSeo'
 import { useAuthStore } from '@/stores'
 import type { LoginPayload } from '@/types/user'
@@ -137,6 +138,12 @@ useSeo({
     <div class="wh-container auth-wrap">
       <div class="auth-card">
         <aside class="auth-aside">
+          <FluidBackground
+            class="auth-aside__fluid"
+            :blur="70"
+            :opacity="0.22"
+            :speed="26"
+          />
           <p class="auth-eyebrow">WISDOMHUB / AUTH</p>
           <p class="auth-display">把散落的知识，<em>连成网络。</em></p>
           <p class="auth-lead">

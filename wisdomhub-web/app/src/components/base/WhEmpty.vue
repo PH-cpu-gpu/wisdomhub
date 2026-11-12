@@ -53,6 +53,7 @@ withDefaults(
   width: min(160px, 55%);
   height: auto;
   color: var(--line-strong);
+  animation: wh-empty-rise var(--anim-slow) var(--anim-ease-out) both;
 }
 
 .wh-empty__link {
@@ -63,19 +64,24 @@ withDefaults(
 .wh-empty__link--broken {
   stroke: var(--verm);
   stroke-dasharray: 3 3;
+  animation: wh-empty-flow 6s linear infinite;
 }
 
 .wh-empty__node {
   fill: var(--surface-strong);
   stroke: var(--ink);
+  transform-box: fill-box;
+  transform-origin: center;
 }
 
 .wh-empty__node--acid {
   fill: var(--acid);
+  animation: wh-empty-node 2.8s var(--anim-smooth) infinite;
 }
 
 .wh-empty__node--broken {
   stroke-dasharray: 2 2;
+  animation: wh-empty-flicker 4s var(--anim-smooth) infinite;
 }
 
 .wh-empty__title {
@@ -104,5 +110,56 @@ withDefaults(
 
 .wh-empty--sm .wh-empty__title {
   font-size: var(--text-md);
+}
+
+@keyframes wh-empty-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes wh-empty-flow {
+  to {
+    stroke-dashoffset: -12;
+  }
+}
+
+@keyframes wh-empty-node {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+
+  50% {
+    transform: scale(1.28);
+    opacity: 0.72;
+  }
+}
+
+@keyframes wh-empty-flicker {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wh-empty__art,
+  .wh-empty__link--broken,
+  .wh-empty__node--acid,
+  .wh-empty__node--broken {
+    animation: none;
+  }
 }
 </style>

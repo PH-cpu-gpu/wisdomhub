@@ -84,4 +84,11 @@ function barStyle(index: number): Record<string, string> {
     background-position: 0 50%;
   }
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .wh-skeleton.is-animated .wh-skeleton__bar {
+    animation: none;
+    background: var(--bone-2);
+  }
+}
 </style>

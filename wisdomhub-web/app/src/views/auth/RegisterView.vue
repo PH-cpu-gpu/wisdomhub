@@ -8,6 +8,7 @@ import WhButton from '@/components/base/WhButton.vue'
 import WhInput from '@/components/base/WhInput.vue'
 import WhTabs from '@/components/base/WhTabs.vue'
 import { toast } from '@/components/base/toast'
+import FluidBackground from '@/components/effects/FluidBackground.vue'
 import { useSeo } from '@/composables/useSeo'
 import { useAuthStore } from '@/stores'
 import type { RegisterPayload } from '@/types/user'
@@ -64,6 +65,9 @@ const codeButtonText = computed(() => {
   if (countdown.value > 0) return `${countdown.value}s 后重试`
   return codeSent.value ? '重新获取' : '获取验证码'
 })
+
+const CODE_RING_LENGTH = 2 * Math.PI * 8
+const codeRingOffset = computed(() => CODE_RING_LENGTH * (1 - countdown.value / 60))
 
 const redirect = computed(() =>
   typeof route.query.redirect === 'string' ? route.query.redirect : '',
@@ -251,6 +255,12 @@ useSeo({
     <div class="wh-container auth-wrap">
       <div class="auth-card">
         <aside class="auth-aside">
+          <FluidBackground
+            class="auth-aside__fluid"
+            :blur="70"
+            :opacity="0.22"
+            :speed="26"
+          />
           <p class="auth-eyebrow">WISDOMHUB / JOIN</p>
           <p class="auth-display">从一篇好文章开始，<em>建立你的网络。</em></p>
           <p class="auth-lead">
@@ -317,17 +327,35 @@ useSeo({
                   :error="codeError"
                   size="lg"
                 />
-                <WhButton
-                  class="auth-code-button"
-                  type="button"
-                  size="lg"
-                  variant="ghost"
-                  :loading="sendingCode"
-                  :disabled="countdown > 0"
-                  @click="sendCode"
-                >
-                  {{ codeButtonText }}
-                </WhButton>
+                <span class="auth-code-send">
+                  <WhButton
+                    class="auth-code-button"
+                    :class="{ 'has-ring': countdown > 0 }"
+                    type="button"
+                    size="lg"
+                    variant="ghost"
+                    :loading="sendingCode"
+                    :disabled="countdown > 0"
+                    @click="sendCode"
+                  >
+                    {{ codeButtonText }}
+                  </WhButton>
+                  <svg
+                    v-if="countdown > 0"
+                    class="auth-code-ring"
+                    viewBox="0 0 20 20"
+                    aria-hidden="true"
+                  >
+                    <circle class="auth-code-ring__track" cx="10" cy="10" r="8" />
+                    <circle
+                      class="auth-code-ring__value"
+                      cx="10"
+                      cy="10"
+                      r="8"
+                      :style="{ strokeDashoffset: codeRingOffset }"
+                    />
+                  </svg>
+                </span>
               </div>
               <p class="auth-hint">短信 / 邮件通道尚未接入，验证码为模拟实现。</p>
               <div v-if="mockCode" class="auth-code-notice" role="status" aria-live="polite">

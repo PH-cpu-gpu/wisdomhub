@@ -16,10 +16,36 @@ const safeHtml = computed(() => sanitizeSearchHighlight(props.html || props.fall
 </template>
 
 <style scoped>
+@keyframes highlight-scan {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
 .search-highlight :deep(em) {
-  background: var(--acid);
+  position: relative;
+  z-index: 0;
+  padding-inline: 2px;
   color: var(--ink);
   font-style: normal;
-  padding-inline: 2px;
+}
+
+.search-highlight :deep(em)::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--acid);
+  transform-origin: left center;
+  animation: highlight-scan 480ms var(--anim-ease-out) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .search-highlight :deep(em)::before {
+    animation: none;
+  }
 }
 </style>

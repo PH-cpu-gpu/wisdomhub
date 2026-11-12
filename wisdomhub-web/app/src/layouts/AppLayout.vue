@@ -3,6 +3,7 @@ import { RouterView } from 'vue-router'
 
 import WhConfirm from '@/components/base/WhConfirm.vue'
 import WhToast from '@/components/base/WhToast.vue'
+import PageTransition from '@/components/effects/PageTransition.vue'
 import AppFooter from '@/components/layout/AppFooter.vue'
 import AppHeader from '@/components/layout/AppHeader.vue'
 </script>
@@ -12,7 +13,11 @@ import AppHeader from '@/components/layout/AppHeader.vue'
     <a class="wh-skip-link" href="#main">跳到主要内容</a>
     <AppHeader />
     <main id="main" class="app-shell__main" tabindex="-1">
-      <RouterView />
+      <RouterView v-slot="{ Component, route }">
+        <PageTransition name="page" mode="out-in">
+          <component :is="Component" :key="route.path" />
+        </PageTransition>
+      </RouterView>
     </main>
     <AppFooter />
     <WhToast />

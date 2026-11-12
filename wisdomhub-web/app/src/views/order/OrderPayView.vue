@@ -62,6 +62,10 @@ const remainingSeconds = computed(() => {
 
 const expired = computed(() => order.value?.state === 0 && remainingSeconds.value <= 0)
 
+const countdownUrgent = computed(
+  () => order.value?.state === 0 && remainingSeconds.value > 0 && remainingSeconds.value <= 60,
+)
+
 const countdownText = computed(() => {
   const total = remainingSeconds.value
   const hours = Math.floor(total / 3600)
@@ -296,7 +300,7 @@ useSeo({
           <div
             v-if="order.state === 0"
             class="order-deadline"
-            :class="{ 'is-expired': expired }"
+            :class="{ 'is-expired': expired, 'is-urgent': countdownUrgent }"
             aria-live="polite"
           >
             <template v-if="expired">订单已过期，请返回专栏重新下单。</template>
@@ -306,7 +310,13 @@ useSeo({
           </div>
 
           <div v-if="order.state === 1" class="order-success" role="status">
-            <p class="order-success__eyebrow">[ PAID ]</p>
+            <div class="order-success__head">
+              <svg class="order-success__check" viewBox="0 0 64 64" aria-hidden="true">
+                <circle cx="32" cy="32" r="28" />
+                <path pathLength="1" d="M20 33.5 28.5 42 45 24" />
+              </svg>
+              <p class="order-success__eyebrow">[ PAID ]</p>
+            </div>
             <h2>支付成功，权益已开通</h2>
             <p>现在可以阅读该专栏的付费内容。</p>
           </div>
@@ -629,6 +639,28 @@ a.order-item__title:hover {
   color: var(--verm-deep);
 }
 
+.order-deadline.is-urgent {
+  border-color: var(--verm);
+  background: rgb(255 59 31 / 6%);
+  color: var(--verm-deep);
+}
+
+.order-deadline.is-urgent b {
+  display: inline-block;
+  color: var(--verm);
+  animation: deadline-pulse 1s ease-in-out infinite;
+}
+
+@keyframes deadline-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.08);
+  }
+}
+
 .order-success {
   display: grid;
   gap: var(--space-2);
@@ -636,6 +668,56 @@ a.order-item__title:hover {
   border: 1px solid var(--ink);
   background: var(--acid);
   color: var(--ink);
+}
+
+.order-success__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.order-success__check {
+  flex: none;
+  width: 42px;
+  height: 42px;
+  overflow: visible;
+}
+
+.order-success__check circle {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  opacity: 0.35;
+  transform-origin: 32px 32px;
+  animation: order-check-ring 480ms var(--anim-ease-out) both;
+}
+
+.order-success__check path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 3.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: order-check-draw 520ms 120ms var(--anim-ease-out) forwards;
+}
+
+@keyframes order-check-ring {
+  from {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  to {
+    opacity: 0.35;
+    transform: scale(1);
+  }
+}
+
+@keyframes order-check-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
 }
 
 .order-success__eyebrow {
@@ -786,6 +868,22 @@ a.order-item__title:hover {
 
   .order-item__title {
     white-space: normal;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .order-deadline.is-urgent b {
+    animation: none;
+  }
+
+  .order-success__check circle {
+    animation: none;
+    opacity: 0.35;
+  }
+
+  .order-success__check path {
+    animation: none;
+    stroke-dashoffset: 0;
   }
 }
 </style>

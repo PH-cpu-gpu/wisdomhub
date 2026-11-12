@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 
 import { isApiError } from '@/api/error'
@@ -53,6 +53,19 @@ const detailLoading = ref(true)
 const detailError = ref('')
 const notFound = ref(false)
 
+const proseRef = ref<HTMLElement | null>(null)
+const activeTocId = ref('')
+const readingProgress = ref(0)
+const showReadingRing = ref(false)
+const readingPercent = computed(() => Math.round(readingProgress.value * 100))
+const READING_RING_LENGTH = 2 * Math.PI * 20
+const readingRingOffset = computed(
+  () => READING_RING_LENGTH * (1 - readingProgress.value),
+)
+
+let scrollFrame = 0
+const copyTimers = new Set<number>()
+
 const related = ref<RecommendationItemVO[]>([])
 const relatedLoading = ref(false)
 const relatedError = ref('')
@@ -95,6 +108,104 @@ function prepareContent(html: string | null): void {
     }
   })
   contentHtml.value = template.innerHTML
+  void nextTick(enhanceCodeBlocks)
+}
+
+/** 为正文代码块补一个复制按钮；v-html 重渲染后按钮会随之重建 */
+function enhanceCodeBlocks(): void {
+  const root = proseRef.value
+  if (!root) return
+
+  root.querySelectorAll<HTMLPreElement>('pre').forEach((pre) => {
+    if (pre.parentElement?.classList.contains('article-code')) return
+
+    const wrapper = document.createElement('div')
+    wrapper.className = 'article-code'
+    pre.parentNode?.insertBefore(wrapper, pre)
+    wrapper.appendChild(pre)
+
+    const button = document.createElement('button')
+    button.type = 'button'
+    button.className = 'article-code__copy'
+    button.textContent = '复制'
+    button.setAttribute('aria-label', '复制代码')
+    wrapper.appendChild(button)
+  })
+}
+
+function onProseClick(event: MouseEvent): void {
+  const target = event.target as HTMLElement | null
+  const button = target?.closest<HTMLButtonElement>('.article-code__copy')
+  if (!button) return
+
+  const wrapper = button.closest('.article-code')
+  const code = wrapper?.querySelector('pre code')?.textContent ?? ''
+  if (!code) return
+
+  void copyCode(button, code)
+}
+
+async function copyCode(button: HTMLButtonElement, code: string): Promise<void> {
+  let copied = false
+  try {
+    await navigator.clipboard.writeText(code)
+    copied = true
+  } catch {
+    // 非安全上下文（http）没有 clipboard API，退回到 execCommand
+    const area = document.createElement('textarea')
+    area.value = code
+    area.setAttribute('readonly', '')
+    area.style.position = 'fixed'
+    area.style.opacity = '0'
+    document.body.appendChild(area)
+    area.select()
+    copied = document.execCommand('copy')
+    area.remove()
+  }
+
+  button.textContent = copied ? '已复制' : '复制失败'
+  button.classList.toggle('is-copied', copied)
+  const timer = window.setTimeout(() => {
+    button.textContent = '复制'
+    button.classList.remove('is-copied')
+    copyTimers.delete(timer)
+  }, 1600)
+  copyTimers.add(timer)
+}
+
+function scrollToTop(): void {
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
+function updateReadingState(): void {
+  scrollFrame = 0
+
+  const prose = proseRef.value
+  if (!prose) {
+    showReadingRing.value = false
+    activeTocId.value = ''
+    return
+  }
+
+  const top = prose.getBoundingClientRect().top + window.scrollY
+  const height = prose.offsetHeight
+  const anchor = window.scrollY + window.innerHeight * 0.5
+  const ratio = height > 0 ? (anchor - top) / height : 0
+  readingProgress.value = Math.min(1, Math.max(0, ratio))
+  showReadingRing.value = window.scrollY > 160
+
+  const headings = prose.querySelectorAll<HTMLElement>('h2[id], h3[id]')
+  let current = ''
+  for (const heading of headings) {
+    if (heading.getBoundingClientRect().top <= 160) current = heading.id
+    else break
+  }
+  activeTocId.value = current
+}
+
+function onScroll(): void {
+  if (scrollFrame) return
+  scrollFrame = window.requestAnimationFrame(updateReadingState)
 }
 
 async function loadState(id: string): Promise<void> {
@@ -139,6 +250,9 @@ async function loadDetail(): Promise<void> {
   toc.value = []
   commentTotal.value = null
   interaction.value = null
+  activeTocId.value = ''
+  readingProgress.value = 0
+  showReadingRing.value = false
 
   if (!id) {
     detailLoading.value = false
@@ -157,6 +271,7 @@ async function loadDetail(): Promise<void> {
     prepareContent(data.html)
     void ensureAuthors([data.authorId])
     void report(data.articleId)
+    void nextTick(updateReadingState)
   } catch (error) {
     if (request !== detailRequest) return
 
@@ -293,6 +408,18 @@ watch(
   { immediate: true },
 )
 
+onMounted(() => {
+  window.addEventListener('scroll', onScroll, { passive: true })
+  updateReadingState()
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('scroll', onScroll)
+  if (scrollFrame) window.cancelAnimationFrame(scrollFrame)
+  for (const timer of copyTimers) window.clearTimeout(timer)
+  copyTimers.clear()
+})
+
 useSeo({
   title: computed(() => detail.value?.title ?? '文章详情'),
   description: computed(() => detail.value?.summary ?? 'WisdomHub 文章详情。'),
@@ -354,7 +481,13 @@ useSeo({
               :columns="detail.columns"
               @purchased="loadDetail"
             />
-            <div v-else class="article-prose" v-html="contentHtml"></div>
+            <div
+              v-else
+              ref="proseRef"
+              class="article-prose"
+              v-html="contentHtml"
+              @click="onProseClick"
+            ></div>
 
             <footer class="article-actions">
               <button
@@ -420,7 +553,10 @@ useSeo({
                   v-for="item in toc"
                   :key="item.id"
                   class="article-toc__item"
-                  :class="`article-toc__item--${item.level}`"
+                  :class="[
+                    `article-toc__item--${item.level}`,
+                    { 'is-active': activeTocId === item.id },
+                  ]"
                 >
                   <a :href="`#${item.id}`" @click.prevent="scrollToSection(item.id)">
                     {{ item.text }}
@@ -459,6 +595,28 @@ useSeo({
           </aside>
         </div>
       </template>
+
+      <Transition name="reading-ring">
+        <button
+          v-if="showReadingRing && !detailLoading"
+          class="reading-ring"
+          type="button"
+          :aria-label="`回到顶部，已阅读 ${readingPercent}%`"
+          @click="scrollToTop"
+        >
+          <svg viewBox="0 0 48 48" aria-hidden="true">
+            <circle class="reading-ring__track" cx="24" cy="24" r="20" />
+            <circle
+              class="reading-ring__value"
+              cx="24"
+              cy="24"
+              r="20"
+              :style="{ strokeDashoffset: readingRingOffset }"
+            />
+          </svg>
+          <span class="reading-ring__label">{{ readingPercent }}%</span>
+        </button>
+      </Transition>
     </div>
   </PageContainer>
 </template>
@@ -614,6 +772,39 @@ useSeo({
   font-size: inherit;
 }
 
+.article-prose :deep(.article-code) {
+  position: relative;
+  margin: 1.6em 0;
+}
+
+.article-prose :deep(.article-code pre) {
+  margin: 0;
+}
+
+.article-prose :deep(.article-code__copy) {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 3px 8px;
+  border: 1px solid rgb(255 255 255 / 32%);
+  background: rgb(255 255 255 / 8%);
+  color: var(--bone);
+  font-family: var(--mono);
+  font-size: var(--text-2xs);
+  cursor: pointer;
+  transition:
+    background var(--dur) var(--ease),
+    border-color var(--dur) var(--ease),
+    color var(--dur) var(--ease);
+}
+
+.article-prose :deep(.article-code__copy:hover),
+.article-prose :deep(.article-code__copy.is-copied) {
+  border-color: var(--acid);
+  background: var(--acid);
+  color: var(--ink);
+}
+
 .article-prose :deep(code) {
   padding: 1px 5px;
   background: var(--surface-strong);
@@ -749,15 +940,24 @@ useSeo({
 }
 
 .article-toc__item a {
+  display: inline-block;
   color: var(--text-muted);
   font-size: var(--text-sm);
   line-height: var(--leading-snug);
   text-decoration: none;
-  transition: color var(--dur) var(--ease);
+  transition:
+    color var(--dur) var(--ease),
+    transform var(--dur) var(--ease);
 }
 
 .article-toc__item a:hover {
   color: var(--verm-deep);
+}
+
+.article-toc__item.is-active a {
+  color: var(--ink);
+  font-weight: var(--weight-semibold);
+  transform: translateX(4px);
 }
 
 .article-toc__item--3 {
@@ -833,6 +1033,74 @@ useSeo({
   text-underline-offset: 3px;
 }
 
+.reading-ring {
+  position: fixed;
+  right: clamp(16px, 3vw, 32px);
+  bottom: clamp(16px, 3vw, 32px);
+  z-index: var(--z-sticky);
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  padding: 0;
+  border: 1px solid var(--ink);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--bone) 92%, transparent);
+  color: var(--ink);
+  cursor: pointer;
+  backdrop-filter: blur(10px);
+  transition:
+    transform var(--dur) var(--ease),
+    box-shadow var(--dur) var(--ease);
+}
+
+.reading-ring:hover {
+  transform: translateY(-2px);
+  box-shadow: 3px 3px 0 var(--ink);
+}
+
+.reading-ring svg {
+  position: absolute;
+  inset: 4px;
+  width: calc(100% - 8px);
+  height: calc(100% - 8px);
+  transform: rotate(-90deg);
+}
+
+.reading-ring__track {
+  fill: none;
+  stroke: var(--line-strong);
+  stroke-width: 2;
+}
+
+.reading-ring__value {
+  fill: none;
+  stroke: var(--verm);
+  stroke-width: 2;
+  stroke-dasharray: 125.66;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 120ms linear;
+}
+
+.reading-ring__label {
+  font-family: var(--mono);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-semibold);
+}
+
+.reading-ring-enter-active,
+.reading-ring-leave-active {
+  transition:
+    opacity var(--dur) var(--ease),
+    transform var(--dur) var(--ease);
+}
+
+.reading-ring-enter-from,
+.reading-ring-leave-to {
+  opacity: 0;
+  transform: translateY(8px) scale(0.9);
+}
+
 @media (max-width: 900px) {
   .article-layout {
     grid-template-columns: 1fr;
@@ -856,6 +1124,28 @@ useSeo({
 
   .article-prose {
     font-size: var(--text-base);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reading-ring,
+  .reading-ring__value,
+  .article-toc__item a {
+    transition: none;
+  }
+
+  .reading-ring-enter-active,
+  .reading-ring-leave-active {
+    transition: none;
+  }
+
+  .reading-ring-enter-from,
+  .reading-ring-leave-to {
+    transform: none;
+  }
+
+  .article-toc__item.is-active a {
+    transform: none;
   }
 }
 </style>

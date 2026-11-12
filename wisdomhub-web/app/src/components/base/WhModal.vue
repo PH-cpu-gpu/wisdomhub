@@ -198,7 +198,7 @@ useDismissibleLayer({
 
 .wh-modal-enter-active,
 .wh-modal-leave-active {
-  transition: opacity var(--dur) var(--ease);
+  transition: opacity var(--anim-normal) var(--anim-ease-out);
 }
 
 .wh-modal-enter-from,
@@ -208,7 +208,7 @@ useDismissibleLayer({
 
 .wh-modal-enter-active .wh-modal__panel,
 .wh-modal-leave-active .wh-modal__panel {
-  transition: transform var(--dur) var(--ease);
+  transition: transform var(--anim-normal) var(--anim-ease-out);
 }
 
 .wh-modal-enter-from .wh-modal__panel,

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, ref } from 'vue'
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 export interface WhTabItem {
   label: string
@@ -27,6 +27,48 @@ const emit = defineEmits<{
 }>()
 
 const tablistRef = ref<HTMLElement | null>(null)
+const indicatorReady = ref(false)
+const indicatorStyle = ref<Record<string, string>>({
+  transform: 'translateX(0px) scaleX(0)',
+})
+let resizeObserver: ResizeObserver | null = null
+
+function measureIndicator(): void {
+  const root = tablistRef.value
+  if (!root || props.variant !== 'line') return
+
+  const active = root.querySelector<HTMLElement>(`[data-value="${props.modelValue}"]`)
+  if (!active || active.offsetWidth === 0) {
+    indicatorStyle.value = { transform: 'translateX(0px) scaleX(0)' }
+    return
+  }
+
+  const left = active.offsetLeft + 8
+  const width = Math.max(0, active.offsetWidth - 16)
+  indicatorStyle.value = { transform: `translateX(${left}px) scaleX(${width})` }
+}
+
+onMounted(() => {
+  void nextTick(() => {
+    measureIndicator()
+    indicatorReady.value = true
+
+    if (tablistRef.value && typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(measureIndicator)
+      resizeObserver.observe(tablistRef.value)
+    }
+  })
+})
+
+onBeforeUnmount(() => {
+  resizeObserver?.disconnect()
+  resizeObserver = null
+})
+
+watch(
+  () => [props.modelValue, props.items, props.variant, props.size],
+  () => void nextTick(measureIndicator),
+)
 
 function select(item: WhTabItem): void {
   if (item.disabled || item.value === props.modelValue) return
@@ -85,6 +127,14 @@ function onKeydown(event: KeyboardEvent): void {
     role="tablist"
     @keydown="onKeydown"
   >
+    <span
+      v-if="variant === 'line'"
+      class="wh-tabs__indicator"
+      :class="{ 'is-ready': indicatorReady }"
+      :style="indicatorStyle"
+      aria-hidden="true"
+    ></span>
+
     <button
       v-for="item in items"
       :key="item.value"
@@ -106,9 +156,25 @@ function onKeydown(event: KeyboardEvent): void {
 
 <style scoped>
 .wh-tabs {
+  position: relative;
   display: flex;
   gap: var(--space-1);
   border-bottom: 1px solid var(--line);
+}
+
+.wh-tabs__indicator {
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  width: 1px;
+  height: 2px;
+  background: var(--verm);
+  transform-origin: left center;
+  pointer-events: none;
+}
+
+.wh-tabs__indicator.is-ready {
+  transition: transform var(--dur) var(--ease-out);
 }
 
 .wh-tabs__tab {
@@ -137,23 +203,6 @@ function onKeydown(event: KeyboardEvent): void {
   cursor: not-allowed;
 }
 
-.wh-tabs--line .wh-tabs__tab::after {
-  content: '';
-  position: absolute;
-  right: 8px;
-  bottom: -1px;
-  left: 8px;
-  height: 2px;
-  background: var(--verm);
-  transform: scaleX(0);
-  transform-origin: left;
-  transition: transform var(--dur) var(--ease);
-}
-
-.wh-tabs--line .wh-tabs__tab.is-active::after {
-  transform: scaleX(1);
-}
-
 .wh-tabs--pill {
   gap: 6px;
   border-bottom: 0;
@@ -162,6 +211,10 @@ function onKeydown(event: KeyboardEvent): void {
 .wh-tabs--pill .wh-tabs__tab {
   border: 1px solid var(--line-strong);
   background: transparent;
+  transition:
+    color var(--dur) var(--ease),
+    background var(--dur) var(--ease),
+    border-color var(--dur) var(--ease);
 }
 
 .wh-tabs--pill .wh-tabs__tab.is-active {

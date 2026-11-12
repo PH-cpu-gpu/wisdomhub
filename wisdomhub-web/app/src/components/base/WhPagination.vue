@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 import WhSelect from './WhSelect.vue'
 
@@ -63,13 +63,68 @@ function changePageSize(value: string | number | null): void {
   if (props.page !== 1) emit('update:page', 1)
   emit('change', { page: 1, pageSize: value })
 }
+
+const pagesRef = ref<HTMLElement | null>(null)
+const slabReady = ref(false)
+const slabStyle = ref<Record<string, string>>({
+  width: '32px',
+  transform: 'translateX(0px)',
+  opacity: '0',
+})
+let resizeObserver: ResizeObserver | null = null
+
+function measureSlab(): void {
+  const root = pagesRef.value
+  if (!root) return
+
+  const active = root.querySelector<HTMLElement>('.wh-pagination__button.is-active')
+  if (!active || active.offsetWidth === 0) {
+    slabStyle.value = { ...slabStyle.value, opacity: '0' }
+    return
+  }
+
+  slabStyle.value = {
+    width: `${active.offsetWidth}px`,
+    transform: `translateX(${active.offsetLeft}px)`,
+    opacity: '1',
+  }
+}
+
+onMounted(() => {
+  void nextTick(() => {
+    measureSlab()
+    slabReady.value = true
+
+    if (pagesRef.value && typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(measureSlab)
+      resizeObserver.observe(pagesRef.value)
+    }
+  })
+})
+
+onBeforeUnmount(() => {
+  resizeObserver?.disconnect()
+  resizeObserver = null
+})
+
+watch(
+  () => [props.page, props.pageSize, props.total, props.showTotal, props.showSizeChanger],
+  () => void nextTick(measureSlab),
+)
 </script>
 
 <template>
   <nav class="wh-pagination" aria-label="分页">
     <span v-if="showTotal" class="wh-pagination__total">共 {{ total }} 条</span>
 
-    <div class="wh-pagination__pages">
+    <div ref="pagesRef" class="wh-pagination__pages">
+      <span
+        class="wh-pagination__slab"
+        :class="{ 'is-ready': slabReady }"
+        :style="slabStyle"
+        aria-hidden="true"
+      ></span>
+
       <button
         class="wh-pagination__button"
         type="button"
@@ -150,12 +205,34 @@ function changePageSize(value: string | number | null): void {
 }
 
 .wh-pagination__pages {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 2px;
 }
 
+.wh-pagination__slab {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 32px;
+  border: 1px solid var(--ink);
+  background: var(--acid);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.wh-pagination__slab.is-ready {
+  transition:
+    transform var(--dur) var(--ease-out),
+    width var(--dur) var(--ease-out),
+    opacity var(--dur) var(--ease);
+}
+
 .wh-pagination__button {
+  position: relative;
+  z-index: 1;
   display: grid;
   place-items: center;
   width: 32px;
@@ -181,8 +258,8 @@ function changePageSize(value: string | number | null): void {
 }
 
 .wh-pagination__button.is-active {
-  border-color: var(--ink);
-  background: var(--acid);
+  border-color: transparent;
+  background: transparent;
   color: var(--ink);
   font-weight: var(--weight-bold);
 }

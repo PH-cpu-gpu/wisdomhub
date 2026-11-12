@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 
 import { isApiError } from '@/api/error'
@@ -55,6 +55,21 @@ const answerContent = ref('')
 const answerSubmitting = ref(false)
 const likePendingId = ref('')
 const expandedAnswerId = ref('')
+const celebratingAnswerId = ref('')
+let celebrationTimer: number | undefined
+
+function celebrateAccept(answerId: string): void {
+  if (celebrationTimer) window.clearTimeout(celebrationTimer)
+  celebratingAnswerId.value = answerId
+  celebrationTimer = window.setTimeout(() => {
+    celebratingAnswerId.value = ''
+    celebrationTimer = undefined
+  }, 1600)
+}
+
+onBeforeUnmount(() => {
+  if (celebrationTimer) window.clearTimeout(celebrationTimer)
+})
 
 const { authors, ensureAuthors } = useAuthorBrief()
 
@@ -310,6 +325,7 @@ async function toggleAccept(answer: AnswerVO): Promise<void> {
     toast.success(accepted ? '已取消采纳' : '已采纳回答')
     await loadQuestion()
     await loadAnswers()
+    if (!accepted) celebrateAccept(String(answer.answerId))
   } catch (err) {
     toast.error(isApiError(err) ? err.message : '采纳失败，请稍后重试。')
   }
@@ -427,6 +443,7 @@ useSeo({
                 :like-pending="likePendingId === answer.answerId"
                 :can-delete="answer.userId === auth.userId"
                 :can-accept="question.userId === auth.userId"
+                :celebrating="celebratingAnswerId === String(answer.answerId)"
                 @like="toggleLike"
                 @remove="removeAnswer"
                 @accept="toggleAccept"

@@ -148,8 +148,8 @@ const iconMap: Record<ToastType, string> = {
 .wh-toast-leave-active,
 .wh-toast-move {
   transition:
-    opacity var(--dur) var(--ease),
-    transform var(--dur) var(--ease);
+    opacity var(--anim-normal) var(--anim-ease-out),
+    transform var(--anim-normal) var(--anim-ease-out);
 }
 
 .wh-toast-enter-from,

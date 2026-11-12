@@ -2,6 +2,7 @@
 import { computed, ref, useId } from 'vue'
 
 import { useDismissibleLayer } from '@/composables/useDismissibleLayer'
+import { useMotionEnabled } from '@/composables/useMotionEnabled'
 
 const props = withDefaults(
   defineProps<{
@@ -31,6 +32,7 @@ const emit = defineEmits<{
 const panelRef = ref<HTMLElement | null>(null)
 const titleId = useId()
 const isOpen = computed(() => props.modelValue)
+const motionEnabled = useMotionEnabled()
 
 function close(): void {
   emit('update:modelValue', false)
@@ -51,7 +53,12 @@ useDismissibleLayer({
 
 <template>
   <Teleport to="body">
-    <Transition name="wh-drawer" @after-enter="emit('opened')" @after-leave="emit('closed')">
+    <Transition
+      name="wh-drawer"
+      :css="motionEnabled"
+      @after-enter="emit('opened')"
+      @after-leave="emit('closed')"
+    >
       <div v-if="modelValue" class="wh-drawer" role="presentation" @mousedown.self="onOverlay">
         <aside
           ref="panelRef"
@@ -176,7 +183,7 @@ useDismissibleLayer({
 
 .wh-drawer-enter-active,
 .wh-drawer-leave-active {
-  transition: opacity var(--dur) var(--ease);
+  transition: opacity var(--anim-normal) var(--anim-ease-out);
 }
 
 .wh-drawer-enter-from,
@@ -186,7 +193,7 @@ useDismissibleLayer({
 
 .wh-drawer-enter-active .wh-drawer__panel,
 .wh-drawer-leave-active .wh-drawer__panel {
-  transition: transform var(--dur) var(--ease);
+  transition: transform var(--anim-normal) var(--anim-ease-out);
 }
 
 .wh-drawer-enter-from .wh-drawer__panel,

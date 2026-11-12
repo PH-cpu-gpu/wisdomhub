@@ -101,6 +101,11 @@ watch(
   display: grid;
   gap: var(--space-3);
   min-width: 0;
+  transition: transform var(--dur) var(--ease);
+}
+
+.video-card:hover {
+  transform: translateY(-4px);
 }
 
 .video-card__cover {

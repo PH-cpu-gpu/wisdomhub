@@ -12,6 +12,12 @@ import { listHot } from '@/api/modules/tag'
 import WhButton from '@/components/base/WhButton.vue'
 import WhInput from '@/components/base/WhInput.vue'
 import ArticleCard from '@/components/business/ArticleCard.vue'
+import AnimatedCounter from '@/components/effects/AnimatedCounter.vue'
+import FluidBackground from '@/components/effects/FluidBackground.vue'
+import GlowBorder from '@/components/effects/GlowBorder.vue'
+import ParticleBackground from '@/components/effects/ParticleBackground.vue'
+import TiltCard from '@/components/effects/TiltCard.vue'
+import TypewriterText from '@/components/effects/TypewriterText.vue'
 import HomeSection from '@/components/home/HomeSection.vue'
 import PageContainer from '@/components/layout/PageContainer.vue'
 import VideoCard from '@/components/video/VideoCard.vue'
@@ -164,6 +170,12 @@ const latestArticlesEmpty = computed(
     !latestArticles.value?.items.length,
 )
 
+const totalArticleCount = computed(() =>
+  (hotArticles.value ?? []).reduce((sum, a) => sum + (a.viewCount || 0), 0),
+)
+const totalTagCount = computed(() => hotTags.value?.length ?? 0)
+const totalQuestionCount = computed(() => hotQuestions.value?.total ?? 0)
+
 function padIndex(index: number): string {
   return String(index + 1).padStart(2, '0')
 }
@@ -202,15 +214,35 @@ void loadHome()
   <PageContainer tag="div">
     <div class="home-page">
       <section class="home-hero">
-        <div class="home-hero__main">
-          <p class="home-hero__eyebrow">[ WISDOMHUB / HOME ]</p>
-          <h1 v-if="loggedIn">{{ greeting }}，<br />欢迎回来。</h1>
-          <h1 v-else>把散落的知识，<br />连成一张图。</h1>
-          <p v-if="!loggedIn" class="home-hero__lede">
+        <FluidBackground :colors="['#c9ff2e', '#ff3b1f', '#3b1dff']" :blur="100" :opacity="0.15" />
+        <ParticleBackground
+          :particle-count="50"
+          :connection-distance="120"
+          particle-color="#c9ff2e"
+          line-color="#c9ff2e"
+          :speed="0.3"
+        />
+
+        <div class="home-hero__content">
+          <div class="home-hero__main" v-reveal="{ animation: 'left', delay: 100 }">
+            <p class="home-hero__eyebrow">
+              <span class="home-hero__eyebrow-dot" />
+              [ WISDOMHUB / HOME ]
+            </p>
+            <h1 class="home-hero__title">
+              <TypewriterText
+                v-if="loggedIn"
+                :text="`${greeting}，\n欢迎回来。`"
+                :speed="50"
+                :delay="500"
+              />
+              <TypewriterText v-else :text="'把散落的知识，\n连成一张图。'" :speed="60" :delay="300" />
+            </h1>
+          <p v-if="!loggedIn" class="home-hero__lede" v-reveal="{ animation: 'up', delay: 400 }">
             文章、问答、搜索与 AI，共用同一张知识网络。
           </p>
 
-          <form class="home-search" @submit.prevent="submitSearch">
+          <form class="home-search" @submit.prevent="submitSearch" v-reveal="{ animation: 'up', delay: 600 }">
             <WhInput
               v-model="keyword"
               size="lg"
@@ -220,7 +252,7 @@ void loadHome()
             <WhButton type="submit" size="lg">搜索</WhButton>
           </form>
 
-          <div class="home-hero__actions">
+          <div class="home-hero__actions" v-reveal="{ animation: 'up', delay: 800 }">
             <template v-if="loggedIn">
               <RouterLink class="home-hero__cta" to="/editor/new">写一篇文章</RouterLink>
               <RouterLink class="home-hero__cta" to="/videos/upload">发一段视频</RouterLink>
@@ -232,25 +264,57 @@ void loadHome()
               <RouterLink class="home-hero__ghost" to="/register">注册</RouterLink>
             </template>
           </div>
+
+          <div class="home-stats" v-reveal="{ animation: 'up', delay: 1000 }">
+            <div class="home-stat">
+              <AnimatedCounter :value="totalArticleCount" class="home-stat__value" />
+              <span class="home-stat__label">次浏览</span>
+            </div>
+            <div class="home-stat-divider" />
+            <div class="home-stat">
+              <AnimatedCounter :value="totalTagCount" class="home-stat__value" />
+              <span class="home-stat__label">个标签</span>
+            </div>
+            <div class="home-stat-divider" />
+            <div class="home-stat">
+              <AnimatedCounter :value="totalQuestionCount" class="home-stat__value" />
+              <span class="home-stat__label">个问题</span>
+            </div>
+          </div>
         </div>
 
-        <div class="home-hero__graphic" aria-hidden="true">
+        <div class="home-hero__graphic" aria-hidden="true" v-reveal="{ animation: 'scale', delay: 300 }">
           <svg class="home-graph" viewBox="0 0 340 340" fill="none">
+            <defs>
+              <filter id="glow">
+                <feGaussianBlur stdDeviation="3" result="coloredBlur" />
+                <feMerge>
+                  <feMergeNode in="coloredBlur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+              <linearGradient id="lineGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#c9ff2e" stop-opacity="0.8" />
+                <stop offset="100%" stop-color="#ff3b1f" stop-opacity="0.4" />
+              </linearGradient>
+            </defs>
+
             <g class="home-graph__lines">
-              <path d="M65 82 L170 170" />
-              <path d="M275 72 L170 170" />
-              <path d="M72 272 L170 170" />
-              <path d="M286 258 L170 170" />
-              <path d="M65 82 L275 72" opacity=".3" />
-              <path d="M72 272 L286 258" opacity=".3" />
+              <path d="M65 82 L170 170" stroke="url(#lineGradient)" stroke-width="1.5" class="graph-line" />
+              <path d="M275 72 L170 170" stroke="url(#lineGradient)" stroke-width="1.5" class="graph-line" style="animation-delay: 0.2s" />
+              <path d="M72 272 L170 170" stroke="url(#lineGradient)" stroke-width="1.5" class="graph-line" style="animation-delay: 0.4s" />
+              <path d="M286 258 L170 170" stroke="url(#lineGradient)" stroke-width="1.5" class="graph-line" style="animation-delay: 0.6s" />
+              <path d="M65 82 L275 72" stroke="url(#lineGradient)" stroke-width="1" opacity=".3" class="graph-line" style="animation-delay: 0.8s" />
+              <path d="M72 272 L286 258" stroke="url(#lineGradient)" stroke-width="1" opacity=".3" class="graph-line" style="animation-delay: 1s" />
             </g>
             <g class="home-graph__nodes">
-              <rect x="20" y="60" width="90" height="34" />
-              <rect x="240" y="52" width="78" height="34" />
-              <rect x="30" y="255" width="84" height="34" />
-              <rect x="252" y="242" width="68" height="34" />
+              <rect x="20" y="60" width="90" height="34" class="graph-node" style="animation-delay: 0.3s" />
+              <rect x="240" y="52" width="78" height="34" class="graph-node" style="animation-delay: 0.5s" />
+              <rect x="30" y="255" width="84" height="34" class="graph-node" style="animation-delay: 0.7s" />
+              <rect x="252" y="242" width="68" height="34" class="graph-node" style="animation-delay: 0.9s" />
             </g>
-            <circle cx="170" cy="170" r="46" class="home-graph__core" />
+            <circle cx="170" cy="170" r="46" class="home-graph__core" filter="url(#glow)" />
+            <circle cx="170" cy="170" r="46" class="home-graph__core-pulse" />
             <text x="170" y="177" text-anchor="middle" class="home-graph__core-text">WH</text>
             <g class="home-graph__labels">
               <text x="65" y="81">文章</text>
@@ -258,9 +322,14 @@ void loadHome()
               <text x="72" y="276">视频</text>
               <text x="286" y="263">AI</text>
             </g>
+            <circle class="graph-particle" cx="100" cy="120" r="2" />
+            <circle class="graph-particle" cx="240" cy="150" r="2" style="animation-delay: 1s" />
+            <circle class="graph-particle" cx="150" cy="250" r="2" style="animation-delay: 2s" />
+            <circle class="graph-particle" cx="220" cy="100" r="2" style="animation-delay: 3s" />
           </svg>
         </div>
-      </section>
+      </div>
+    </section>
 
       <div class="home-sections">
         <HomeSection
@@ -277,15 +346,21 @@ void loadHome()
           @retry="executeRecommendations"
         >
           <div class="home-article-grid">
-            <ArticleCard
-              v-for="item in recommendedArticles"
+            <TiltCard
+              v-for="(item, index) in recommendedArticles"
               :key="item.articleId"
-              :article="item"
-              :author="authors[item.authorId]"
-              :counts="countsFor(CONTENT_TARGET_TYPE.ARTICLE, item.articleId)"
-              compact
-              :tags="item.tags"
-            />
+              :max-tilt="8"
+              :scale="1.02"
+              v-reveal="{ animation: 'up', delay: index * 100 }"
+            >
+              <ArticleCard
+                :article="item"
+                :author="authors[item.authorId]"
+                :counts="countsFor(CONTENT_TARGET_TYPE.ARTICLE, item.articleId)"
+                compact
+                :tags="item.tags"
+              />
+            </TiltCard>
           </div>
         </HomeSection>
 
@@ -298,13 +373,19 @@ void loadHome()
           skeleton="article"
         >
           <div class="home-video-grid">
-            <VideoCard
-              v-for="item in recommendedVideos"
+            <TiltCard
+              v-for="(item, index) in recommendedVideos"
               :key="item.videoId ?? item.articleId"
-              :video="toVideoItem(item)"
-              :author="authors[item.authorId]"
-              :counts="countsFor(CONTENT_TARGET_TYPE.VIDEO, item.videoId ?? item.articleId)"
-            />
+              :max-tilt="10"
+              :scale="1.03"
+              v-reveal="{ animation: 'scale', delay: index * 100 }"
+            >
+              <VideoCard
+                :video="toVideoItem(item)"
+                :author="authors[item.authorId]"
+                :counts="countsFor(CONTENT_TARGET_TYPE.VIDEO, item.videoId ?? item.articleId)"
+              />
+            </TiltCard>
           </div>
         </HomeSection>
 
@@ -321,19 +402,25 @@ void loadHome()
           @retry="executeHotTags"
         >
           <div class="home-tags">
-            <RouterLink
+            <GlowBorder
               v-for="(tag, index) in hotTags"
               :key="tag.tagId"
-              class="home-tag"
-              :to="{ name: 'tech-detail', params: { tagId: tag.tagId } }"
+              color="var(--acid)"
+              :animated="false"
+              v-reveal="{ animation: 'left', delay: index * 80 }"
             >
-              <span class="home-tag__index">{{ padIndex(index) }}</span>
-              <span class="home-tag__name">{{ tag.name }}</span>
-              <span class="home-tag__foot">
-                <span>{{ tag.articleCount }} 篇</span>
-                <span aria-hidden="true">↗</span>
-              </span>
-            </RouterLink>
+              <RouterLink
+                class="home-tag"
+                :to="{ name: 'tech-detail', params: { tagId: tag.tagId } }"
+              >
+                <span class="home-tag__index">{{ padIndex(index) }}</span>
+                <span class="home-tag__name">{{ tag.name }}</span>
+                <span class="home-tag__foot">
+                  <span>{{ tag.articleCount }} 篇</span>
+                  <span class="home-tag__arrow" aria-hidden="true">&#8599;</span>
+                </span>
+              </RouterLink>
+            </GlowBorder>
           </div>
         </HomeSection>
 
@@ -350,15 +437,21 @@ void loadHome()
           @retry="executeHotArticles"
         >
           <div class="home-article-grid">
-            <ArticleCard
-              v-for="article in hotArticles"
+            <TiltCard
+              v-for="(article, index) in hotArticles"
               :key="article.articleId"
-              :article="article"
-              :author="authors[article.authorId]"
-              :counts="countsFor(CONTENT_TARGET_TYPE.ARTICLE, article.articleId)"
-              compact
-              :tags="article.tags"
-            />
+              :max-tilt="8"
+              :scale="1.02"
+              v-reveal="{ animation: 'up', delay: index * 100 }"
+            >
+              <ArticleCard
+                :article="article"
+                :author="authors[article.authorId]"
+                :counts="countsFor(CONTENT_TARGET_TYPE.ARTICLE, article.articleId)"
+                compact
+                :tags="article.tags"
+              />
+            </TiltCard>
           </div>
         </HomeSection>
 
@@ -379,6 +472,7 @@ void loadHome()
               v-for="(question, index) in hotQuestions?.items ?? []"
               :key="question.questionId"
               class="home-question"
+              v-reveal="{ animation: 'right', delay: index * 100 }"
             >
               <span class="home-question__index">{{ padIndex(index) }}</span>
               <div class="home-question__main">
@@ -419,14 +513,20 @@ void loadHome()
           @retry="executeLatestArticles"
         >
           <div class="home-article-grid">
-            <ArticleCard
-              v-for="article in latestArticles?.items ?? []"
+            <TiltCard
+              v-for="(article, index) in latestArticles?.items ?? []"
               :key="article.articleId"
-              :article="article"
-              :author="authors[article.authorId]"
-              :counts="countsFor(CONTENT_TARGET_TYPE.ARTICLE, article.articleId)"
-              compact
-            />
+              :max-tilt="8"
+              :scale="1.02"
+              v-reveal="{ animation: 'up', delay: index * 100 }"
+            >
+              <ArticleCard
+                :article="article"
+                :author="authors[article.authorId]"
+                :counts="countsFor(CONTENT_TARGET_TYPE.ARTICLE, article.articleId)"
+                compact
+              />
+            </TiltCard>
           </div>
         </HomeSection>
       </div>
@@ -440,36 +540,29 @@ void loadHome()
   gap: clamp(32px, 5vw, 64px);
 }
 
-/* ---------- Hero ---------- */
-
 .home-hero {
   position: relative;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: clamp(24px, 4vw, 56px);
-  align-items: center;
   padding: clamp(28px, 5vw, 56px);
   overflow: hidden;
   background: var(--ink);
   color: var(--bone);
   box-shadow: var(--shadow-hard);
+  min-height: 500px;
+  display: flex;
+  align-items: center;
 }
 
-.home-hero::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background-image:
-    linear-gradient(var(--line-inverse) 1px, transparent 1px),
-    linear-gradient(90deg, var(--line-inverse) 1px, transparent 1px);
-  background-size: 48px 48px;
-  opacity: 0.2;
-  pointer-events: none;
+.home-hero__content {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: clamp(24px, 4vw, 56px);
+  align-items: center;
+  width: 100%;
 }
 
 .home-hero__main {
-  position: relative;
-  z-index: 1;
   display: grid;
   align-content: center;
   gap: var(--space-4);
@@ -477,19 +570,36 @@ void loadHome()
 }
 
 .home-hero__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
   color: var(--verm);
   font-family: var(--mono);
   font-size: var(--text-2xs);
   letter-spacing: var(--tracking-wider);
 }
 
-.home-hero h1 {
-  color: var(--bone);
+.home-hero__eyebrow-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--verm);
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(1.5); }
+}
+
+.home-hero__title {
   font-family: var(--serif);
   font-size: clamp(2.25rem, 4.2vw, 4rem);
   font-weight: var(--weight-black);
   line-height: 1.05;
   letter-spacing: var(--tracking-tight);
+  color: var(--bone);
+  min-height: 2.2em;
 }
 
 .home-hero__lede {
@@ -507,18 +617,9 @@ void loadHome()
   padding-top: var(--space-2);
 }
 
-.home-search :deep(.wh-field) {
-  flex: 1;
-}
-
-.home-search :deep(.wh-input) {
-  min-height: 48px;
-  background: var(--bone);
-}
-
-.home-search :deep(.wh-button) {
-  min-height: 48px;
-}
+.home-search :deep(.wh-field) { flex: 1; }
+.home-search :deep(.wh-input) { min-height: 48px; background: var(--bone); }
+.home-search :deep(.wh-button) { min-height: 48px; }
 
 .home-hero__actions {
   display: flex;
@@ -533,25 +634,34 @@ void loadHome()
   align-items: center;
   justify-content: center;
   min-height: 40px;
-  padding-inline: 16px;
+  padding-inline: 20px;
   border: 1px solid var(--acid);
-  font-family: var(--sans);
+  font-family: var(--mono);
   font-size: var(--text-sm);
   font-weight: var(--weight-semibold);
   text-decoration: none;
-  transition:
-    background var(--dur) var(--ease),
-    color var(--dur) var(--ease);
+  transition: all var(--dur) var(--ease);
+  position: relative;
+  overflow: hidden;
 }
 
-.home-hero__cta {
+.home-hero__cta::before {
+  content: '';
+  position: absolute;
+  inset: 0;
   background: var(--acid);
-  color: var(--ink);
+  transform: translateX(-100%);
+  transition: transform var(--dur-slow) var(--ease);
+  z-index: -1;
 }
+
+.home-hero__cta:hover::before { transform: translateX(0); }
+.home-hero__cta { background: var(--acid); color: var(--ink); }
 
 .home-hero__cta:hover {
-  background: transparent;
-  color: var(--acid);
+  color: var(--ink);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgb(201 255 46 / 40%);
 }
 
 .home-hero__ghost {
@@ -563,6 +673,37 @@ void loadHome()
 .home-hero__ghost:hover {
   border-color: var(--acid);
   color: var(--acid);
+  transform: translateY(-2px);
+}
+
+.home-stats {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding-top: var(--space-4);
+  margin-top: var(--space-2);
+}
+
+.home-stat { display: flex; flex-direction: column; gap: 2px; }
+
+.home-stat__value {
+  font-family: var(--mono);
+  font-size: var(--text-xl);
+  font-weight: var(--weight-black);
+  color: var(--acid);
+}
+
+.home-stat__label {
+  font-family: var(--mono);
+  font-size: var(--text-2xs);
+  color: color-mix(in srgb, var(--bone) 60%, transparent);
+  letter-spacing: var(--tracking-wide);
+}
+
+.home-stat-divider {
+  width: 1px;
+  height: 32px;
+  background: color-mix(in srgb, var(--bone) 20%, transparent);
 }
 
 .home-hero__graphic {
@@ -572,37 +713,52 @@ void loadHome()
   justify-content: center;
 }
 
-.home-graph {
-  width: min(340px, 30vw);
-  height: auto;
-  overflow: visible;
-}
-
-.home-graph__lines {
-  color: color-mix(in srgb, var(--bone) 28%, transparent);
-}
+.home-graph { width: min(340px, 30vw); height: auto; overflow: visible; }
 
 .home-graph__lines path {
-  stroke: currentColor;
-  stroke-width: 1;
+  stroke-dasharray: 300;
+  stroke-dashoffset: 300;
+  animation: draw-line 1.5s ease-out forwards;
 }
 
-.home-graph__nodes rect {
+@keyframes draw-line { to { stroke-dashoffset: 0; } }
+
+.graph-node {
   fill: var(--ink);
   stroke: var(--acid);
-  stroke-width: 1;
+  stroke-width: 1.5;
+  opacity: 0;
+  animation: node-appear 0.5s ease-out forwards;
+}
+
+@keyframes node-appear {
+  from { opacity: 0; transform: scale(0.8); }
+  to { opacity: 1; transform: scale(1); }
 }
 
 .home-graph__core {
   fill: var(--acid);
+  animation: core-pulse 3s ease-in-out infinite;
 }
 
-.home-graph__core-text {
-  fill: var(--ink);
-  font-family: var(--serif);
-  font-size: 22px;
-  font-weight: 900;
+@keyframes core-pulse {
+  0%, 100% { filter: drop-shadow(0 0 10px var(--acid)); }
+  50% { filter: drop-shadow(0 0 25px var(--acid)); }
 }
+
+.home-graph__core-pulse {
+  fill: none;
+  stroke: var(--acid);
+  stroke-width: 2;
+  animation: ring-expand 2s ease-out infinite;
+}
+
+@keyframes ring-expand {
+  0% { r: 46; opacity: 1; }
+  100% { r: 70; opacity: 0; }
+}
+
+.home-graph__core-text { fill: var(--ink); font-family: var(--serif); font-size: 22px; font-weight: 900; }
 
 .home-graph__labels text {
   fill: var(--acid);
@@ -613,12 +769,20 @@ void loadHome()
   dominant-baseline: middle;
 }
 
-/* ---------- Sections ---------- */
-
-.home-sections {
-  display: grid;
-  gap: clamp(36px, 5vw, 56px);
+.graph-particle {
+  fill: var(--acid);
+  opacity: 0.6;
+  animation: float-particle 4s ease-in-out infinite;
 }
+
+@keyframes float-particle {
+  0%, 100% { transform: translate(0, 0); opacity: 0.6; }
+  25% { transform: translate(10px, -15px); opacity: 1; }
+  50% { transform: translate(-5px, -30px); opacity: 0.4; }
+  75% { transform: translate(-15px, -15px); opacity: 0.8; }
+}
+
+.home-sections { display: grid; gap: clamp(36px, 5vw, 56px); }
 
 .home-article-grid {
   display: grid;
@@ -626,9 +790,9 @@ void loadHome()
   column-gap: clamp(24px, 4vw, 56px);
 }
 
-.home-article-grid :deep(.article-card) {
-  min-width: 0;
-}
+.home-article-grid :deep(.article-card) { min-width: 0; }
+.home-article-grid :deep(.tilt-card) { border-radius: var(--radius-sm); }
+.home-article-grid :deep(.tilt-card__glare) { border-radius: var(--radius-sm); }
 
 .home-video-grid {
   display: grid;
@@ -638,37 +802,29 @@ void loadHome()
 }
 
 @media (max-width: 1100px) {
-  .home-video-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
+  .home-video-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 .home-tags {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 1px;
-  border: 1px solid var(--line);
-  background: var(--line);
+  gap: var(--space-3);
 }
 
 .home-tag {
   display: grid;
   gap: var(--space-3);
   padding: var(--space-4);
-  background: var(--surface);
   text-decoration: none;
-  transition: background var(--dur) var(--ease);
+  transition: all var(--dur) var(--ease);
+  position: relative;
+  z-index: 1;
 }
 
-.home-tag:hover {
-  background: var(--acid);
-}
+.home-tag:hover { transform: translateY(-2px); }
+.home-tag:hover .home-tag__arrow { transform: translate(2px, -2px); }
 
-.home-tag__index {
-  color: var(--text-muted);
-  font-family: var(--mono);
-  font-size: var(--text-2xs);
-}
+.home-tag__index { color: var(--text-muted); font-family: var(--mono); font-size: var(--text-2xs); }
 
 .home-tag__name {
   color: var(--ink);
@@ -687,14 +843,12 @@ void loadHome()
   font-size: var(--text-2xs);
 }
 
-.home-tag:hover .home-tag__index,
-.home-tag:hover .home-tag__foot {
-  color: var(--ink);
-}
+.home-tag__arrow { transition: transform var(--dur) var(--ease); color: var(--verm); }
 
-.home-questions {
-  display: grid;
-}
+.home-tag:hover .home-tag__index,
+.home-tag:hover .home-tag__foot { color: var(--ink); }
+
+.home-questions { display: grid; }
 
 .home-question {
   display: grid;
@@ -703,23 +857,15 @@ void loadHome()
   gap: var(--space-4);
   padding-block: var(--space-4);
   border-top: var(--border);
+  transition: all var(--dur) var(--ease);
 }
 
-.home-question:first-child {
-  border-top: 0;
-}
+.home-question:hover { padding-left: var(--space-2); background: var(--surface); }
+.home-question:first-child { border-top: 0; }
 
-.home-question__index {
-  color: var(--text-muted);
-  font-family: var(--mono);
-  font-size: var(--text-2xs);
-}
+.home-question__index { color: var(--text-muted); font-family: var(--mono); font-size: var(--text-2xs); }
 
-.home-question__main {
-  display: grid;
-  gap: var(--space-2);
-  min-width: 0;
-}
+.home-question__main { display: grid; gap: var(--space-2); min-width: 0; }
 
 .home-question__title {
   color: var(--ink);
@@ -731,9 +877,7 @@ void loadHome()
   transition: color var(--dur) var(--ease);
 }
 
-.home-question__title:hover {
-  color: var(--verm-deep);
-}
+.home-question__title:hover { color: var(--verm-deep); }
 
 .home-question__meta {
   display: flex;
@@ -745,65 +889,45 @@ void loadHome()
 }
 
 .home-question__state {
-  padding: 2px 7px;
+  padding: 4px 10px;
   border: 1px solid var(--line-strong);
   color: var(--text-muted);
   font-family: var(--mono);
   font-size: var(--text-2xs);
   white-space: nowrap;
+  transition: all var(--dur) var(--ease);
 }
 
 .home-question__state.is-solved {
   border-color: var(--acid);
   background: var(--acid);
   color: var(--ink);
+  box-shadow: 0 0 10px rgb(201 255 46 / 30%);
 }
 
-/* ---------- Responsive ---------- */
-
 @media (max-width: 900px) {
-  .home-hero {
-    grid-template-columns: 1fr;
-  }
-
-  .home-hero__graphic {
-    display: none;
-  }
+  .home-hero__content { grid-template-columns: 1fr; }
+  .home-hero__graphic { display: none; }
+  .home-stats { justify-content: flex-start; }
 }
 
 @media (max-width: 720px) {
   .home-article-grid,
-  .home-video-grid {
-    grid-template-columns: 1fr;
-  }
+  .home-video-grid { grid-template-columns: 1fr; }
 
   .home-question {
     grid-template-columns: 32px minmax(0, 1fr);
     align-items: start;
   }
 
-  .home-question__state {
-    grid-column: 2;
-    justify-self: start;
-  }
+  .home-question__state { grid-column: 2; justify-self: start; }
+  .home-stats { flex-wrap: wrap; gap: var(--space-3); }
 }
 
 @media (max-width: 640px) {
-  .home-hero {
-    padding: var(--space-5);
-    box-shadow: var(--shadow-hard-sm);
-  }
-
-  .home-search {
-    flex-direction: column;
-  }
-
-  .home-search :deep(.wh-button) {
-    width: 100%;
-  }
-
-  .home-tags {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
+  .home-hero { padding: var(--space-5); box-shadow: var(--shadow-hard-sm); min-height: auto; }
+  .home-search { flex-direction: column; }
+  .home-search :deep(.wh-button) { width: 100%; }
+  .home-tags { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 </style>
