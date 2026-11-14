@@ -807,8 +807,12 @@ void loadHome()
 
 .home-tags {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--space-3);
+}
+
+@media (max-width: 900px) {
+  .home-tags { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 .home-tag {

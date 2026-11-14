@@ -128,6 +128,44 @@
       </div>
     </section>
 
+    <!-- ───────────────────── PRESS RUN / scroll-scrubbed ───────────────────── -->
+    <section class="press" id="press" data-press aria-label="印张过渡动画">
+      <div class="press__stage" data-press-stage>
+        <div class="press__media" data-press-media>
+          <img class="press__poster press__poster--start" data-press-poster src="assets/video/press-start.webp" width="1920" height="1080" alt="" aria-hidden="true" loading="lazy" decoding="async">
+          <img class="press__poster press__poster--end" data-press-poster-end src="assets/video/press-end.webp" width="1920" height="1080" alt="" aria-hidden="true" loading="lazy" decoding="async">
+          <video class="press__video" data-press-video data-press-src="assets/video/press-run.mp4" muted playsinline preload="none" aria-hidden="true"></video>
+        </div>
+
+        <div class="press__copy">
+          <p class="press__eyebrow"><span>[ PRESS RUN ]</span><span>四色 / 错位 / 叠印</span></p>
+          <div class="press__slabs">
+            <div class="press__slab is-on" data-press-slab="0">
+              <h2 class="press__title">知识，<br>先印在<em>纸上</em>。</h2>
+              <p class="press__lede">四层油墨在米色纸面上错位、叠印——黑是骨架，酸绿、朱红与紫是关系。每一次偏移，都是新的连接。</p>
+            </div>
+            <div class="press__slab" data-press-slab="1">
+              <h2 class="press__title">然后，<br>连成<em>一张图</em>。</h2>
+              <p class="press__lede">印张散开，64 个节点浮起，连线在纸面上生长成你已知的那张网。</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="press__hud" aria-hidden="true">
+          <span class="is-on" data-press-plate="0">PLATE 01 / ARCHIVE</span>
+          <span class="press__hud-mid">INK RUN — 4 PLATES</span>
+          <span data-press-plate="1">PLATE 02 / NETWORK</span>
+        </div>
+
+        <div class="press__meter" aria-hidden="true">
+          <span class="press__meter-num" data-press-num>00</span>
+          <span class="press__meter-track"><i data-press-meter></i></span>
+        </div>
+
+        <p class="press__hint" aria-hidden="true"><span>SCROLL TO PRINT</span><i></i></p>
+      </div>
+    </section>
+
     <!-- ───────────────────────── TICKER ───────────────────────── -->
     <div class="ticker" aria-hidden="true">
       <div class="ticker__track">
@@ -654,7 +692,7 @@
       </svg>
 
       <div class="cta__plate" aria-hidden="true">
-        <img src="assets/core-plate.webp" alt="" loading="lazy" decoding="async">
+        <img src="assets/cta-plate.webp" width="1280" height="731" alt="" loading="lazy" decoding="async">
       </div>
 
       <p class="eyebrow"><span>05</span> 开始 / START</p>
@@ -748,5 +786,6 @@
 
   <script src="main.js"></script>
   <script src="riso-plate.js" defer></script>
+  <script src="press-stage.js" defer></script>
 </body>
 </html>

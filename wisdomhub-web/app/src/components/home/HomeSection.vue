@@ -54,7 +54,7 @@ const errorMessage = computed(() => {
 
     <div v-if="loading" class="home-section__skeleton" :class="`is-${skeleton}`" aria-busy="true">
       <template v-if="skeleton === 'tag'">
-        <div v-for="index in 5" :key="index" class="home-skeleton-tag">
+        <div v-for="index in 8" :key="index" class="home-skeleton-tag">
           <WhSkeleton width="32%" height="10px" />
           <WhSkeleton width="72%" height="26px" />
           <WhSkeleton width="45%" height="10px" />
@@ -157,7 +157,7 @@ const errorMessage = computed(() => {
 }
 
 .home-section__skeleton.is-tag {
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 1px;
   border: 1px solid var(--line);
   background: var(--line);
@@ -205,6 +205,12 @@ const errorMessage = computed(() => {
 .home-section__state--error {
   border-color: var(--verm);
   color: var(--verm-deep);
+}
+
+@media (max-width: 900px) {
+  .home-section__skeleton.is-tag {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 720px) {
