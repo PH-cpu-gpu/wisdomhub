@@ -1,6 +1,6 @@
 # wisdomhub-agent
 
-WisdomHub 的 AI 引擎：对外提供会话聊天（问答 + 学习路线）与文章分析能力。
+WisdomHub 的 AI 引擎：对外提供会话聊天（问答 + 学习路线 + 文本问答）与文章分析能力。
 
 ## 技术栈
 
@@ -14,10 +14,10 @@ WisdomHub 的 AI 引擎：对外提供会话聊天（问答 + 学习路线）与
 ```text
 app/
 ├─ core/          配置、日志、错误、生命周期、依赖容器
-├─ contracts/     对外契约：SSE、Chat、会话、分析
+├─ contracts/     对外契约：SSE 传输事件、聊天业务事件、Chat、会话、分析
 ├─ chat/          会话图与 SSE 聊天用例
 ├─ features/      会话域与文章分析用例
-├─ capabilities/  知识图谱、站内检索、内容快照、提案工具
+├─ capabilities/  知识图谱、内容快照、提案工具
 ├─ runtime/       模型、结构化输出、分词、上下文预算、观测
 └─ infra/         DB、迁移、内部 HTTP、Nacos、MQ、安全
 tests/            脚手架与用例
