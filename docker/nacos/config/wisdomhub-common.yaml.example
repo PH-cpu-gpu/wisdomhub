@@ -29,7 +29,7 @@ wisdomhub:
         - search-service
         - user-service
         - video-service
-        - agent-engine
+        - wisdomhub-agent
       timestamp-window-seconds: 300
       nonce-ttl-seconds: 300
 spring:

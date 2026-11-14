@@ -31,7 +31,7 @@ WisdomHub 把 **内容社区 + 全文搜索 + 知识图谱 + 推荐系统 + AI A
 | `wisdomhub-order` | 9097 | 付费技术专栏订单 |
 | `wisdomhub-interaction` | 9098 | 评论、点赞、收藏与互动计数（唯一权威） |
 | `wisdomhub-video` | 9099 | 视频直传、MPS 转码、HLS 播放与标签 |
-| `wisdomhub-agent-engine` | 8000 | Python AI Agent（问答 / 学习规划 / 文章分析） |
+| `wisdomhub-agent` | 8000 | Python AI Agent（问答 / 学习规划 / 文章分析） |
 | `wisdomhub-common` | — | 公共模块：core、cache、feign、job、mq、security、web |
 | `wisdomhub-web` | 5173 | 前端：`landing` 静态着陆页 + `app` Vue 应用 |
 
@@ -50,7 +50,7 @@ WisdomHub/
 ├── wisdomhub-recommendation/推荐
 ├── wisdomhub-notification/  通知
 ├── wisdomhub-order/         订单
-├── wisdomhub-agent-engine/  Python AI Agent
+├── wisdomhub-agent/         Python AI Agent
 ├── wisdomhub-web/           前端（landing + app）
 ├── docker/                  中间件初始化脚本与配置
 └── docker-compose.yml       本地开发中间件编排
@@ -128,7 +128,7 @@ bash docker/nacos/import.sh
 ### 5. 启动 AI Agent
 
 ```bash
-cd wisdomhub-agent-engine
+cd wisdomhub-agent
 cp .env.example .env      # 填入 CHAT_API_KEY 等大模型配置
 uv sync
 uv run uvicorn app.main:app --port 8000

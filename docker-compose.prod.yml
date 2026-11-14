@@ -353,7 +353,7 @@ services:
     profiles: ["stage3"]
     image: ${REGISTRY:-wisdomhub}/agent-engine:${TAG:-latest}
     build:
-      context: ./wisdomhub-agent-engine
+      context: ./wisdomhub-agent
       dockerfile: ../docker/agent-engine/Dockerfile
     mem_limit: 384m
     restart: unless-stopped
@@ -362,6 +362,7 @@ services:
       APP_PORT: "8000"
       NACOS_SERVER_ADDR: nacos:8848
       NACOS_NAMESPACE: wisdomhub
+      NACOS_SERVICE_NAME: wisdomhub-agent
       # 留空 → entrypoint 取容器 eth0 的地址再注册
       NACOS_REGISTER_IP: ""
       DATABASE_URL: postgresql+asyncpg://wisdomhub:${POSTGRES_PASSWORD}@postgres:5432/wisdomhub_agent

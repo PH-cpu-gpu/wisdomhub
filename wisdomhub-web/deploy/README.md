@@ -86,7 +86,7 @@ docker run -d --name wisdomhub-web \
    本地实测 `/api/knowledge/**` 游客仍返回 401，需要补。
 2. **WebSocket 路由**：Nacos 是否有 `/api/notification/ws` → `lb:ws://notification-service`
    且 `order: -1`；`allowed-origins` 是否包含正式域名。
-3. **AI SSE**：网关到 `agent-engine` 的路由也不要缓冲；LLM Key 与 Python 服务就绪。
+3. **AI SSE**：网关到 `wisdomhub-agent` 的路由也不要缓冲；LLM Key 与 Python 服务就绪。
 
 ## 5. 冒烟命令
 

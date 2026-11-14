@@ -1,4 +1,4 @@
-# agent-engine 运行镜像。构建上下文是 wisdomhub-agent-engine/。
+# agent-engine 运行镜像。构建上下文是 wisdomhub-agent/。
 # uv.lock 必须存在，锁文件变更后要重新 uv lock 再构建。
 
 FROM ghcr.io/astral-sh/uv:python3.13-bookworm-slim

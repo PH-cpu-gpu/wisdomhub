@@ -15,7 +15,7 @@
 #   Nacos          v3.0.3  必须为 3.0.x，对应 nacos-client 3.0.3
 #   Seata          2.5.0   必须与客户端 2.5.0 一致
 #   XXL-JOB admin  3.4.2   必须与 xxl-job-core 3.4.2 一致
-#   PostgreSQL     17      agent-engine 会话库（Python 独占）
+#   PostgreSQL     17      wisdomhub-agent 会话库（Python 独占）
 # =============================================================================
 
 name: wisdomhub
@@ -242,7 +242,7 @@ services:
     networks: [wisdomhub]
 
   # ===========================================================================
-  # 批次五：PostgreSQL（agent-engine 独占的会话库）
+  # 批次五：PostgreSQL（wisdomhub-agent 独占的会话库）
   # ===========================================================================
 
   postgres:

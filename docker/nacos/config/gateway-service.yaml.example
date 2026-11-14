@@ -134,7 +134,7 @@ spring:
                 redis-rate-limiter.replenish-rate: 3
                 redis-rate-limiter.burst-capacity: 5
         - id: agent
-          uri: lb://agent-engine
+          uri: lb://wisdomhub-agent
           predicates:
             - Path=/api/agent/**
           filters:
@@ -176,7 +176,7 @@ springdoc:
         url: /api/notification/v3/api-docs
       - name: order-service
         url: /api/order/v3/api-docs
-      - name: agent-engine
+      - name: wisdomhub-agent
         url: /api/agent/v3/api-docs
 
 management:
