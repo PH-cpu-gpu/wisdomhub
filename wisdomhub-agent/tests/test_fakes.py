@@ -3,6 +3,7 @@
 import pytest
 from langchain_core.messages import HumanMessage
 
+from app.infra.http.internal_client import InternalUnavailable
 from tests.fakes import FakeInternalClient, FakeLLM, FakePublisher
 
 
@@ -32,15 +33,22 @@ async def test_fake_llm_astream_and_bind_tools() -> None:
 async def test_fake_internal_client_success_and_error() -> None:
     client = FakeInternalClient({"/internal/search/recall": {"items": []}})
 
-    assert await client.get("/internal/search/recall", params={"q": "x"}) == {"items": []}
+    result = await client.get("search-service", "/internal/search/recall", params={"q": "x"})
+
+    assert result == {"items": []}
+    assert client.calls[0].service == "search-service"
     assert client.calls[0].params == {"q": "x"}
 
     with pytest.raises(KeyError):
-        await client.get("/missing")
+        await client.get("search-service", "/missing")
 
     failing = FakeInternalClient(error=RuntimeError("down"))
     with pytest.raises(RuntimeError, match="down"):
-        await failing.post("/any", json={})
+        await failing.post("content-service", "/any", json_body={})
+
+    timeout = FakeInternalClient(timeout=True)
+    with pytest.raises(InternalUnavailable):
+        await timeout.get("knowledge-service", "/internal/knowledge/prerequisites")
 
     await client.aclose()
     assert client.closed

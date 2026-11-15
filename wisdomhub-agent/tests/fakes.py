@@ -6,6 +6,8 @@ from typing import Any, Self
 
 from langchain_core.messages import AIMessage, AIMessageChunk, BaseMessage
 
+from app.infra.http.internal_client import InternalUnavailable
+
 
 class FakeLLM:
     """按脚本依次返回固定回答；脚本用完后重复最后一个。"""
@@ -50,38 +52,73 @@ class FakeLLM:
 @dataclass(frozen=True, slots=True)
 class InternalCall:
     method: str
+    service: str
     path: str
     params: dict[str, Any]
     json: Any
 
 
 class FakeInternalClient:
-    """按路径返回预设响应；预设值可以是异常。"""
+    """按 (service, path) 或 path 返回预设响应；预设值可以是异常。"""
 
     def __init__(
-        self, responses: Mapping[str, Any] | None = None, *, error: Exception | None = None
+        self,
+        responses: Mapping[Any, Any] | None = None,
+        *,
+        error: Exception | None = None,
+        timeout: bool = False,
     ) -> None:
         self.responses = dict(responses or {})
         self.error = error
+        self.timeout = timeout
         self.calls: list[InternalCall] = []
         self.closed = False
 
-    async def get(self, path: str, *, params: Mapping[str, Any] | None = None) -> Any:
-        return self._handle("GET", path, params or {}, None)
+    async def get(
+        self,
+        service: str,
+        path: str,
+        *,
+        params: dict[str, Any] | None = None,
+        read_timeout: float | None = None,
+        retry: bool = True,
+    ) -> Any:
+        return self._handle("GET", service, path, params or {}, None)
 
-    async def post(self, path: str, *, json: Any = None) -> Any:
-        return self._handle("POST", path, {}, json)
+    async def post(
+        self,
+        service: str,
+        path: str,
+        *,
+        params: dict[str, Any] | None = None,
+        json_body: dict[str, Any] | None = None,
+        read_timeout: float | None = None,
+        retry: bool = False,
+    ) -> Any:
+        return self._handle("POST", service, path, params or {}, json_body)
 
     async def aclose(self) -> None:
         self.closed = True
 
-    def _handle(self, method: str, path: str, params: Mapping[str, Any], json: Any) -> Any:
-        self.calls.append(InternalCall(method, path, dict(params), json))
+    def _handle(
+        self,
+        method: str,
+        service: str,
+        path: str,
+        params: dict[str, Any],
+        json: Any,
+    ) -> Any:
+        self.calls.append(InternalCall(method, service, path, params, json))
         if self.error is not None:
             raise self.error
-        if path not in self.responses:
-            raise KeyError(f"未配置响应: {path}")
-        value = self.responses[path]
+        if self.timeout:
+            raise InternalUnavailable("内部服务超时", service=service, path=path)
+        if (service, path) in self.responses:
+            value = self.responses[(service, path)]
+        elif path in self.responses:
+            value = self.responses[path]
+        else:
+            raise KeyError(f"未配置响应: {service} {path}")
         if isinstance(value, Exception):
             raise value
         return value
