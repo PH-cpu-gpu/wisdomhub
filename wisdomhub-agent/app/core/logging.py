@@ -20,6 +20,10 @@ _TRACE_ID_RE = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 
 _trace_id: ContextVar[str | None] = ContextVar("trace_id", default=None)
 _handler: logging.Handler | None = None
+_RESERVED_EXTRA = frozenset(logging.LogRecord("", 0, "", 0, "", (), None).__dict__) | {
+    "message",
+    "asctime",
+}
 
 
 def get_trace_id() -> str | None:
@@ -59,6 +63,9 @@ class JsonFormatter(logging.Formatter):
             "service": SERVICE_NAME,
             "trace_id": get_trace_id(),
         }
+        for key, value in record.__dict__.items():
+            if key not in _RESERVED_EXTRA and key not in payload:
+                payload[key] = value
         if record.exc_info:
             payload["exception"] = self.formatException(record.exc_info)
         if record.stack_info:

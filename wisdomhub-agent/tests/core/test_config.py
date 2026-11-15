@@ -62,6 +62,7 @@ def test_flat_env_maps_to_groups(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("APP_PORT", "8123")
     monkeypatch.setenv("CONTEXT_MAX_TURNS", "7")
     monkeypatch.setenv("RABBITMQ_RECONNECT_INTERVAL", "9")
+    monkeypatch.setenv("STRUCTURED_RETRY_TIMES", "3")
     monkeypatch.setenv("DB_ECHO", "true")
 
     settings = load_settings(env_file=None)
@@ -69,6 +70,7 @@ def test_flat_env_maps_to_groups(monkeypatch: pytest.MonkeyPatch) -> None:
     assert settings.app.port == 8123
     assert settings.limits.context_max_turns == 7
     assert settings.mq.reconnect_interval == 9
+    assert settings.llm.structured_retry_times == 3
     assert settings.db.echo is True
 
 

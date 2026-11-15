@@ -70,6 +70,7 @@ class LlmSettings(_Group):
     reflection_timeout: float = Field(
         default=30.0, gt=0, validation_alias="PROPOSAL_REFLECTION_TIMEOUT"
     )
+    structured_retry_times: int = Field(default=1, ge=0, validation_alias="STRUCTURED_RETRY_TIMES")
 
     @field_validator("model", "base_url", "api_key")
     @classmethod

@@ -108,3 +108,37 @@ def test_middleware_replaces_invalid_trace_id() -> None:
     assert trace_id != "bad id!"
     assert trace_id is not None
     assert len(trace_id) == 32
+
+
+def _extra_logger(name: str) -> tuple[logging.Logger, io.StringIO]:
+    stream = io.StringIO()
+    handler = logging.StreamHandler(stream)
+    handler.setFormatter(JsonFormatter())
+    logger = logging.getLogger(name)
+    logger.handlers = [handler]
+    logger.setLevel(logging.INFO)
+    logger.propagate = False
+    return logger, stream
+
+
+def test_json_formatter_merges_extra_fields() -> None:
+    logger, stream = _extra_logger("tests.logging.extra")
+
+    with trace_context("trace-1"):
+        logger.info("done", extra={"event": "turn.done", "total_tokens": 42})
+
+    payload = json.loads(stream.getvalue())
+    assert payload["event"] == "turn.done"
+    assert payload["total_tokens"] == 42
+    assert payload["trace_id"] == "trace-1"
+
+
+def test_json_formatter_builtin_fields_win_over_extra() -> None:
+    logger, stream = _extra_logger("tests.logging.extra2")
+
+    with trace_context("real"):
+        logger.info("done", extra={"trace_id": "fake", "level": "DEBUG"})
+
+    payload = json.loads(stream.getvalue())
+    assert payload["trace_id"] == "real"
+    assert payload["level"] == "INFO"
