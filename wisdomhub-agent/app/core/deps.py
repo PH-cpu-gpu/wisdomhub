@@ -4,11 +4,14 @@ import asyncio
 import logging
 from collections.abc import Awaitable, Callable, Coroutine
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from fastapi import Request
 
 from app.core.config import Settings
+
+if TYPE_CHECKING:
+    from app.features.conversation.service import ConversationService
 
 log = logging.getLogger(__name__)
 
@@ -18,6 +21,7 @@ Cleanup = Callable[[], Awaitable[None]]
 @dataclass(slots=True)
 class AppDeps:
     settings: Settings
+    conversation: "ConversationService | None" = None
     tasks: set[asyncio.Task[Any]] = field(default_factory=set)
     cleanups: list[tuple[str, Cleanup]] = field(default_factory=list)
 
