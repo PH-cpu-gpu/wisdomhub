@@ -17,6 +17,7 @@ function landingPlugin(): Plugin {
     '.png': 'image/png',
     '.svg': 'image/svg+xml',
     '.mp4': 'video/mp4',
+    '.webmanifest': 'application/manifest+json',
   }
   const middleware: Connect.NextHandleFunction = (req, res, next) => {
     const pathname = decodeURIComponent((req.url ?? '/').split('?')[0])
