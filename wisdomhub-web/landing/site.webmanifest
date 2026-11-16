@@ -1,0 +1,14 @@
+{
+  "name": "WisdomHub — 把散落的知识，连成一张图",
+  "short_name": "WisdomHub",
+  "description": "面向开发者的技术知识社区：文章、问答、全文搜索、知识图谱、个性推荐与 AI 助手，共用同一张知识网络。",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F2EDDF",
+  "theme_color": "#F2EDDF",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" },
+    { "src": "/favicon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/favicon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

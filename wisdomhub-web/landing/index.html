@@ -9,13 +9,16 @@
   <meta property="og:title" content="WisdomHub — 把散落的知识，连成一张图">
   <meta property="og:description" content="面向开发者的技术知识社区：内容、搜索、图谱、推荐与 AI 助手。">
   <meta property="og:type" content="website">
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%230B0B0E'/%3E%3Ctext x='32' y='44' font-family='monospace' font-size='30' font-weight='700' fill='%23C9FF2E' text-anchor='middle'%3E64%3C/text%3E%3C/svg%3E">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="icon" href="/favicon-16.png" sizes="16x16" type="image/png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180">
+  <link rel="manifest" href="/site.webmanifest">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;800&family=Noto+Sans+SC:wght@400;500;600&family=Noto+Serif+SC:wght@600;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
-  <link rel="preload" as="image" href="assets/core-plate.webp" type="image/webp" fetchpriority="high">
-  <noscript><style>.reveal{opacity:1;transform:none}</style></noscript>
+  <noscript><style>.reveal{opacity:1;transform:none}.hero__path{stroke-dashoffset:0}.hero__node,.hero__label{opacity:1;transform:none}</style></noscript>
 </head>
 <body>
   <a class="skip" href="#main">跳到主要内容</a>
@@ -33,7 +36,16 @@
 
   <header class="nav" id="nav">
     <a class="brand" href="#top" aria-label="WisdomHub 首页">
-      <span class="brand__mark" aria-hidden="true">64</span>
+      <span class="brand__mark" aria-hidden="true">
+        <svg class="brand__glyph" viewBox="0 0 64 64" focusable="false">
+          <path d="M9 14 L22 50 L32 26 L42 50 L55 14" fill="none" stroke="currentColor" stroke-width="5.4" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="9" cy="14" r="7.2" fill="var(--mark-end)"/>
+          <circle cx="22" cy="50" r="7.2" fill="currentColor"/>
+          <circle cx="32" cy="26" r="7.2" fill="var(--mark-core)"/>
+          <circle cx="42" cy="50" r="7.2" fill="currentColor"/>
+          <circle cx="55" cy="14" r="7.2" fill="var(--mark-end)"/>
+        </svg>
+      </span>
       <span class="brand__name">Wisdom<b>Hub</b></span>
     </a>
     <nav class="nav__links" aria-label="主导航">
@@ -60,24 +72,59 @@
   <main id="main">
     <!-- ───────────────────────── HERO ───────────────────────── -->
     <section class="hero" id="top">
-      <div class="hero__fluid-bg" aria-hidden="true" data-parallax="0.3"></div>
-      <canvas class="hero-particles" id="heroParticles" aria-hidden="true" data-parallax="0.5"></canvas>
-      <div class="hero__ghost" aria-hidden="true" data-parallax="0.2">64</div>
+      <div class="hero__grid" aria-hidden="true"></div>
 
-      <!-- Generated print plate: the 64-node core -->
-      <div class="hero__plate-layer" aria-hidden="true">
-        <div class="hero__plate" data-riso-plate data-plate-tilt>
-          <img class="hero__plate-img" src="assets/core-plate.webp" width="900" height="1042" alt="" decoding="async" fetchpriority="high">
-          <canvas class="hero__plate-canvas" data-riso-canvas></canvas>
-        </div>
+      <div class="hero__stage" aria-hidden="true">
+        <svg viewBox="0 0 620 540" role="presentation">
+          <g class="hero__target">
+            <circle cx="310" cy="270" r="236"/>
+            <circle cx="310" cy="270" r="176" stroke-dasharray="2 9"/>
+            <path d="M310 8 V 52 M310 488 V 532 M48 270 H 92 M528 270 H 572" stroke-width="1"/>
+          </g>
+
+          <path class="hero__path" d="M 50 70 L 210 450 L 310 190 L 410 450 L 570 70"/>
+
+          <g class="hero__node" style="animation-delay:.55s">
+            <circle cx="50" cy="70" r="30" fill="none" stroke="rgba(11,11,14,.18)"/>
+            <circle cx="50" cy="70" r="21" fill="var(--acid)"/>
+          </g>
+          <g class="hero__node" style="animation-delay:.75s">
+            <circle cx="210" cy="450" r="30" fill="none" stroke="rgba(11,11,14,.18)"/>
+            <circle cx="210" cy="450" r="21" fill="var(--ink)"/>
+          </g>
+          <g class="hero__node" style="animation-delay:.95s">
+            <circle cx="310" cy="190" r="30" fill="none" stroke="rgba(11,11,14,.18)"/>
+            <circle cx="310" cy="190" r="21" fill="var(--verm)"/>
+          </g>
+          <g class="hero__node" style="animation-delay:1.15s">
+            <circle cx="410" cy="450" r="30" fill="none" stroke="rgba(11,11,14,.18)"/>
+            <circle cx="410" cy="450" r="21" fill="var(--ink)"/>
+          </g>
+          <g class="hero__node" style="animation-delay:1.35s">
+            <circle cx="570" cy="70" r="30" fill="none" stroke="rgba(11,11,14,.18)"/>
+            <circle cx="570" cy="70" r="21" fill="var(--acid)"/>
+          </g>
+
+          <g class="hero__lead">
+            <path d="M 80 70 H 96"/>
+            <path d="M 210 480 V 494"/>
+            <path d="M 332 190 H 348"/>
+            <path d="M 410 480 V 494"/>
+            <path d="M 540 70 H 528"/>
+          </g>
+
+          <text class="hero__label hero__label--cn" x="100" y="64" text-anchor="start" style="animation-delay:1.5s">内容</text>
+          <text class="hero__label" x="100" y="80" text-anchor="start" style="animation-delay:1.5s">CONTENT / 01</text>
+          <text class="hero__label hero__label--cn" x="210" y="502" text-anchor="middle" style="animation-delay:1.55s">搜索</text>
+          <text class="hero__label" x="210" y="518" text-anchor="middle" style="animation-delay:1.55s">SEARCH / 02</text>
+          <text class="hero__label hero__label--cn" x="348" y="186" text-anchor="start" style="animation-delay:1.6s">图谱</text>
+          <text class="hero__label" x="348" y="202" text-anchor="start" style="animation-delay:1.6s">GRAPH / 03</text>
+          <text class="hero__label hero__label--cn" x="410" y="502" text-anchor="middle" style="animation-delay:1.65s">推荐</text>
+          <text class="hero__label" x="410" y="518" text-anchor="middle" style="animation-delay:1.65s">RECOMMEND / 04</text>
+          <text class="hero__label hero__label--cn" x="520" y="58" text-anchor="end" style="animation-delay:1.7s">AI 助手</text>
+          <text class="hero__label" x="520" y="74" text-anchor="end" style="animation-delay:1.7s">AGENT / 05</text>
+        </svg>
       </div>
-
-      <!-- Floating particles -->
-      <div class="hero-particle" aria-hidden="true"></div>
-      <div class="hero-particle" aria-hidden="true"></div>
-      <div class="hero-particle" aria-hidden="true"></div>
-      <div class="hero-particle" aria-hidden="true"></div>
-      <div class="hero-particle" aria-hidden="true"></div>
 
       <div class="hero__inner">
         <div class="hero__meta">
@@ -101,30 +148,13 @@
           <a class="btn btn--primary" href="/home">进入知识社区 <span class="btn__arrow" aria-hidden="true">→</span></a>
           <a class="btn btn--text" href="/register">创建账号</a>
         </div>
-
-        <div class="seed-wrap">
-          <div class="seed" id="seed" role="img" aria-label="WisdomHub 知识矩阵示意：8×8 的 64 个节点，重复节点之间以连线表示关系。">
-            <div class="seed__bar">
-              <span>KNOWLEDGE MATRIX</span>
-              <span>8 × 8</span>
-            </div>
-            <div class="seed__stage" id="seedStage">
-              <div class="seed__grid" id="seedGrid"></div>
-              <svg class="seed__edges" id="seedEdges" aria-hidden="true"></svg>
-            </div>
-            <div class="seed__foot">
-              <span>64 NODES</span>
-              <span>11 EDGES</span>
-              <span>5 CLUSTERS</span>
-              <span>4 RELATIONS</span>
-            </div>
-          </div>
-        </div>
       </div>
 
-      <div class="hero__scroll" aria-hidden="true">
-        <span>SCROLL</span>
-        <span class="hero__scroll-line"></span>
+      <div class="hero__readout" aria-hidden="true"><i></i><span data-hero-readout>REGISTER · X 0310 Y 0190</span></div>
+
+      <div class="hero__cross" aria-hidden="true">
+        <div class="hero__cross-x"></div>
+        <div class="hero__cross-y"></div>
       </div>
     </section>
 
@@ -717,7 +747,16 @@
     <div class="footer__top">
       <div class="footer__brand">
         <a class="brand brand--footer" href="#top">
-          <span class="brand__mark" aria-hidden="true">64</span>
+          <span class="brand__mark" aria-hidden="true">
+            <svg class="brand__glyph" viewBox="0 0 64 64" focusable="false">
+              <path d="M9 14 L22 50 L32 26 L42 50 L55 14" fill="none" stroke="currentColor" stroke-width="5.4" stroke-linecap="round" stroke-linejoin="round"/>
+              <circle cx="9" cy="14" r="7.2" fill="var(--mark-end)"/>
+              <circle cx="22" cy="50" r="7.2" fill="currentColor"/>
+              <circle cx="32" cy="26" r="7.2" fill="var(--mark-core)"/>
+              <circle cx="42" cy="50" r="7.2" fill="currentColor"/>
+              <circle cx="55" cy="14" r="7.2" fill="var(--mark-end)"/>
+            </svg>
+          </span>
           <span class="brand__name">Wisdom<b>Hub</b></span>
         </a>
         <p>面向开发者的智能技术知识社区与知识图谱平台。</p>
@@ -759,7 +798,16 @@
   <dialog class="menu" id="mobileMenu" aria-label="导航菜单">
     <div class="menu__top">
       <a class="brand brand--menu" href="#top">
-        <span class="brand__mark" aria-hidden="true">64</span>
+        <span class="brand__mark" aria-hidden="true">
+          <svg class="brand__glyph" viewBox="0 0 64 64" focusable="false">
+            <path d="M9 14 L22 50 L32 26 L42 50 L55 14" fill="none" stroke="currentColor" stroke-width="5.4" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="9" cy="14" r="7.2" fill="var(--mark-end)"/>
+            <circle cx="22" cy="50" r="7.2" fill="currentColor"/>
+            <circle cx="32" cy="26" r="7.2" fill="var(--mark-core)"/>
+            <circle cx="42" cy="50" r="7.2" fill="currentColor"/>
+            <circle cx="55" cy="14" r="7.2" fill="var(--mark-end)"/>
+          </svg>
+        </span>
         <span class="brand__name">Wisdom<b>Hub</b></span>
       </a>
       <button class="menu__close" type="button">关闭 <span aria-hidden="true">✕</span></button>
@@ -785,7 +833,6 @@
   </dialog>
 
   <script src="main.js"></script>
-  <script src="riso-plate.js" defer></script>
   <script src="press-stage.js" defer></script>
 </body>
 </html>

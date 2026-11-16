@@ -2,8 +2,6 @@
    WisdomHub landing — interactions
    ============================================================ */
 
-const SEED = "LHXSKg2Lx6oY39gpAMv0OXoqTqqSM7ZpZifjg1SE5WuDsNYB7OkMLdaeQ3bB0tnM";
-const SVG_NS = "http://www.w3.org/2000/svg";
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /* ── nav ─────────────────────────────────────────────────── */
@@ -28,6 +26,53 @@ window.addEventListener("scroll", onScroll, { passive: true });
   
   window.addEventListener("scroll", updateProgress, { passive: true });
   updateProgress();
+})();
+
+/* ── deterministic frames for screenshot QA (?still=1) ───── */
+
+if (new URLSearchParams(location.search).has("still")) {
+  document.documentElement.classList.add("is-still");
+}
+
+/* ── Hero registration crosshair ───────────────────────── */
+
+(function initHeroRegister() {
+  const hero = document.querySelector(".hero");
+  const stage = hero?.querySelector(".hero__stage");
+  const cross = hero?.querySelector(".hero__cross");
+  const readout = hero?.querySelector("[data-hero-readout]");
+  if (!hero || !stage || !cross || !readout) return;
+  if (reduceMotion) return;
+  if (!window.matchMedia("(hover: hover) and (pointer: fine)").matches) return;
+
+  hero.addEventListener("pointermove", (e) => {
+    const hr = hero.getBoundingClientRect();
+    const cr = cross.getBoundingClientRect();
+    if (!cr.width) return;
+    if (e.clientX < cr.left) {
+      hero.classList.remove("is-pointer");
+      return;
+    }
+    const nx = (e.clientX - hr.left) / hr.width;
+    const ny = (e.clientY - hr.top) / hr.height;
+    hero.classList.add("is-pointer");
+    hero.style.setProperty("--cx", `${(e.clientX - cr.left).toFixed(1)}px`);
+    hero.style.setProperty("--cy", `${(e.clientY - cr.top).toFixed(1)}px`);
+    const tx = (nx - 0.5) * -10;
+    const ty = (ny - 0.5) * -8;
+    stage.style.transform = `translateY(-50%) translate(${tx.toFixed(1)}px, ${ty.toFixed(1)}px)`;
+    const x = String(Math.round(nx * 1440)).padStart(4, "0");
+    const y = String(Math.round(ny * 900)).padStart(4, "0");
+    readout.textContent = `REGISTER · X ${x} Y ${y}`;
+  });
+
+  hero.addEventListener("pointerleave", () => hero.classList.remove("is-pointer"));
+
+  window.addEventListener("resize", () => {
+    if (window.innerWidth > 900) return;
+    hero.classList.remove("is-pointer");
+    stage.style.transform = "";
+  }, { passive: true });
 })();
 
 /* ── Custom cursor ─────────────────────────────────────── */
@@ -222,111 +267,6 @@ if (menu && menuButton) {
     if (window.innerWidth > 900) closeMenu();
   }, { passive: true });
 }
-
-/* ── seed grid ───────────────────────────────────────────── */
-
-const grid = document.getElementById("seedGrid");
-const stage = document.getElementById("seedStage");
-const edgeSvg = document.getElementById("seedEdges");
-
-const count = new Map();
-for (const ch of SEED) count.set(ch, (count.get(ch) || 0) + 1);
-
-const cells = [...SEED].map((ch) => {
-  const cell = document.createElement("span");
-  cell.className = "cell";
-  if (/[0-9]/.test(ch)) cell.classList.add("cell--digit");
-  else if (/[A-Z]/.test(ch)) cell.classList.add("cell--upper");
-  else cell.classList.add("cell--lower");
-  if ((count.get(ch) || 0) >= 3) cell.classList.add("cell--repeat");
-  if (ch === "M") cell.classList.add("cell--m");
-  cell.dataset.char = ch;
-  cell.textContent = ch;
-  return cell;
-});
-grid.append(...cells);
-
-function centerOf(cell) {
-  return {
-    x: cell.offsetLeft + cell.offsetWidth / 2,
-    y: cell.offsetTop + cell.offsetHeight / 2,
-  };
-}
-
-function drawSeedEdges() {
-  const w = stage.clientWidth;
-  const h = stage.clientHeight;
-  if (!w || !h) return;
-
-  edgeSvg.setAttribute("viewBox", `0 0 ${w} ${h}`);
-  edgeSvg.replaceChildren();
-
-  for (const [ch, n] of count) {
-    if (n < 3) continue;
-    const peers = cells.filter((c) => c.dataset.char === ch);
-    const color = ch === "M" ? "#ff3b1f" : "#3b1dff";
-
-    for (let p = 0; p < peers.length - 1; p++) {
-      const a = centerOf(peers[p]);
-      const b = centerOf(peers[p + 1]);
-      const dx = b.x - a.x;
-      const dy = b.y - a.y;
-      const len = Math.hypot(dx, dy) || 1;
-      const sign = p % 2 === 0 ? 1 : -1;
-      const bend = Math.min(26, 9 + len * 0.04) * sign;
-      const cx = (a.x + b.x) / 2 - (dy / len) * bend;
-      const cy = (a.y + b.y) / 2 + (dx / len) * bend;
-
-      const path = document.createElementNS(SVG_NS, "path");
-      path.setAttribute(
-        "d",
-        `M ${a.x.toFixed(1)} ${a.y.toFixed(1)} Q ${cx.toFixed(1)} ${cy.toFixed(1)} ${b.x.toFixed(1)} ${b.y.toFixed(1)}`
-      );
-      path.setAttribute("stroke", color);
-      path.setAttribute("stroke-width", ch === "M" ? "1.8" : "1.3");
-      if (ch !== "M") path.setAttribute("stroke-dasharray", "4 5");
-      path.setAttribute("class", "edge");
-      path.dataset.char = ch;
-      edgeSvg.append(path);
-    }
-  }
-}
-
-function setSeedFocus(char) {
-  grid.classList.add("has-hover");
-  edgeSvg.classList.add("has-hover");
-  for (const cell of cells) {
-    cell.classList.toggle("is-peer", cell.dataset.char === char);
-  }
-  for (const path of edgeSvg.querySelectorAll(".edge")) {
-    path.classList.toggle("is-peer", path.dataset.char === char);
-  }
-}
-
-function clearSeedFocus() {
-  grid.classList.remove("has-hover");
-  edgeSvg.classList.remove("has-hover");
-  for (const cell of cells) cell.classList.remove("is-peer");
-  for (const path of edgeSvg.querySelectorAll(".edge")) {
-    path.classList.remove("is-peer");
-  }
-}
-
-for (const cell of cells) {
-  cell.addEventListener("pointerenter", () => setSeedFocus(cell.dataset.char));
-}
-grid.addEventListener("pointerleave", clearSeedFocus);
-
-requestAnimationFrame(drawSeedEdges);
-if (document.fonts && document.fonts.ready) {
-  document.fonts.ready.then(() => requestAnimationFrame(drawSeedEdges));
-}
-
-let resizeFrame = 0;
-new ResizeObserver(() => {
-  cancelAnimationFrame(resizeFrame);
-  resizeFrame = requestAnimationFrame(drawSeedEdges);
-}).observe(stage);
 
 /* ── knowledge graph ─────────────────────────────────────── */
 
@@ -660,192 +600,6 @@ if ("IntersectionObserver" in window) {
 window.setTimeout(() => {
   if (!demoStarted) typeDemo("qa");
 }, 2200);
-
-/* ── Particle background ─────────────────────────────────── */
-
-(function initParticles() {
-  const canvas = document.getElementById("heroParticles");
-  if (!canvas) return;
-  
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return;
-  
-  let particles = [];
-  let animationId;
-  let running = false;
-  let mouse = { x: -1000, y: -1000 };
-  
-  const CONFIG = {
-    particleCount: 50,
-    connectionDistance: 120,
-    mouseRadius: 150,
-    speed: 0.4,
-    color: "#c9ff2e",
-  };
-  
-  function resize() {
-    const dpr = window.devicePixelRatio || 1;
-    const rect = canvas.getBoundingClientRect();
-    canvas.width = rect.width * dpr;
-    canvas.height = rect.height * dpr;
-    ctx.scale(dpr, dpr);
-  }
-  
-  function createParticles() {
-    particles = [];
-    const rect = canvas.getBoundingClientRect();
-    for (let i = 0; i < CONFIG.particleCount; i++) {
-      particles.push({
-        x: Math.random() * rect.width,
-        y: Math.random() * rect.height,
-        vx: (Math.random() - 0.5) * CONFIG.speed,
-        vy: (Math.random() - 0.5) * CONFIG.speed,
-        radius: Math.random() * 2 + 1,
-        opacity: Math.random() * 0.5 + 0.2,
-      });
-    }
-  }
-  
-  function drawParticle(p) {
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-    ctx.fillStyle = CONFIG.color;
-    ctx.globalAlpha = p.opacity;
-    ctx.fill();
-    ctx.globalAlpha = 1;
-  }
-  
-  function drawConnections() {
-    for (let i = 0; i < particles.length; i++) {
-      for (let j = i + 1; j < particles.length; j++) {
-        const pi = particles[i];
-        const pj = particles[j];
-        const dx = pi.x - pj.x;
-        const dy = pi.y - pj.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        
-        if (dist < CONFIG.connectionDistance) {
-          const opacity = 1 - dist / CONFIG.connectionDistance;
-          ctx.beginPath();
-          ctx.moveTo(pi.x, pi.y);
-          ctx.lineTo(pj.x, pj.y);
-          ctx.strokeStyle = CONFIG.color;
-          ctx.globalAlpha = opacity * 0.3;
-          ctx.lineWidth = 0.5;
-          ctx.stroke();
-          ctx.globalAlpha = 1;
-        }
-      }
-      
-      // Mouse connections
-      const p = particles[i];
-      const mdx = p.x - mouse.x;
-      const mdy = p.y - mouse.y;
-      const mDist = Math.sqrt(mdx * mdx + mdy * mdy);
-      if (mDist < CONFIG.mouseRadius) {
-        const opacity = 1 - mDist / CONFIG.mouseRadius;
-        ctx.beginPath();
-        ctx.moveTo(p.x, p.y);
-        ctx.lineTo(mouse.x, mouse.y);
-        ctx.strokeStyle = CONFIG.color;
-        ctx.globalAlpha = opacity * 0.5;
-        ctx.lineWidth = 1;
-        ctx.stroke();
-        ctx.globalAlpha = 1;
-      }
-    }
-  }
-  
-  function update() {
-    const rect = canvas.getBoundingClientRect();
-    
-    for (const p of particles) {
-      p.x += p.vx;
-      p.y += p.vy;
-      
-      // Bounce off edges
-      if (p.x < 0 || p.x > rect.width) p.vx *= -1;
-      if (p.y < 0 || p.y > rect.height) p.vy *= -1;
-      
-      // Mouse repulsion
-      const dx = p.x - mouse.x;
-      const dy = p.y - mouse.y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist < CONFIG.mouseRadius && dist > 0) {
-        const force = (CONFIG.mouseRadius - dist) / CONFIG.mouseRadius;
-        p.vx += (dx / dist) * force * 0.02;
-        p.vy += (dy / dist) * force * 0.02;
-      }
-      
-      // Damping
-      p.vx *= 0.99;
-      p.vy *= 0.99;
-    }
-  }
-  
-  function animate() {
-    if (!running) return;
-    const rect = canvas.getBoundingClientRect();
-    ctx.clearRect(0, 0, rect.width, rect.height);
-    
-    update();
-    for (const p of particles) drawParticle(p);
-    drawConnections();
-    
-    animationId = requestAnimationFrame(animate);
-  }
-
-  function playParticles() {
-    if (running) return;
-    running = true;
-    animationId = requestAnimationFrame(animate);
-  }
-
-  function pauseParticles() {
-    running = false;
-    cancelAnimationFrame(animationId);
-  }
-  
-  function onMouseMove(e) {
-    const rect = canvas.getBoundingClientRect();
-    mouse.x = e.clientX - rect.left;
-    mouse.y = e.clientY - rect.top;
-  }
-  
-  function onMouseLeave() {
-    mouse.x = -1000;
-    mouse.y = -1000;
-  }
-  
-  // Initialize
-  resize();
-  createParticles();
-
-  if ("IntersectionObserver" in window) {
-    const visibility = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && !document.hidden) playParticles();
-        else pauseParticles();
-      },
-      { rootMargin: "80px" }
-    );
-    visibility.observe(canvas);
-  } else {
-    playParticles();
-  }
-
-  document.addEventListener("visibilitychange", () => {
-    if (document.hidden) pauseParticles();
-    else if (canvas.getBoundingClientRect().bottom > 0) playParticles();
-  });
-  
-  window.addEventListener("resize", () => {
-    resize();
-    createParticles();
-  });
-  canvas.addEventListener("mousemove", onMouseMove);
-  canvas.addEventListener("mouseleave", onMouseLeave);
-})();
 
 /* ── 3D Tilt effect for feature cards ────────────────────── */
 
