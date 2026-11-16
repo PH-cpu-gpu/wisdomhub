@@ -73,7 +73,7 @@
   const seek = (p) => {
     if (!ready || !duration) return;
     const t = p * Math.max(duration - 0.06, 0);
-    if (Math.abs(video.currentTime - t) > 0.016) video.currentTime = t;
+    if (Math.abs(video.currentTime - t) > 0.008) video.currentTime = t;
   };
 
   const tick = () => {
