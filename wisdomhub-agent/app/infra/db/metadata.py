@@ -1,5 +1,6 @@
 """ORM 模型汇总入口，供 Alembic 使用。"""
 
+from app.features.analysis import models as _analysis_models  # noqa: F401
 from app.features.conversation import models as _conversation_models  # noqa: F401
 from app.infra.db.base import Base
 
