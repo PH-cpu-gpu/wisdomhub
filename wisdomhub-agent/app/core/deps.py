@@ -11,6 +11,9 @@ from fastapi import Request
 from app.core.config import Settings
 
 if TYPE_CHECKING:
+    from langgraph.graph.state import CompiledStateGraph
+
+    from app.capabilities.knowledge.tools import KnowledgeTools
     from app.features.conversation.service import ConversationService
 
 log = logging.getLogger(__name__)
@@ -22,6 +25,8 @@ Cleanup = Callable[[], Awaitable[None]]
 class AppDeps:
     settings: Settings
     conversation: "ConversationService | None" = None
+    graph: "CompiledStateGraph | None" = None
+    knowledge_tools: "KnowledgeTools | None" = None
     tasks: set[asyncio.Task[Any]] = field(default_factory=set)
     cleanups: list[tuple[str, Cleanup]] = field(default_factory=list)
 

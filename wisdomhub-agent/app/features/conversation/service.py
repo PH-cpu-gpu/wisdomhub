@@ -4,7 +4,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from enum import StrEnum
-from typing import Literal, cast
+from typing import Any, Literal, cast
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -16,6 +16,7 @@ from app.features.conversation.repository import (
     ConversationDetail,
     ConversationPage,
     ConversationRepository,
+    TerminalStatus,
 )
 
 TITLE_MAX_LENGTH = 30
@@ -171,6 +172,36 @@ class ConversationService:
             )
         if not deleted:
             raise BusinessError(ErrorCode.NOT_FOUND, "会话不存在")
+
+    async def history(self, conversation_id: UUID) -> list[AgentMessage]:
+        async with self._session_factory() as session:
+            return await ConversationRepository(session).list_history(conversation_id)
+
+    async def finish_turn(
+        self,
+        *,
+        conversation_id: UUID,
+        message_id: str,
+        status: TerminalStatus,
+        content: str,
+        steps: list[dict[str, Any]] | None,
+        artifacts: dict[str, Any] | None,
+        workflow: WorkflowKind,
+        lease_expires_at: datetime,
+        now: datetime | None = None,
+    ) -> bool:
+        async with self._session_factory() as session, session.begin():
+            return await ConversationRepository(session).finish_assistant(
+                conversation_id,
+                message_id,
+                status=status,
+                content=content,
+                steps=steps,
+                artifacts=artifacts,
+                workflow=workflow,
+                lease_expires_at=lease_expires_at,
+                now=now,
+            )
 
     async def _resolve_conversation(
         self,

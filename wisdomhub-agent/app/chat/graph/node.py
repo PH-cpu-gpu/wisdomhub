@@ -1,6 +1,6 @@
 """会话图节点：QA、文本问答、学习路线取数与讲解。"""
 
-from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
+from collections.abc import AsyncIterator, Sequence
 from typing import Any, Protocol
 
 from langchain_core.messages import (
@@ -32,7 +32,10 @@ TOOLS_UNAVAILABLE_MESSAGE = "知识图谱暂不可用，请稍后重试"
 NO_ROUTE_MESSAGE = "学习路线暂时不可用，请稍后重试"
 
 NodeUpdate = dict[str, Any]
-Node = Callable[[ChatState], Awaitable[NodeUpdate]]
+
+
+class Node(Protocol):
+    def __call__(self, state: ChatState) -> Any: ...
 
 
 class ChatModel(Protocol):
@@ -42,21 +45,20 @@ class ChatModel(Protocol):
 
 
 async def _stream_answer(llm: ChatModel, messages: Sequence[BaseMessage]) -> AIMessage:
-    pieces: list[str] = []
-    last: BaseMessageChunk | None = None
+    accumulated: BaseMessageChunk | None = None
     async for chunk in llm.astream(messages):
-        last = chunk
-        text = _chunk_text(chunk)
-        if text:
-            pieces.append(text)
+        accumulated = chunk if accumulated is None else accumulated + chunk
+    if accumulated is None:
+        return AIMessage(content="")
     return AIMessage(
-        content="".join(pieces),
-        usage_metadata=getattr(last, "usage_metadata", None),
-        response_metadata=getattr(last, "response_metadata", None) or {},
+        content=message_text(accumulated),
+        id=accumulated.id,
+        usage_metadata=getattr(accumulated, "usage_metadata", None),
+        response_metadata=accumulated.response_metadata or {},
     )
 
 
-def _chunk_text(message: BaseMessage) -> str:
+def message_text(message: BaseMessage) -> str:
     content = message.content
     if isinstance(content, str):
         return content
