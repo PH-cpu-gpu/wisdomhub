@@ -15,7 +15,7 @@ from app.features.analysis.models import AnalysisResult
 from app.features.analysis.pipeline import ArticleAnalysis
 from app.features.analysis.repository import ClaimOutcome, ClaimResult
 from app.infra.http.internal_client import InternalUnavailable
-from app.infra.mq.topology import KNOWLEDGE_EXTRACT
+from app.infra.mq.topology import AI_COMPLETED, KNOWLEDGE_EXTRACT
 from tests.fakes import FakePublisher
 
 ARTICLE = "1001"
@@ -53,8 +53,10 @@ class _FakeRepo:
         self.finished: list[dict[str, Any]] = []
         self.failed: list[str] = []
         self.marked_published = 0
+        self.marked_notified = 0
         self.finish_result = True
         self.mark_result = True
+        self.notify_result = True
         self.fail_error: Exception | None = None
 
     async def claim(
@@ -103,6 +105,16 @@ class _FakeRepo:
         self.marked_published += 1
         return self.mark_result
 
+    async def mark_notified(
+        self,
+        article_id: str,
+        source_updated_at: datetime,
+        *,
+        now: datetime | None = None,
+    ) -> bool:
+        self.marked_notified += 1
+        return self.notify_result
+
 
 class _Pipeline:
     def __init__(self, results: Sequence[ArticleAnalysis | Exception]) -> None:
@@ -131,6 +143,13 @@ class _Pipeline:
         return value
 
 
+class _CompletedFailPublisher(FakePublisher):
+    async def publish(self, routing_key: str, payload: Mapping[str, Any]) -> None:
+        if routing_key == AI_COMPLETED:
+            raise InternalUnavailable("通知发布失败", service="mq", path=routing_key)
+        await super().publish(routing_key, payload)
+
+
 class _FlakyPublisher(FakePublisher):
     def __init__(self, failures: int) -> None:
         super().__init__()
@@ -144,8 +163,19 @@ class _FlakyPublisher(FakePublisher):
         await super().publish(routing_key, payload)
 
 
-def _row(analysis: dict[str, Any] | None = None) -> AnalysisResult:
-    return AnalysisResult(article_id=ARTICLE, status="done", analysis=analysis)
+def _row(
+    analysis: dict[str, Any] | None = None,
+    *,
+    published_at: datetime | None = None,
+    notified_at: datetime | None = None,
+) -> AnalysisResult:
+    return AnalysisResult(
+        article_id=ARTICLE,
+        status="done",
+        analysis=analysis,
+        published_at=published_at,
+        notified_at=notified_at,
+    )
 
 
 def _analysis(entities: Sequence[str] = ("Redis", "AOF")) -> ArticleAnalysis:
@@ -399,6 +429,124 @@ async def test_fail_persistence_error_does_not_raise(
     result = await job.run(ARTICLE, VERSION)
 
     assert result is JobResult.ACK
+
+
+async def test_new_publishes_completed_after_extract(monkeypatch: pytest.MonkeyPatch) -> None:
+    repo = _FakeRepo(ClaimResult(ClaimOutcome.NEW, _row()))
+    job, _, publisher = _make_job(monkeypatch, repo)
+    _use_pipeline(monkeypatch, _Pipeline([_analysis()]))
+
+    result = await job.run(ARTICLE, VERSION, author_id="2001")
+
+    assert result is JobResult.ACK
+    assert [message.routing_key for message in publisher.messages] == [
+        KNOWLEDGE_EXTRACT,
+        AI_COMPLETED,
+    ]
+    assert publisher.messages[1].payload == {"articleId": 1001, "authorId": 2001}
+    assert repo.marked_published == 1
+    assert repo.marked_notified == 1
+
+
+async def test_missing_author_skips_notification(monkeypatch: pytest.MonkeyPatch) -> None:
+    repo = _FakeRepo(ClaimResult(ClaimOutcome.NEW, _row()))
+    job, _, publisher = _make_job(monkeypatch, repo)
+    _use_pipeline(monkeypatch, _Pipeline([_analysis()]))
+
+    result = await job.run(ARTICLE, VERSION)
+
+    assert result is JobResult.ACK
+    assert [message.routing_key for message in publisher.messages] == [KNOWLEDGE_EXTRACT]
+    assert repo.marked_notified == 0
+
+
+async def test_invalid_author_skips_notification(monkeypatch: pytest.MonkeyPatch) -> None:
+    repo = _FakeRepo(ClaimResult(ClaimOutcome.NEW, _row()))
+    job, _, publisher = _make_job(monkeypatch, repo)
+    _use_pipeline(monkeypatch, _Pipeline([_analysis()]))
+
+    result = await job.run(ARTICLE, VERSION, author_id="not-a-number")
+
+    assert result is JobResult.ACK
+    assert [message.routing_key for message in publisher.messages] == [KNOWLEDGE_EXTRACT]
+    assert repo.marked_notified == 0
+
+
+async def test_duplicate_without_notified_at_republishes_completed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    row = _row({"entities": ["Redis"]}, published_at=NOW)
+    repo = _FakeRepo(ClaimResult(ClaimOutcome.DUPLICATE, row))
+    job, _, publisher = _make_job(monkeypatch, repo)
+
+    result = await job.run(ARTICLE, VERSION, author_id="2001")
+
+    assert result is JobResult.ACK
+    assert [message.routing_key for message in publisher.messages] == [AI_COMPLETED]
+    assert publisher.messages[0].payload == {"articleId": 1001, "authorId": 2001}
+    assert repo.marked_published == 0
+    assert repo.marked_notified == 1
+
+
+async def test_duplicate_with_notified_at_is_noop(monkeypatch: pytest.MonkeyPatch) -> None:
+    row = _row({"entities": ["Redis"]}, published_at=NOW, notified_at=NOW)
+    repo = _FakeRepo(ClaimResult(ClaimOutcome.DUPLICATE, row))
+    job, _, publisher = _make_job(monkeypatch, repo)
+
+    result = await job.run(ARTICLE, VERSION, author_id="2001")
+
+    assert result is JobResult.ACK
+    assert publisher.messages == []
+    assert repo.marked_notified == 0
+
+
+async def test_mark_published_false_skips_notification(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = _FakeRepo(ClaimResult(ClaimOutcome.NEW, _row()))
+    repo.mark_result = False
+    job, _, publisher = _make_job(monkeypatch, repo)
+    _use_pipeline(monkeypatch, _Pipeline([_analysis()]))
+
+    result = await job.run(ARTICLE, VERSION, author_id="2001")
+
+    assert result is JobResult.ACK
+    assert [message.routing_key for message in publisher.messages] == [KNOWLEDGE_EXTRACT]
+    assert repo.marked_notified == 0
+
+
+async def test_republish_notifies_when_needed(monkeypatch: pytest.MonkeyPatch) -> None:
+    repo = _FakeRepo(ClaimResult(ClaimOutcome.REPUBLISH, _row({"entities": ["Redis"]})))
+    job, _, publisher = _make_job(monkeypatch, repo)
+
+    result = await job.run(ARTICLE, VERSION, author_id="2001")
+
+    assert result is JobResult.ACK
+    assert [message.routing_key for message in publisher.messages] == [
+        KNOWLEDGE_EXTRACT,
+        AI_COMPLETED,
+    ]
+    assert repo.marked_notified == 1
+
+
+async def test_notification_failure_retries_then_dlq(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = _FakeRepo(ClaimResult(ClaimOutcome.NEW, _row()))
+    job, sleeps, publisher = _make_job(monkeypatch, repo, publisher=_CompletedFailPublisher())
+    _use_pipeline(monkeypatch, _Pipeline([_analysis()]))
+
+    result = await job.run(ARTICLE, VERSION, author_id="2001")
+
+    assert result is JobResult.DLQ
+    assert sleeps == [RETRY_BASE_SECONDS, RETRY_BASE_SECONDS * 2]
+    assert [message.routing_key for message in publisher.messages] == [
+        KNOWLEDGE_EXTRACT,
+        KNOWLEDGE_EXTRACT,
+        KNOWLEDGE_EXTRACT,
+    ]
+    assert repo.marked_notified == 0
+    assert "InternalUnavailable" in repo.failed[0]
 
 
 @pytest.mark.parametrize(

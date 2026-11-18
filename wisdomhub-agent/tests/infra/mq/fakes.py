@@ -88,7 +88,8 @@ class FakeConnection:
 
 
 class FakeMessage:
-    def __init__(self) -> None:
+    def __init__(self, body: bytes = b"") -> None:
+        self.body = body
         self.acked = 0
         self.nacked: list[bool] = []
 

@@ -17,7 +17,7 @@ from app.features.analysis.repository import (
     ClaimOutcome,
     ClaimResult,
 )
-from app.infra.mq.topology import KNOWLEDGE_EXTRACT
+from app.infra.mq.topology import AI_COMPLETED, KNOWLEDGE_EXTRACT
 from app.runtime.structured import StructuredLLM
 
 log = logging.getLogger(__name__)
@@ -81,7 +81,13 @@ class AnalysisJob:
         self._clock = clock
         self._sleep = sleep
 
-    async def run(self, article_id: str, source_updated_at: datetime) -> JobResult:
+    async def run(
+        self,
+        article_id: str,
+        source_updated_at: datetime,
+        *,
+        author_id: str | None = None,
+    ) -> JobResult:
         claim = await self._claim(article_id, source_updated_at)
         log.info(
             "文章分析 claim article=%s version=%s outcome=%s",
@@ -90,11 +96,12 @@ class AnalysisJob:
             claim.outcome,
         )
 
-        if claim.outcome in (
-            ClaimOutcome.IN_PROGRESS,
-            ClaimOutcome.STALE,
-            ClaimOutcome.DUPLICATE,
-        ):
+        if claim.outcome in (ClaimOutcome.IN_PROGRESS, ClaimOutcome.STALE):
+            return JobResult.ACK
+
+        if claim.outcome is ClaimOutcome.DUPLICATE:
+            if claim.row.notified_at is None:
+                await self._notify(article_id, source_updated_at, author_id)
             return JobResult.ACK
 
         if claim.outcome is ClaimOutcome.REPUBLISH:
@@ -108,6 +115,8 @@ class AnalysisJob:
                 analysis=None,
                 entities=entities,
                 finished=True,
+                notified=claim.row.notified_at is not None,
+                author_id=author_id,
             )
 
         return await self._execute(
@@ -116,6 +125,8 @@ class AnalysisJob:
             analysis=None,
             entities=None,
             finished=False,
+            notified=False,
+            author_id=author_id,
         )
 
     async def _execute(
@@ -126,6 +137,8 @@ class AnalysisJob:
         analysis: ArticleAnalysis | None,
         entities: list[str] | None,
         finished: bool,
+        notified: bool,
+        author_id: str | None,
     ) -> JobResult:
         total = self._retry_times + 1
         last_error = ""
@@ -151,8 +164,11 @@ class AnalysisJob:
                     KNOWLEDGE_EXTRACT,
                     _payload(article_id, entities),
                 )
-                if not await self._mark_published(article_id, source_updated_at):
+                published = await self._mark_published(article_id, source_updated_at)
+                if not published:
                     log.warning("发布标记未写入（版本可能已变化）article=%s", article_id)
+                elif not notified:
+                    notified = await self._notify(article_id, source_updated_at, author_id)
                 return JobResult.ACK
             except ArticleSnapshotError as exc:
                 await self._fail(article_id, source_updated_at, _describe(exc))
@@ -203,6 +219,31 @@ class AnalysisJob:
                 source_updated_at,
             )
 
+    async def _notify(
+        self,
+        article_id: str,
+        source_updated_at: datetime,
+        author_id: str | None,
+    ) -> bool:
+        if author_id is None:
+            log.info("缺少作者 ID，跳过完成通知 article=%s", article_id)
+            return False
+        payload = _completed_payload(article_id, author_id)
+        if payload is None:
+            log.warning("作者 ID 非法，跳过完成通知 article=%s author=%s", article_id, author_id)
+            return False
+        await self._publisher.publish(AI_COMPLETED, payload)
+        if not await self._mark_notified(article_id, source_updated_at):
+            log.warning("通知标记未写入（版本可能已变化）article=%s", article_id)
+        return True
+
+    async def _mark_notified(self, article_id: str, source_updated_at: datetime) -> bool:
+        async with self._session_factory() as session, session.begin():
+            return await AnalysisRepository(session).mark_notified(
+                article_id,
+                source_updated_at,
+            )
+
     async def _fail(self, article_id: str, source_updated_at: datetime, error: str) -> None:
         try:
             async with self._session_factory() as session, session.begin():
@@ -227,3 +268,10 @@ def _payload(article_id: str, entities: list[str]) -> dict[str, Any]:
         "articleId": int(article_id),
         "entities": [{"name": name} for name in entities],
     }
+
+
+def _completed_payload(article_id: str, author_id: str) -> dict[str, Any] | None:
+    try:
+        return {"articleId": int(article_id), "authorId": int(author_id)}
+    except (TypeError, ValueError):
+        return None

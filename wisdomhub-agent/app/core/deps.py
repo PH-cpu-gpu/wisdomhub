@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from langgraph.graph.state import CompiledStateGraph
 
     from app.capabilities.knowledge.tools import KnowledgeTools
+    from app.features.analysis.service import AnalysisService
     from app.features.conversation.service import ConversationService
 
 log = logging.getLogger(__name__)
@@ -27,6 +28,7 @@ class AppDeps:
     conversation: "ConversationService | None" = None
     graph: "CompiledStateGraph | None" = None
     knowledge_tools: "KnowledgeTools | None" = None
+    analysis: "AnalysisService | None" = None
     tasks: set[asyncio.Task[Any]] = field(default_factory=set)
     cleanups: list[tuple[str, Cleanup]] = field(default_factory=list)
 
