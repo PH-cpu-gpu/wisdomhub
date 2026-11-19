@@ -131,8 +131,12 @@ bash docker/nacos/import.sh
 cd wisdomhub-agent
 cp .env.example .env      # 填入 CHAT_API_KEY 等大模型配置
 uv sync
-uv run uvicorn app.main:app --port 8000
+uv run alembic upgrade head
+bash scripts/dev.sh       # 等价于 uv run uvicorn app.main:app --reload --port 8000
 ```
+
+Nacos / RabbitMQ 未启动时可以只跑问答：`NACOS_ENABLED=false RABBITMQ_ENABLED=false bash scripts/dev.sh`。
+迁移、降级组合与测试命令见 [`wisdomhub-agent/README.md`](wisdomhub-agent/README.md)。
 
 ### 6. 启动前端
 

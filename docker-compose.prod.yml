@@ -376,4 +376,6 @@ services:
         condition: service_healthy
       nacos:
         condition: service_started
+      rabbitmq:
+        condition: service_started
     networks: [wisdomhub]
