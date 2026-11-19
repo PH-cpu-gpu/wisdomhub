@@ -77,6 +77,9 @@ docker/nacos/
 | `cos-key.yaml` | 腾讯云 COS 凭据（头像上传、视频源文件） |
 | `mps-key.yaml` | 腾讯云 MPS 凭据与区域（视频转码） |
 
+> `wisdomhub-common.yaml` 里的 `internal-sign.allowed-services` 是 `/internal/**` 的调用方白名单。
+> 新增调用方（如 Python `wisdomhub-agent`）后要重新导入该配置并刷新相关服务，否则请求会 401。
+
 ## 占位符说明
 
 | 占位符 | 出现位置 | 填什么 |

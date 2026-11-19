@@ -12,6 +12,7 @@ from app.capabilities.content.client import (
     CONTENT_SERVICE,
     ArticleContentClient,
     ArticleContentMissing,
+    ArticleLocked,
     ArticleNotFound,
     ArticleNotPublished,
 )
@@ -279,11 +280,11 @@ async def test_empty_markdown_raises(markdown: str | None) -> None:
     assert llm.calls == []
 
 
-async def test_locked_article_without_markdown_raises() -> None:
+async def test_locked_article_skips_llm() -> None:
     llm = _FakeStructuredLLM([DEFAULT_DRAFT])
 
-    with pytest.raises(ArticleContentMissing):
-        await _run(llm, client=_client(locked=True, markdown=""))
+    with pytest.raises(ArticleLocked):
+        await _run(llm, client=_client(locked=True))
 
     assert llm.calls == []
 

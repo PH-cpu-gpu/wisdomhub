@@ -822,7 +822,8 @@ public class ArticleServiceImpl implements ArticleService {
             throw new BusinessException(CommonErrorCode.INTERNAL_ERROR, "文章正文缺失");
         }
         List<ArticleTagVO> tags = loadTagsByArticleIds(List.of(articleId)).getOrDefault(articleId, List.of());
-        return toInternalVO(article, content.getMarkdown(), tags);
+        boolean locked = resolveLockedByArticleIds(List.of(articleId)).getOrDefault(articleId, false);
+        return toInternalVO(article, content.getMarkdown(), tags, locked);
     }
 
     @Override
@@ -852,6 +853,7 @@ public class ArticleServiceImpl implements ArticleService {
             markdownById.put(content.getArticleId(), content.getMarkdown());
         }
         Map<Long, List<ArticleTagVO>> tagsById = loadTagsByArticleIds(articleIds);
+        Map<Long, Boolean> lockedByArticle = resolveLockedByArticleIds(articleIds);
         List<ArticleInternalVO> result = new ArrayList<>(articles.size());
         for (Article article : articles) {
             String markdown = markdownById.get(article.getId());
@@ -860,7 +862,8 @@ public class ArticleServiceImpl implements ArticleService {
                 log.error("正文缺失，跳过同步, articleId={}", article.getId());
                 continue;
             }
-            result.add(toInternalVO(article, markdown, tagsById.getOrDefault(article.getId(), List.of())));
+            result.add(toInternalVO(article, markdown, tagsById.getOrDefault(article.getId(), List.of()),
+                    lockedByArticle.getOrDefault(article.getId(), false)));
         }
         return result;
     }
@@ -889,7 +892,8 @@ public class ArticleServiceImpl implements ArticleService {
                 .toList();
     }
 
-    private ArticleInternalVO toInternalVO(Article article, String markdown, List<ArticleTagVO> tags) {
+    private ArticleInternalVO toInternalVO(Article article, String markdown, List<ArticleTagVO> tags,
+                                           boolean locked) {
         return ArticleInternalVO.builder()
                 .articleId(article.getId())
                 .authorId(article.getAuthorId())
@@ -902,7 +906,50 @@ public class ArticleServiceImpl implements ArticleService {
                 .viewCount(article.getViewCount())
                 .tags(tags)
                 .markdown(markdown)
+                .locked(locked)
                 .build();
+    }
+
+    /**
+     * 内部同步用的付费墙判定：没有用户上下文，只要没有任何免费专栏入口就算锁定。
+     */
+    private Map<Long, Boolean> resolveLockedByArticleIds(List<Long> articleIds) {
+        Map<Long, Boolean> lockedByArticle = new HashMap<>();
+        if (articleIds.isEmpty()) {
+            return lockedByArticle;
+        }
+        List<ColumnArticle> links = columnArticleMapper.selectList(new LambdaQueryWrapper<ColumnArticle>()
+                .in(ColumnArticle::getArticleId, articleIds));
+        if (links.isEmpty()) {
+            return lockedByArticle;
+        }
+        Set<Long> columnIds = links.stream().map(ColumnArticle::getColumnId).collect(Collectors.toSet());
+        Map<Long, Boolean> freeByColumn = new HashMap<>();
+        for (Column column : columnMapper.selectList(new LambdaQueryWrapper<Column>()
+                .in(Column::getId, columnIds)
+                .eq(Column::getDeleted, ColumnConstants.NOT_DELETED))) {
+            freeByColumn.put(column.getId(), isFree(column));
+        }
+        Map<Long, List<Long>> linksByArticle = links.stream().collect(Collectors.groupingBy(
+                ColumnArticle::getArticleId,
+                Collectors.mapping(ColumnArticle::getColumnId, Collectors.toList())));
+        for (Map.Entry<Long, List<Long>> entry : linksByArticle.entrySet()) {
+            boolean hasColumn = false;
+            boolean hasFree = false;
+            for (Long columnId : entry.getValue()) {
+                Boolean free = freeByColumn.get(columnId);
+                if (free == null) {
+                    continue;
+                }
+                hasColumn = true;
+                if (free) {
+                    hasFree = true;
+                    break;
+                }
+            }
+            lockedByArticle.put(entry.getKey(), hasColumn && !hasFree);
+        }
+        return lockedByArticle;
     }
 
     /**

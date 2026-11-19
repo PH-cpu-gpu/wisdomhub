@@ -54,6 +54,14 @@ class ArticleContentMissing(ArticleSnapshotError):
         super().__init__(f"文章正文为空: {article_id}")
 
 
+class ArticleLocked(ArticleSnapshotError):
+    """付费内容不进模型。"""
+
+    def __init__(self, article_id: str) -> None:
+        self.article_id = article_id
+        super().__init__(f"文章属于付费内容: {article_id}")
+
+
 class ArticleSnapshotInvalid(ArticleSnapshotError):
     def __init__(self, article_id: str, detail: str) -> None:
         self.article_id = article_id
@@ -81,7 +89,9 @@ class ArticleContentClient:
 
         if snapshot.state != 2:
             raise ArticleNotPublished(article_id, snapshot.state)
-        if not snapshot.locked and not (snapshot.markdown or "").strip():
+        if snapshot.locked:
+            raise ArticleLocked(article_id)
+        if not (snapshot.markdown or "").strip():
             raise ArticleContentMissing(article_id)
         return snapshot
 

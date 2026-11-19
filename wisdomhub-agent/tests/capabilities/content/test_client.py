@@ -8,6 +8,7 @@ from app.capabilities.content.client import (
     CONTENT_SERVICE,
     ArticleContentClient,
     ArticleContentMissing,
+    ArticleLocked,
     ArticleNotFound,
     ArticleNotPublished,
     ArticleSnapshotInvalid,
@@ -66,13 +67,12 @@ async def test_parses_snapshot() -> None:
     assert snapshot.locked is False
 
 
-async def test_locked_article_without_markdown_is_returned() -> None:
-    client = _client(_payload(locked=True, markdown=""))
+@pytest.mark.parametrize("markdown", ["# 正文", "", None])
+async def test_locked_article_is_rejected(markdown: str | None) -> None:
+    with pytest.raises(ArticleLocked) as excinfo:
+        await _client(_payload(locked=True, markdown=markdown)).get_snapshot("1001")
 
-    snapshot = await client.get_snapshot("1001")
-
-    assert snapshot.locked is True
-    assert snapshot.markdown == ""
+    assert excinfo.value.article_id == "1001"
 
 
 async def test_404_maps_to_not_found() -> None:

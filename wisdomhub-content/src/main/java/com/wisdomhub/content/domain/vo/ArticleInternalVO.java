@@ -10,7 +10,7 @@ import java.util.List;
 
 /**
  * 服务间读契约：一篇「文章的完整快照」= article 行 + 标签 + MongoDB 正文。
- * 消费方是 search-service。
+ * 消费方是 search-service 与 Python Agent。
  */
 @Data
 @Builder
@@ -41,4 +41,7 @@ public class ArticleInternalVO {
 
     /** markdown 原文，来自 MongoDB。正文缺失时单篇接口报错、批量接口跳过该行 */
     private String markdown;
+
+    /** 是否属于付费专栏且没有免费入口；Agent 据此不把付费正文送进模型 */
+    private Boolean locked;
 }

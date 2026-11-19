@@ -28,6 +28,8 @@ wisdomhub:
         - recommendation-service
         - search-service
         - user-service
+        # Python Agent 调用 /internal/**（content 快照、knowledge 前置链、tag-proposal）
+        - wisdomhub-agent
         - video-service
         - wisdomhub-agent
       timestamp-window-seconds: 300
