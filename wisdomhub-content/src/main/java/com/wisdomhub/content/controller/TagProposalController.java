@@ -30,9 +30,10 @@ public class TagProposalController {
     @GetMapping
     public R<PageResponse<TagProposalVO>> page(@RequestParam(required = false) Integer status,
                                                @RequestParam(required = false) Integer proposalType,
+                                               @RequestParam(required = false) Integer proposerType,
                                                @RequestParam(defaultValue = "1") Integer page,
                                                @RequestParam(defaultValue = "10") Integer pageSize) {
-        return R.success(tagProposalService.page(status, proposalType, page, pageSize));
+        return R.success(tagProposalService.page(status, proposalType, proposerType, page, pageSize));
     }
 
     @Operation(summary = "提案详情")

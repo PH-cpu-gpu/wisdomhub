@@ -13,7 +13,8 @@ public interface TagProposalService {
     /** 提交前的校验；submit 内部调用，审批落地前也可复用 */
     TagProposalValidateVO validate(TagProposalSubmitDTO dto);
 
-    PageResponse<TagProposalVO> page(Integer status, Integer proposalType, Integer page, Integer pageSize);
+    PageResponse<TagProposalVO> page(Integer status, Integer proposalType, Integer proposerType,
+                                     Integer page, Integer pageSize);
 
     TagProposalVO detail(Long id);
 

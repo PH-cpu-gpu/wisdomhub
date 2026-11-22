@@ -113,7 +113,8 @@ public class TagProposalServiceImpl implements TagProposalService {
     }
 
     @Override
-    public PageResponse<TagProposalVO> page(Integer status, Integer proposalType, Integer page, Integer pageSize) {
+    public PageResponse<TagProposalVO> page(Integer status, Integer proposalType, Integer proposerType,
+                                            Integer page, Integer pageSize) {
         if (status != null && (status < TagProposalConstants.STATUS_PENDING
                 || status > TagProposalConstants.STATUS_EXPIRED)) {
             throw new BusinessException(CommonErrorCode.BAD_REQUEST, "提案状态不合法");
@@ -122,10 +123,15 @@ public class TagProposalServiceImpl implements TagProposalService {
                 && proposalType != TagProposalConstants.TYPE_RELATION) {
             throw new BusinessException(CommonErrorCode.BAD_REQUEST, "提案类型不合法");
         }
+        if (proposerType != null && (proposerType < TagProposalConstants.PROPOSER_AI
+                || proposerType > TagProposalConstants.PROPOSER_SYSTEM)) {
+            throw new BusinessException(CommonErrorCode.BAD_REQUEST, "提案人类型不合法");
+        }
         Page<TagProposal> result = tagProposalMapper.selectPage(PageUtil.of(page, pageSize),
                 new LambdaQueryWrapper<TagProposal>()
                         .eq(status != null, TagProposal::getStatus, status)
                         .eq(proposalType != null, TagProposal::getProposalType, proposalType)
+                        .eq(proposerType != null, TagProposal::getProposerType, proposerType)
                         .orderByDesc(TagProposal::getCreateTime)
                         .orderByDesc(TagProposal::getId));
         return PageUtil.toResponse(result, result.getRecords().stream().map(this::toVO).toList());
