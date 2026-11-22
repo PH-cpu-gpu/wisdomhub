@@ -10,6 +10,7 @@ import { toast } from '@/components/base/toast'
 import { isApiError } from '@/api/error'
 import type { ID } from '@/types/common'
 import type { AgentAnalysisVO } from '@/types/agent'
+import { formatDateTime } from '@/utils'
 
 const props = defineProps<{
   articleId: ID
@@ -49,6 +50,8 @@ const errorMessage = computed(
 const topic = computed(() => analysis.value?.topic || '')
 const entities = computed(() => analysis.value?.entities ?? [])
 const knowledgePoints = computed(() => analysis.value?.knowledgePoints ?? [])
+const analyzedAt = computed(() => formatDateTime(analysis.value?.analyzedAt))
+const sourceUpdatedAt = computed(() => formatDateTime(analysis.value?.sourceUpdatedAt))
 
 function clearTimer(): void {
   if (timer !== null) {
@@ -220,6 +223,11 @@ onBeforeUnmount(() => {
           </li>
         </ol>
       </div>
+
+      <p v-if="analysis?.analyzedAt" class="analysis-hint">
+        分析于 {{ analyzedAt }}
+        <template v-if="analysis?.sourceUpdatedAt"> · 原文更新于 {{ sourceUpdatedAt }}</template>
+      </p>
     </div>
   </section>
 </template>

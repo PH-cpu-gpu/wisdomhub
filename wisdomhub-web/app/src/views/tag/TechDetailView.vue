@@ -75,7 +75,8 @@ const relationGroups = computed(() =>
 const aiTarget = computed(() => ({
   name: 'ai',
   query: {
-    workflow: 'learning',
+    workflow: 2,
+    tagId: tagId.value,
     technology: detail.value?.name ?? '',
   },
 }))

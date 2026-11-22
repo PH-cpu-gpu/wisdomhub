@@ -23,7 +23,7 @@ const props = withDefaults(
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 let animationId = 0
 let particles: Particle[] = []
-let mouse = { x: -1000, y: -1000 }
+const mouse = { x: -1000, y: -1000 }
 
 interface Particle {
   x: number

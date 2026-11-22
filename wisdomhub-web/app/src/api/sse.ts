@@ -8,6 +8,7 @@ import { refreshAccessToken } from './http'
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
 const IDLE_TIMEOUT = 90_000
+const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
 
 export interface SseFrame {
   event: string
@@ -85,7 +86,12 @@ export async function postSse(
     }, IDLE_TIMEOUT)
   }
 
-  function sendRequest(token: string | null): Promise<Response> {
+  async function sendRequest(token: string | null): Promise<Response> {
+    if (USE_MOCK) {
+      const { mockSseResponse } = await import('@/mocks')
+      return mockSseResponse(url, body, controller.signal)
+    }
+
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       Accept: 'text/event-stream',

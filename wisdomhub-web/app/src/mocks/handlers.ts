@@ -1,5 +1,7 @@
 import { AxiosHeaders, type AxiosResponse, type InternalAxiosRequestConfig } from 'axios'
 
+import type { AgentRoute, AgentStep } from '@/types/agent'
+import type { ConversationDetailVO, ConversationItemVO } from '@/types/conversation'
 import type { PageResponse, R } from '@/types/common'
 import type { ArticleListItemVO, ColumnVO, TagAliasVO } from '@/types/content'
 import type { CommentVO } from '@/types/interaction'
@@ -56,6 +58,98 @@ const CONTENT_ANSWER = CONTENT_TARGET_TYPE.ANSWER
 const mockFollowing = new Set<string>()
 /** 提案 mock 是有状态的：审批后要把状态写回，刷新详情/列表才能看到变化 */
 const mockProposalState = mockTagProposals.map((proposal) => ({ ...proposal }))
+
+/** 会话 mock：删除只改内存，刷新浏览器后回到初始数据 */
+const mockConversationState: ConversationDetailVO[] = [
+  {
+    id: '0b6f1c4e-1f2a-4d3b-8f7e-9a1b2c3d4e5f',
+    title: 'Redis 缓存一致性怎么保证？',
+    workflow: 1,
+    createdAt: '2026-11-20T02:00:00Z',
+    updatedAt: '2026-11-20T02:01:10Z',
+    messages: [
+      {
+        id: '1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d',
+        messageId: 'mock-qa-1',
+        role: 'user',
+        content: 'Redis 缓存一致性怎么保证？',
+        workflow: 1,
+        status: 'done',
+        createdAt: '2026-11-20T02:00:00Z',
+      },
+      {
+        id: '2b3c4d5e-6f7a-4b8c-9d0e-1f2a3b4c5d6e',
+        messageId: 'mock-qa-1',
+        role: 'assistant',
+        content:
+          '缓存一致性通常从更新顺序、失效策略与降级三方面考虑：先写数据库再删缓存，配合重试与延迟双删；读多写少的场景可以让缓存过期时间兜底。',
+        workflow: 1,
+        status: 'done',
+        createdAt: '2026-11-20T02:01:10Z',
+      },
+    ],
+  },
+  {
+    id: '7c2d9e10-3a4b-4c5d-9e6f-1a2b3c4d5e6f',
+    title: '规划 Redis',
+    workflow: 2,
+    createdAt: '2026-11-19T09:00:00Z',
+    updatedAt: '2026-11-19T09:02:00Z',
+    messages: [
+      {
+        id: '3c4d5e6f-7a8b-4c9d-8e0f-2a3b4c5d6e7f',
+        messageId: 'mock-route-1',
+        role: 'user',
+        content: '请为我规划 Redis 的学习路线',
+        workflow: 2,
+        status: 'done',
+        createdAt: '2026-11-19T09:00:00Z',
+      },
+      {
+        id: '4d5e6f7a-8b9c-4d0e-9f1a-3b4c5d6e7f80',
+        messageId: 'mock-route-1',
+        role: 'assistant',
+        content: '## 第 1 阶段：缓存基础\n\n- 技术：[NoSQL](/tag/4)\n- 技术：[缓存](/tag/5)',
+        workflow: 2,
+        status: 'done',
+        steps: [
+          {
+            id: 'fetch',
+            tool: 'knowledge_graph',
+            label: '查询前置知识链',
+            status: 'done',
+            summary: '命中 2 个阶段、3 个技术',
+          },
+          {
+            id: 'plan',
+            tool: 'learning_agent',
+            label: '生成学习路线',
+            status: 'done',
+            summary: '产出 2 个阶段',
+          },
+        ],
+        artifacts: {
+          route: {
+            target: { tagId: '2', name: 'Redis' },
+            known: ['Java'],
+            truncated: false,
+            stages: [
+              {
+                depth: 1,
+                tags: [
+                  { tagId: '4', name: 'NoSQL' },
+                  { tagId: '5', name: '缓存' },
+                ],
+              },
+              { depth: 2, tags: [{ tagId: '6', name: '持久化' }] },
+            ],
+          },
+        },
+        createdAt: '2026-11-19T09:02:00Z',
+      },
+    ],
+  },
+]
 
 /** 标签管理 mock：CRUD 与别名都改这份内存状态，刷新浏览器后回到初始数据 */
 const mockTagState = mockTags.map((tag) => ({ ...tag }))
@@ -2445,6 +2539,37 @@ export async function handleMockRequest(
     return response(config, mockRecommendations.slice(1, 4))
   }
 
+  if (method === 'get' && path === '/api/agent/conversations') {
+    const items: ConversationItemVO[] = mockConversationState
+      .map(({ id, title, workflow, createdAt, updatedAt }) => ({
+        id,
+        title,
+        workflow,
+        createdAt,
+        updatedAt,
+      }))
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+    return response(config, pageOf(items, config))
+  }
+
+  const conversationMatch = path.match(/^\/api\/agent\/conversations\/([^/]+)$/)
+  if (conversationMatch?.[1]) {
+    const conversationId = decodeURIComponent(conversationMatch[1])
+    const index = mockConversationState.findIndex((item) => item.id === conversationId)
+
+    if (method === 'delete') {
+      if (index < 0) return failure(config, 404, '会话不存在')
+      mockConversationState.splice(index, 1)
+      return response(config, null)
+    }
+
+    if (method === 'get') {
+      const conversation = mockConversationState[index]
+      if (!conversation) return failure(config, 404, '会话不存在')
+      return response(config, conversation)
+    }
+  }
+
   const analysisMatch = path.match(/^\/api\/agent\/analysis\/([^/]+)$/)
   if (method === 'get' && analysisMatch?.[1]) {
     const articleId = decodeURIComponent(analysisMatch[1])
@@ -2474,6 +2599,8 @@ export async function handleMockRequest(
       topic: '缓存一致性边界',
       entities: ['Redis', 'Spring Boot', '缓存'],
       knowledgePoints: ['缓存一致性边界', '回源与降级策略', '缓存预热与失效'],
+      sourceUpdatedAt: '2026-11-19T08:00:00Z',
+      analyzedAt: new Date().toISOString(),
     })
   }
 
@@ -2844,4 +2971,159 @@ export async function handleMockRequest(
   }
 
   return failure(config, 404, `Mock 未实现：${method.toUpperCase()} ${path}`)
+}
+
+/** 可选：聊天 SSE mock，localStorage 写 wisdomhub:mock.chatStream=off 可关闭 */
+const MOCK_CHAT_TOGGLE_KEY = 'wisdomhub:mock.chatStream'
+const MOCK_SSE_DELAY = 70
+
+interface MockSseFrame {
+  event: string
+  data: unknown
+}
+
+function mockSseId(value: unknown): string {
+  return typeof value === 'string' && value ? value : crypto.randomUUID()
+}
+
+function mockRouteData(): AgentRoute {
+  return {
+    target: { tagId: '2', name: 'Redis' },
+    known: ['Java'],
+    truncated: false,
+    stages: [
+      {
+        depth: 1,
+        tags: [
+          { tagId: '4', name: 'NoSQL' },
+          { tagId: '5', name: '缓存' },
+        ],
+      },
+      { depth: 2, tags: [{ tagId: '6', name: '持久化' }] },
+    ],
+  }
+}
+
+function chunkText(text: string, size = 16): string[] {
+  const chunks: string[] = []
+  for (let index = 0; index < text.length; index += size) {
+    chunks.push(text.slice(index, index + size))
+  }
+  return chunks
+}
+
+function mockChatFrames(path: string, body: Record<string, unknown>): MockSseFrame[] {
+  const workflow = path === '/api/agent/learning-path' ? 2 : path === '/api/agent/text-qa' ? 3 : 1
+  const question = typeof body.question === 'string' ? body.question : ''
+  const text = typeof body.text === 'string' ? body.text : ''
+  const frames: MockSseFrame[] = [
+    {
+      event: 'meta',
+      data: {
+        conversationId: mockSseId(body.conversationId),
+        messageId: mockSseId(body.messageId),
+        workflow,
+      },
+    },
+  ]
+
+  let answer =
+    `关于「${question}」，可以从三个方面理解：\n\n` +
+    '1. 更新顺序：先写数据库再删缓存，避免读到旧值；\n' +
+    '2. 失效策略：过期时间兜底，热点数据配合延迟双删；\n' +
+    '3. 降级：缓存不可用时回源数据库并限制并发。'
+
+  if (workflow === 2) {
+    const fetchStep: AgentStep = {
+      id: 'fetch',
+      tool: 'knowledge_graph',
+      label: '查询前置知识链',
+      status: 'running',
+    }
+    const fetchDone: AgentStep = {
+      ...fetchStep,
+      status: 'done',
+      summary: '命中 2 个阶段、3 个技术',
+    }
+    const planStep: AgentStep = {
+      id: 'plan',
+      tool: 'learning_agent',
+      label: '生成学习路线',
+      status: 'running',
+    }
+    const planFailed = localStorage.getItem('wisdomhub:mock.stepsError') === '1'
+    const planDone: AgentStep = planFailed
+      ? { ...planStep, status: 'error', summary: '路线生成失败' }
+      : { ...planStep, status: 'done', summary: '产出 2 个阶段' }
+
+    if (localStorage.getItem('wisdomhub:mock.routeMissing') !== '1') {
+      frames.push({ event: 'route', data: mockRouteData() })
+    }
+    frames.push({ event: 'steps', data: { steps: [fetchStep] } })
+    frames.push({ event: 'steps', data: { steps: [fetchDone, planStep] } })
+    frames.push({ event: 'steps', data: { steps: [fetchDone, planDone] } })
+
+    answer =
+      '## 第 1 阶段：缓存基础\n\n- 技术：[NoSQL](/tag/4)\n- 技术：[缓存](/tag/5)\n\n' +
+      '## 第 2 阶段：持久化\n\n- 技术：[持久化](/tag/6)'
+  } else if (workflow === 3) {
+    answer = `已阅读选中的文本（${text.slice(0, 30)}${text.length > 30 ? '…' : ''}）。\n\n${answer}`
+  }
+
+  for (const chunk of chunkText(answer)) {
+    frames.push({ event: 'delta', data: { text: chunk } })
+  }
+  frames.push({ event: 'done', data: { finishReason: 'stop' } })
+  return frames
+}
+
+function sseText(frame: MockSseFrame): string {
+  return `event: ${frame.event}\ndata: ${JSON.stringify(frame.data)}\n\n`
+}
+
+/** 可选：聊天 SSE mock，覆盖三个端点；关闭开关后返回 503 提示 */
+export function mockSseResponse(url: string, body: unknown, signal?: AbortSignal): Response {
+  if (localStorage.getItem(MOCK_CHAT_TOGGLE_KEY) === 'off') {
+    return new Response(JSON.stringify({ code: 503, message: 'Mock 聊天流已关闭', data: null }), {
+      status: 503,
+      headers: { 'content-type': 'application/json' },
+    })
+  }
+
+  const path = new URL(url, 'http://mock.local').pathname
+  const frames = mockChatFrames(path, (body ?? {}) as Record<string, unknown>)
+  const encoder = new TextEncoder()
+
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      let cancelled = false
+      const onAbort = (): void => {
+        cancelled = true
+      }
+      signal?.addEventListener('abort', onAbort, { once: true })
+
+      try {
+        for (const frame of frames) {
+          if (cancelled) break
+          await delay(MOCK_SSE_DELAY)
+          if (cancelled) break
+          controller.enqueue(encoder.encode(sseText(frame)))
+        }
+      } catch {
+        // 读取方已取消，忽略后续写入
+      } finally {
+        signal?.removeEventListener('abort', onAbort)
+        try {
+          controller.close()
+        } catch {
+          // 流已被取消
+        }
+      }
+    },
+  })
+
+  return new Response(stream, {
+    status: 200,
+    headers: { 'content-type': 'text/event-stream' },
+  })
 }

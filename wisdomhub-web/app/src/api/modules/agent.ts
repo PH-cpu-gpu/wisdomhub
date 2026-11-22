@@ -1,15 +1,66 @@
 import { ApiError } from '@/api/error'
 import { get, type RequestOptions } from '@/api/http'
 import { postSse } from '@/api/sse'
+import { isWorkflowKind } from '@/types/agent'
 import type {
   AgentAnalysisVO,
-  AgentChatRequest,
+  AgentEndpoint,
   AgentEvent,
+  AgentPlanStage,
+  AgentRoute,
+  AgentStep,
+  AgentStepStatus,
+  AgentTechRef,
   AgentUnknownEvent,
+  ChatRequest,
 } from '@/types/agent'
 import type { ID } from '@/types/common'
 
-const KNOWN_EVENTS = new Set(['meta', 'delta', 'done', 'error'])
+const KNOWN_EVENTS = new Set(['meta', 'route', 'steps', 'delta', 'done', 'error'])
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
+function isTechRef(value: unknown): value is AgentTechRef {
+  return isRecord(value) && typeof value.tagId === 'string' && typeof value.name === 'string'
+}
+
+function isPlanStage(value: unknown): value is AgentPlanStage {
+  return (
+    isRecord(value) &&
+    typeof value.depth === 'number' &&
+    Array.isArray(value.tags) &&
+    value.tags.every(isTechRef)
+  )
+}
+
+function isRouteData(value: unknown): value is AgentRoute {
+  return (
+    isRecord(value) &&
+    isTechRef(value.target) &&
+    Array.isArray(value.known) &&
+    value.known.every((item) => typeof item === 'string') &&
+    typeof value.truncated === 'boolean' &&
+    Array.isArray(value.stages) &&
+    value.stages.every(isPlanStage)
+  )
+}
+
+function isStepStatus(value: unknown): value is AgentStepStatus {
+  return value === 'running' || value === 'done' || value === 'error'
+}
+
+function isStep(value: unknown): value is AgentStep {
+  return (
+    isRecord(value) &&
+    typeof value.id === 'string' &&
+    typeof value.tool === 'string' &&
+    typeof value.label === 'string' &&
+    isStepStatus(value.status) &&
+    (value.summary === undefined || typeof value.summary === 'string')
+  )
+}
 
 /** trigger=true 时无记录或上次失败会后台补跑；只在首次进入 / 手动重试时传。 */
 export function analysis(
@@ -44,8 +95,23 @@ function toAgentEvent(event: string, data: unknown): AgentEvent | null {
 
   switch (event) {
     case 'meta':
-      return typeof record.conversationId === 'string' && typeof record.messageId === 'string'
-        ? { event, data: { conversationId: record.conversationId, messageId: record.messageId } }
+      return typeof record.conversationId === 'string' &&
+        typeof record.messageId === 'string' &&
+        isWorkflowKind(record.workflow)
+        ? {
+            event,
+            data: {
+              conversationId: record.conversationId,
+              messageId: record.messageId,
+              workflow: record.workflow,
+            },
+          }
+        : null
+    case 'route':
+      return isRouteData(data) ? { event, data } : null
+    case 'steps':
+      return Array.isArray(record.steps) && record.steps.every(isStep)
+        ? { event, data: { steps: record.steps } }
         : null
     case 'delta':
       return typeof record.text === 'string' ? { event, data: { text: record.text } } : null
@@ -63,14 +129,15 @@ function toAgentEvent(event: string, data: unknown): AgentEvent | null {
 }
 
 /**
- * AI 对话流：POST /api/agent/chat。
- * meta → delta* → done | error；未知事件通过 onUnknownEvent / onEvent 透传。
+ * AI 对话流：POST {endpoint}。
+ * meta → route? → steps* → delta* → done | error；未知事件通过 onUnknownEvent 透传。
  */
 export function chatStream(
-  payload: AgentChatRequest,
+  endpoint: AgentEndpoint,
+  payload: ChatRequest,
   options: AgentStreamOptions = {},
 ): Promise<void> {
-  return postSse('/api/agent/chat', payload, {
+  return postSse(endpoint, payload, {
     signal: options.signal,
     onEvent: (frame) => {
       const data = parseFrameData(frame.data)

@@ -1,1 +1,1 @@
-export { handleMockRequest } from './handlers'
+export { handleMockRequest, mockSseResponse } from './handlers'

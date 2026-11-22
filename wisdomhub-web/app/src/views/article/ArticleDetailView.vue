@@ -32,6 +32,7 @@ import { CONTENT_TARGET_TYPE } from '@/types/interaction'
 import type { InteractionStateVO } from '@/types/interaction'
 import type { RecommendationItemVO } from '@/types/recommendation'
 import { formatDateTime } from '@/utils'
+import { AI_TEXT_MAX_LENGTH, AI_TEXT_SELECTION_KEY } from '@/utils/ai-entry'
 import { sanitizeHtml } from '@/utils/sanitize'
 
 interface TocItem {
@@ -63,7 +64,12 @@ const readingRingOffset = computed(
   () => READING_RING_LENGTH * (1 - readingProgress.value),
 )
 
+const selectionText = ref('')
+const selectionTop = ref(0)
+const selectionLeft = ref(0)
+
 let scrollFrame = 0
+let selectionFrame = 0
 const copyTimers = new Set<number>()
 
 const related = ref<RecommendationItemVO[]>([])
@@ -177,6 +183,77 @@ function scrollToTop(): void {
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
+function hideSelectionEntry(): void {
+  selectionText.value = ''
+}
+
+function isInsideProse(node: Node | null): boolean {
+  return Boolean(node && proseRef.value?.contains(node))
+}
+
+/** 仅在正文内的有效选区上显示入口：入口坐标跟随选区最后一行。 */
+function updateSelectionEntry(): void {
+  selectionFrame = 0
+
+  const selection = window.getSelection()
+  if (
+    !selection ||
+    selection.isCollapsed ||
+    selection.rangeCount === 0 ||
+    !isInsideProse(selection.anchorNode) ||
+    !isInsideProse(selection.focusNode)
+  ) {
+    hideSelectionEntry()
+    return
+  }
+
+  const text = selection.toString().trim()
+  if (!text) {
+    hideSelectionEntry()
+    return
+  }
+
+  const range = selection.getRangeAt(selection.rangeCount - 1)
+  const rects = range.getClientRects()
+  const rect = rects.length > 0 ? rects[rects.length - 1] : range.getBoundingClientRect()
+  if (rect.width === 0 && rect.height === 0) {
+    hideSelectionEntry()
+    return
+  }
+
+  const center = rect.left + rect.width / 2
+  const clamp = (value: number, min: number, max: number): number =>
+    Math.min(Math.max(value, min), max)
+
+  selectionLeft.value = clamp(center, 64, window.innerWidth - 64)
+  selectionTop.value =
+    rect.bottom + 44 > window.innerHeight ? Math.max(12, rect.top - 44) : rect.bottom + 10
+  selectionText.value = text.slice(0, AI_TEXT_MAX_LENGTH)
+}
+
+function onSelectionChange(): void {
+  if (selectionFrame) return
+  selectionFrame = window.requestAnimationFrame(updateSelectionEntry)
+}
+
+function askAiWithSelection(): void {
+  const text = selectionText.value.trim()
+  if (!text) {
+    hideSelectionEntry()
+    return
+  }
+
+  try {
+    window.sessionStorage.setItem(AI_TEXT_SELECTION_KEY, text.slice(0, AI_TEXT_MAX_LENGTH))
+  } catch {
+    toast.error('无法携带选中文本，请重试。')
+    return
+  }
+
+  hideSelectionEntry()
+  void router.push({ name: 'ai', query: { workflow: 3 } })
+}
+
 function updateReadingState(): void {
   scrollFrame = 0
 
@@ -204,6 +281,7 @@ function updateReadingState(): void {
 }
 
 function onScroll(): void {
+  hideSelectionEntry()
   if (scrollFrame) return
   scrollFrame = window.requestAnimationFrame(updateReadingState)
 }
@@ -399,6 +477,7 @@ function scrollToSection(id: string): void {
 watch(
   articleId,
   () => {
+    hideSelectionEntry()
     void loadDetail()
     void loadRelated()
     void nextTick(() => {
@@ -410,12 +489,17 @@ watch(
 
 onMounted(() => {
   window.addEventListener('scroll', onScroll, { passive: true })
+  document.addEventListener('selectionchange', onSelectionChange)
+  window.addEventListener('resize', onSelectionChange)
   updateReadingState()
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('scroll', onScroll)
+  document.removeEventListener('selectionchange', onSelectionChange)
+  window.removeEventListener('resize', onSelectionChange)
   if (scrollFrame) window.cancelAnimationFrame(scrollFrame)
+  if (selectionFrame) window.cancelAnimationFrame(selectionFrame)
   for (const timer of copyTimers) window.clearTimeout(timer)
   copyTimers.clear()
 })
@@ -617,6 +701,18 @@ useSeo({
           <span class="reading-ring__label">{{ readingPercent }}%</span>
         </button>
       </Transition>
+
+      <button
+        v-if="selectionText"
+        class="article-ai-entry"
+        type="button"
+        :style="{ top: `${selectionTop}px`, left: `${selectionLeft}px` }"
+        aria-label="用 AI 解读选中文本"
+        @mousedown.prevent
+        @click="askAiWithSelection"
+      >
+        问 AI
+      </button>
     </div>
   </PageContainer>
 </template>
@@ -1031,6 +1127,32 @@ useSeo({
   font-size: var(--text-2xs);
   text-decoration: underline;
   text-underline-offset: 3px;
+}
+
+.article-ai-entry {
+  position: fixed;
+  z-index: var(--z-sticky);
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 14px;
+  border: 1px solid var(--ink);
+  background: var(--ink);
+  color: var(--bone);
+  font-family: var(--mono);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+  box-shadow: var(--shadow-hard-sm);
+  cursor: pointer;
+  transform: translateX(-50%);
+  transition:
+    background var(--dur) var(--ease),
+    color var(--dur) var(--ease);
+}
+
+.article-ai-entry:hover {
+  background: var(--acid);
+  color: var(--ink);
 }
 
 .reading-ring {

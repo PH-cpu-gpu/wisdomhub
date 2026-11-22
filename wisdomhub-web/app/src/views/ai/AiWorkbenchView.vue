@@ -1,27 +1,39 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
-import { RouterLink, useRouter } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 
 import { isApiError } from '@/api/error'
 import { chatStream } from '@/api/modules/agent'
-import { articles as searchArticles, tags as searchTags } from '@/api/modules/search'
+import { deleteConversation, getConversation, listConversations } from '@/api/modules/conversation'
+import { tags as searchTags } from '@/api/modules/search'
 import WhButton from '@/components/base/WhButton.vue'
 import { confirm } from '@/components/base/confirm'
 import { toast } from '@/components/base/toast'
 import { useClickOutside } from '@/composables/useClickOutside'
 import { useSeo } from '@/composables/useSeo'
 import { useDictStore } from '@/stores'
-import type { AgentEvent } from '@/types/agent'
+import {
+  WORKFLOW,
+  WORKFLOW_ENDPOINTS,
+  WORKFLOW_LABELS,
+  isWorkflowKind,
+  type AgentEvent,
+  type AgentRoute,
+  type AgentStep,
+  type AgentStepStatus,
+  type AgentTechRef,
+  type ChatRequest,
+  type WorkflowKind,
+} from '@/types/agent'
 import type { ID } from '@/types/common'
 import type { TagVO } from '@/types/content'
-import type { SearchTagBriefVO } from '@/types/search'
+import type { ConversationDetailVO, ConversationItemVO } from '@/types/conversation'
+import { AI_TEXT_MAX_LENGTH, consumeTextSelection } from '@/utils/ai-entry'
 import { renderMarkdown } from '@/utils/markdown'
-
-type Workflow = 'qa' | 'learning_path'
 
 interface StreamRequest {
   messageId: string
-  workflow: Workflow
+  workflow: WorkflowKind
   question: string
   technology?: string
   knownTechnologies?: string[]
@@ -34,99 +46,83 @@ interface ChatMessage {
   status: 'streaming' | 'done' | 'error' | 'stopped'
   error?: string
   html?: string
+  steps: AgentStep[]
   /** 重试所需：messageId / 工作流 / 原始问题 */
   request?: StreamRequest
 }
 
-interface ReferenceArticle {
-  articleId: ID
-  title: string
-  summary: string
-  tags: SearchTagBriefVO[]
-}
-
 interface RouteStage {
-  index: number
-  title: string
-  id: string
-  technologies: string[]
+  depth: number
+  tags: AgentTechRef[]
 }
 
 interface StageReference extends RouteStage {
-  references: ReferenceArticle[]
-  loading: boolean
-  error: string
-  loaded: boolean
-  request: number
+  id: string
 }
 
 interface LocalSession {
   id: ID
   title: string
-  workflow: Workflow
+  workflow: WorkflowKind
   conversationId: string | null
   messages: ChatMessage[]
-  references: ReferenceArticle[]
-  referencesQuestion: string
-  referencesLoading: boolean
-  referencesError: string
-  referencesLoaded: boolean
-  referenceRequest: number
   stageReferences: StageReference[]
   routeTarget: string
+  /** 文本问答的选中文本；每轮请求都要带，后端不落库 */
+  textContext: string
+  /** 是否已从服务端加载过详情；本地草稿视为已加载 */
+  detailLoaded: boolean
 }
 
 type TagNavigation =
   | { name: 'tech-detail'; params: { tagId: ID } }
   | { name: 'search'; query: { type: string; keyword: string } }
 
-interface StoredMessage {
+interface DraftMessageSnapshot {
   id: string
   role: 'user' | 'assistant'
   content: string
   status: 'done' | 'error' | 'stopped'
   error?: string
+  steps: AgentStep[]
   request?: StreamRequest
 }
 
-interface StoredStageReference {
-  index: number
-  title: string
-  id: string
-  technologies: string[]
-  references: ReferenceArticle[]
-  loaded: boolean
-}
-
-interface StoredSession {
+/** 尚未拿到 meta 的新会话草稿：只存在于本地，不进服务端列表。 */
+interface DraftSnapshot {
   id: string
   title: string
-  workflow: Workflow
-  conversationId: string | null
-  messages: StoredMessage[]
-  references: ReferenceArticle[]
-  referencesQuestion: string
-  referencesLoaded: boolean
-  stageReferences: StoredStageReference[]
+  workflow: WorkflowKind
+  textContext: string
   routeTarget: string
+  stageReferences: StageReference[]
+  messages: DraftMessageSnapshot[]
 }
 
-interface StoredPayload {
-  version: number
-  sessions: StoredSession[]
-  activeSessionId: string
+/** localStorage 只留草稿：输入内容、路线参数、未上服务端的会话草稿。 */
+interface DraftCache {
+  draft: string
   targetTechnology: string
   knownTechnologies: string[]
+  textContexts: Record<string, string>
+  drafts: DraftSnapshot[]
+  activeDraftId: string | null
 }
 
-const STORAGE_KEY = 'wisdomhub:ai.sessions'
-const STORAGE_VERSION = 1
-const MAX_SESSIONS = 30
+const DRAFT_KEY = 'wisdomhub:ai.draft'
+/** 会话列表分页大小：后端 pageSize 上限 100 */
+const SESSIONS_PAGE_SIZE = 20
 
-const WORKFLOWS: { value: Workflow; label: string; desc: string }[] = [
-  { value: 'qa', label: '技术问答', desc: '带引用的连续追问' },
-  { value: 'learning_path', label: '学习路线', desc: '从目标到分阶段计划' },
+const WORKFLOWS: { value: WorkflowKind; label: string; desc: string }[] = [
+  { value: WORKFLOW.QA, label: '技术问答', desc: '连续追问的技术答疑' },
+  { value: WORKFLOW.LEARNING_PATH, label: '学习路线', desc: '从目标到分阶段计划' },
 ]
+
+const STEP_STATUS_LABELS: Record<AgentStepStatus, string> = {
+  running: '执行中',
+  done: '完成',
+  error: '失败',
+}
 
 const QA_SAMPLES = [
   'Redis 缓存一致性怎么保证？',
@@ -135,32 +131,24 @@ const QA_SAMPLES = [
 ]
 
 const router = useRouter()
+const route = useRoute()
 const dict = useDictStore()
-const restored = loadStoredState()
-const initialSessions: LocalSession[] = restored?.sessions.length
-  ? restored.sessions
-  : [createSession(createId(), 'qa')]
-const sessions = ref<LocalSession[]>(initialSessions)
-const initialActiveId =
-  restored?.activeSessionId &&
-  initialSessions.some((session) => session.id === restored.activeSessionId)
-    ? restored.activeSessionId
-    : (initialSessions[0]?.id ?? '')
-const activeSessionId = ref<ID>(initialActiveId)
-const workflow = ref<Workflow>(
-  initialSessions.find((session) => session.id === initialActiveId)?.workflow ?? 'qa',
-)
-const draft = ref('')
+const draftCache = loadDraftCache()
+const sessions = ref<LocalSession[]>([])
+const drafts = ref<LocalSession[]>(restoreDrafts(draftCache.drafts))
+const restoredActiveDraftId = draftCache.activeDraftId
+const activeSessionId = ref<ID>('')
+const workflow = ref<WorkflowKind>(WORKFLOW.QA)
+const draft = ref(draftCache.draft)
 const inputRef = ref<HTMLTextAreaElement | null>(null)
 const messagesRef = ref<HTMLElement | null>(null)
 const atBottom = ref(true)
 const streaming = ref<{ sessionId: ID; messageId: string } | null>(null)
 const tagRouteCache = new Map<string, TagNavigation>()
-const restoredTarget = restored?.targetTechnology ?? ''
-const targetTechnology = ref(restoredTarget)
+const targetTechnology = ref(draftCache.targetTechnology)
 const knownTechnologies = ref<string[]>(
-  (restored?.knownTechnologies ?? []).filter(
-    (item) => item.toLowerCase() !== restoredTarget.trim().toLowerCase(),
+  draftCache.knownTechnologies.filter(
+    (item) => item.toLowerCase() !== draftCache.targetTechnology.trim().toLowerCase(),
   ),
 )
 const targetPickerRef = ref<HTMLElement | null>(null)
@@ -168,26 +156,57 @@ const targetOpen = ref(false)
 const knownFilter = ref('')
 const customKnown = ref('')
 const online = ref(typeof navigator === 'undefined' ? true : navigator.onLine)
+const sessionsLoading = ref(true)
+const detailLoading = ref(false)
+const sessionPage = ref(1)
+const sessionTotal = ref(0)
+const hasMore = ref(false)
+const loadingMore = ref(false)
+const deletingId = ref<ID | null>(null)
 
 let activeController: AbortController | null = null
 let flushTimer: number | null = null
-let saveTimer: number | null = null
+let draftTimer: number | null = null
+let detailTicket = 0
+const detailTickets = new Map<string, number>()
 
 const activeSession = computed(
-  () => sessions.value.find((session) => session.id === activeSessionId.value) ?? null,
+  () =>
+    drafts.value.find((session) => session.id === activeSessionId.value) ??
+    sessions.value.find((session) => session.id === activeSessionId.value) ??
+    null,
 )
+/** 侧栏展示顺序：未发送的草稿在前，服务端会话在后。 */
+const listedSessions = computed(() => [...drafts.value, ...sessions.value])
 const activeMessages = computed(() => activeSession.value?.messages ?? [])
-const references = computed(() => activeSession.value?.references ?? [])
-const referencesQuestion = computed(() => activeSession.value?.referencesQuestion ?? '')
-const referencesLoading = computed(() => activeSession.value?.referencesLoading ?? false)
-const referencesError = computed(() => activeSession.value?.referencesError ?? '')
-const referencesLoaded = computed(() => activeSession.value?.referencesLoaded ?? false)
 const stageReferences = computed(() => activeSession.value?.stageReferences ?? [])
 const routeTarget = computed(() => activeSession.value?.routeTarget ?? '')
+const activeTextContext = computed(() => activeSession.value?.textContext ?? '')
+/** 路线流程结束但没有阶段数据：如实提示，不把空侧栏留作“生成中”。 */
+const routeMissing = computed(
+  () =>
+    workflow.value === WORKFLOW.LEARNING_PATH &&
+    stageReferences.value.length === 0 &&
+    activeMessages.value.some(
+      (message) => message.role === 'assistant' && message.status === 'done',
+    ),
+)
 
-const workflowLabel = computed(() => (workflow.value === 'qa' ? '技术问答' : '学习路线'))
+const sessionsMeta = computed(() =>
+  sessionsLoading.value
+    ? '正在载入会话…'
+    : `服务端共 ${sessionTotal.value} 个会话 · 切换时按需加载`,
+)
+const workflowLabel = computed(() => WORKFLOW_LABELS[workflow.value])
 const isStreaming = computed(() => streaming.value !== null)
-const canSend = computed(() => draft.value.trim().length > 0 && !isStreaming.value)
+const canSend = computed(
+  () =>
+    draft.value.trim().length > 0 &&
+    !isStreaming.value &&
+    !sessionsLoading.value &&
+    !detailLoading.value &&
+    (workflow.value !== WORKFLOW.TEXT_QA || activeTextContext.value.length > 0),
+)
 /** 目标技术必须精确命中标签库，图谱外的技术不生成路线。 */
 const matchedTarget = computed(() => {
   const name = targetTechnology.value.trim().toLowerCase()
@@ -245,25 +264,81 @@ const composerHint = computed(() => {
 })
 
 const statusLabel = computed(() => {
-  if (isStreaming.value) return workflow.value === 'qa' ? '正在回答…' : '正在规划路线…'
-  return workflow.value === 'qa' ? 'QA 可用' : '学习路线'
+  if (workflow.value === WORKFLOW.QA) {
+    return isStreaming.value ? '正在回答…' : 'QA 可用'
+  }
+  if (workflow.value === WORKFLOW.TEXT_QA) {
+    return isStreaming.value ? '正在分析…' : '文本问答'
+  }
+  return isStreaming.value ? '正在规划路线…' : '学习路线'
 })
 
-function createSession(id: ID, nextWorkflow: Workflow): LocalSession {
+const workbenchEyebrow = computed(() => {
+  if (workflow.value === WORKFLOW.QA) return '[ QA / WORKBENCH ]'
+  if (workflow.value === WORKFLOW.TEXT_QA) return '[ TEXT / WORKBENCH ]'
+  return '[ LEARNING / WORKBENCH ]'
+})
+
+function queryValue(value: unknown): string {
+  if (Array.isArray(value)) return typeof value[0] === 'string' ? value[0] : ''
+  return typeof value === 'string' ? value : ''
+}
+
+/** 深链只消费一次：应用后清掉 query，刷新不会重复带入文本。 */
+async function applyEntryQuery(): Promise<void> {
+  const rawWorkflow = queryValue(route.query.workflow)
+  const technology = queryValue(route.query.technology).trim()
+  const tagId = queryValue(route.query.tagId).trim()
+  if (!rawWorkflow && !technology && !tagId) return
+
+  const parsedWorkflow = Number(rawWorkflow)
+  const mode: WorkflowKind | null = isWorkflowKind(parsedWorkflow) ? parsedWorkflow : null
+
+  if (technology || tagId) {
+    let target = technology
+    if (tagId) {
+      await dict.loadTags()
+      target = dict.getTag(tagId)?.name ?? target
+    }
+    if (target) targetTechnology.value = target
+  }
+
+  if (mode === WORKFLOW.TEXT_QA) {
+    const text = consumeTextSelection()
+    if (text) {
+      const reuse = drafts.value.find((session) => session.messages.length === 0)
+      const draftSession = reuse ?? createDraftSession(createId(), WORKFLOW.TEXT_QA)
+      if (!reuse) drafts.value.unshift(draftSession)
+      draftSession.workflow = WORKFLOW.TEXT_QA
+      draftSession.textContext = text
+      activeSessionId.value = draftSession.id
+      workflow.value = WORKFLOW.TEXT_QA
+      draft.value = ''
+      atBottom.value = true
+      scheduleDraftSave()
+      focusInput()
+    } else {
+      toast.info('未读取到选中的文本，请回到文章中重新选择。')
+    }
+  } else if (mode !== null) {
+    selectWorkflow(mode)
+  }
+
+  await router.replace({ query: {} })
+}
+
+/** 新会话在拿到 meta 之前只是本地草稿，不产生服务端记录。 */
+function createDraftSession(id: ID, nextWorkflow: WorkflowKind): LocalSession {
   return {
     id,
     title: '新的对话',
     workflow: nextWorkflow,
     conversationId: null,
     messages: [],
-    references: [],
-    referencesQuestion: '',
-    referencesLoading: false,
-    referencesError: '',
-    referencesLoaded: false,
-    referenceRequest: 0,
     stageReferences: [],
     routeTarget: '',
+    textContext: '',
+    detailLoaded: true,
   }
 }
 
@@ -274,282 +349,550 @@ function createId(): string {
   return `id-${Date.now()}-${Math.random().toString(16).slice(2)}`
 }
 
-function isReferenceArticle(value: unknown): value is ReferenceArticle {
+function isAgentStep(value: unknown): value is AgentStep {
   if (typeof value !== 'object' || value === null) return false
-  const record = value as Partial<ReferenceArticle>
-  return typeof record.articleId === 'string' && typeof record.title === 'string'
+  const record = value as Partial<AgentStep>
+  return (
+    typeof record.id === 'string' &&
+    typeof record.tool === 'string' &&
+    typeof record.label === 'string' &&
+    (record.status === 'running' || record.status === 'done' || record.status === 'error')
+  )
 }
+
+const cachedTextContexts = new Map<string, string>(Object.entries(draftCache.textContexts))
 
 function isStreamRequest(value: unknown): value is StreamRequest {
   if (typeof value !== 'object' || value === null) return false
   const record = value as Partial<StreamRequest>
   return (
     typeof record.messageId === 'string' &&
-    (record.workflow === 'qa' || record.workflow === 'learning_path') &&
-    typeof record.question === 'string'
+    isWorkflowKind(record.workflow) &&
+    typeof record.question === 'string' &&
+    (record.technology === undefined || typeof record.technology === 'string') &&
+    (record.knownTechnologies === undefined ||
+      (Array.isArray(record.knownTechnologies) &&
+        record.knownTechnologies.every((item) => typeof item === 'string')))
   )
 }
 
-function hydrateSession(value: unknown): LocalSession | null {
-  if (typeof value !== 'object' || value === null) return null
-  const record = value as Partial<StoredSession>
-  if (typeof record.id !== 'string' || !Array.isArray(record.messages)) return null
-
-  const sessionWorkflow: Workflow = record.workflow === 'learning_path' ? 'learning_path' : 'qa'
-  const messages = record.messages.flatMap((item) => {
-    if (typeof item !== 'object' || item === null) return []
-    const message = item as Partial<StoredMessage>
-    if (typeof message.content !== 'string') return []
-
-    const status =
-      message.status === 'done' || message.status === 'error' ? message.status : 'stopped'
-    const request: StreamRequest | undefined = isStreamRequest(message.request)
-      ? {
-          messageId: message.request.messageId,
-          workflow: message.request.workflow,
-          question: message.request.question,
-          technology:
-            typeof message.request.technology === 'string' ? message.request.technology : undefined,
-          knownTechnologies: Array.isArray(message.request.knownTechnologies)
-            ? message.request.knownTechnologies.filter(
-                (item): item is string => typeof item === 'string',
-              )
-            : [],
-        }
-      : undefined
-
-    const restoredMessage: ChatMessage = {
-      id: typeof message.id === 'string' ? message.id : createId(),
-      role: message.role === 'user' ? 'user' : 'assistant',
-      content: message.content,
-      status,
-      error: typeof message.error === 'string' ? message.error : undefined,
-      request,
-    }
-    restoredMessage.html =
-      sessionWorkflow === 'learning_path'
-        ? parseRoute(message.content).html
-        : renderMarkdown(message.content)
-    return [restoredMessage]
-  })
-
-  const references = Array.isArray(record.references)
-    ? record.references.filter(isReferenceArticle).map((reference) => ({
-        articleId: reference.articleId,
-        title: reference.title,
-        summary: typeof reference.summary === 'string' ? reference.summary : '',
-        tags: Array.isArray(reference.tags) ? reference.tags : [],
-      }))
-    : []
-
-  const stageReferences = Array.isArray(record.stageReferences)
-    ? record.stageReferences.flatMap((item) => {
-        if (typeof item !== 'object' || item === null) return []
-        const stage = item as Partial<StoredStageReference>
-        if (typeof stage.title !== 'string' || typeof stage.id !== 'string') return []
-
-        const stageRefs = Array.isArray(stage.references)
-          ? stage.references.filter(isReferenceArticle).map((reference) => ({
-              articleId: reference.articleId,
-              title: reference.title,
-              summary: typeof reference.summary === 'string' ? reference.summary : '',
-              tags: Array.isArray(reference.tags) ? reference.tags : [],
-            }))
-          : []
-
-        return [
-          reactive<StageReference>({
-            index: typeof stage.index === 'number' ? stage.index : 1,
-            title: stage.title,
-            id: stage.id,
-            technologies: Array.isArray(stage.technologies)
-              ? stage.technologies.filter(
-                  (technology): technology is string => typeof technology === 'string',
-                )
-              : [],
-            references: stageRefs,
-            loading: false,
-            error: '',
-            loaded: Boolean(stage.loaded) || stageRefs.length > 0,
-            request: 0,
-          }),
-        ]
-      })
-    : []
-
-  return {
-    id: record.id,
-    title: typeof record.title === 'string' && record.title ? record.title : '新的对话',
-    workflow: sessionWorkflow,
-    conversationId: typeof record.conversationId === 'string' ? record.conversationId : null,
-    messages,
-    references,
-    referencesQuestion:
-      typeof record.referencesQuestion === 'string' ? record.referencesQuestion : '',
-    referencesLoading: false,
-    referencesError: '',
-    referencesLoaded: Boolean(record.referencesLoaded) || references.length > 0,
-    referenceRequest: 0,
-    stageReferences,
-    routeTarget: typeof record.routeTarget === 'string' ? record.routeTarget : '',
-  }
+function isTechRef(value: unknown): value is AgentTechRef {
+  if (typeof value !== 'object' || value === null) return false
+  const record = value as Partial<AgentTechRef>
+  return typeof record.tagId === 'string' && typeof record.name === 'string'
 }
 
-function loadStoredState(): {
-  sessions: LocalSession[]
-  activeSessionId: string
-  targetTechnology: string
-  knownTechnologies: string[]
-} | null {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return null
+function parseStageReferences(value: unknown): StageReference[] {
+  if (!Array.isArray(value)) return []
+  const stages: StageReference[] = []
+  for (const item of value) {
+    if (typeof item !== 'object' || item === null) continue
+    const record = item as Partial<StageReference>
+    if (typeof record.id !== 'string' || typeof record.depth !== 'number') continue
+    if (!Array.isArray(record.tags)) continue
+    stages.push({ id: record.id, depth: record.depth, tags: record.tags.filter(isTechRef) })
+  }
+  return stages
+}
 
-    const payload = JSON.parse(raw) as Partial<StoredPayload>
-    if (payload.version !== STORAGE_VERSION || !Array.isArray(payload.sessions)) return null
-
-    const parsed = payload.sessions.slice(0, MAX_SESSIONS).flatMap((item) => {
-      const session = hydrateSession(item)
-      return session ? [session] : []
+function parseDraftMessages(value: unknown): DraftMessageSnapshot[] {
+  if (!Array.isArray(value)) return []
+  const messages: DraftMessageSnapshot[] = []
+  for (const item of value) {
+    if (typeof item !== 'object' || item === null) continue
+    const record = item as Partial<DraftMessageSnapshot> & { status?: unknown }
+    if (typeof record.id !== 'string' || typeof record.content !== 'string') continue
+    if (record.role !== 'user' && record.role !== 'assistant') continue
+    // 缓存时仍在流式的消息，恢复后按“已停止”收口
+    const status =
+      record.status === 'done' || record.status === 'error' || record.status === 'stopped'
+        ? record.status
+        : 'stopped'
+    messages.push({
+      id: record.id,
+      role: record.role,
+      content: record.content,
+      status,
+      error: typeof record.error === 'string' ? record.error : undefined,
+      steps: Array.isArray(record.steps) ? record.steps.filter(isAgentStep) : [],
+      request: isStreamRequest(record.request) ? record.request : undefined,
     })
-    if (!parsed.length) return null
+  }
+  return messages
+}
 
-    const active =
-      typeof payload.activeSessionId === 'string' &&
-      parsed.some((session) => session.id === payload.activeSessionId)
-        ? payload.activeSessionId
-        : (parsed[0]?.id ?? '')
+function parseDraftSnapshots(value: unknown): DraftSnapshot[] {
+  if (!Array.isArray(value)) return []
+  const snapshots: DraftSnapshot[] = []
+  for (const item of value) {
+    if (typeof item !== 'object' || item === null) continue
+    const record = item as Partial<DraftSnapshot>
+    if (typeof record.id !== 'string' || !isWorkflowKind(record.workflow)) continue
+    snapshots.push({
+      id: record.id,
+      title: typeof record.title === 'string' && record.title ? record.title : '新的对话',
+      workflow: record.workflow,
+      textContext:
+        typeof record.textContext === 'string'
+          ? record.textContext.slice(0, AI_TEXT_MAX_LENGTH)
+          : '',
+      routeTarget: typeof record.routeTarget === 'string' ? record.routeTarget : '',
+      stageReferences: parseStageReferences(record.stageReferences),
+      messages: parseDraftMessages(record.messages),
+    })
+  }
+  return snapshots
+}
+
+function restoreDrafts(snapshots: DraftSnapshot[]): LocalSession[] {
+  return snapshots.map((snapshot) => ({
+    id: snapshot.id,
+    title: snapshot.title,
+    workflow: snapshot.workflow,
+    conversationId: null,
+    messages: snapshot.messages.map((message) => ({
+      ...message,
+      html: renderMarkdown(message.content),
+    })),
+    stageReferences: snapshot.stageReferences,
+    routeTarget: snapshot.routeTarget,
+    textContext: snapshot.textContext,
+    detailLoaded: true,
+  }))
+}
+
+/** 只缓存有内容的草稿：空草稿刷新后没有可恢复的东西。 */
+function serializeDrafts(): DraftSnapshot[] {
+  return drafts.value
+    .filter((session) => session.messages.length > 0 || session.textContext)
+    .map((session) => ({
+      id: session.id,
+      title: session.title,
+      workflow: session.workflow,
+      textContext: session.textContext,
+      routeTarget: session.routeTarget,
+      stageReferences: session.stageReferences,
+      messages: session.messages.map((message) => ({
+        id: message.id,
+        role: message.role,
+        content: message.content,
+        status: message.status === 'streaming' ? 'stopped' : message.status,
+        error: message.error,
+        steps: message.steps,
+        request: message.request,
+      })),
+    }))
+}
+
+function loadDraftCache(): DraftCache {
+  const empty: DraftCache = {
+    draft: '',
+    targetTechnology: '',
+    knownTechnologies: [],
+    textContexts: {},
+    drafts: [],
+    activeDraftId: null,
+  }
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY)
+    if (!raw) return empty
+    const parsed = JSON.parse(raw) as Partial<DraftCache>
+
+    const textContexts: Record<string, string> = {}
+    if (parsed.textContexts && typeof parsed.textContexts === 'object') {
+      for (const [key, value] of Object.entries(parsed.textContexts)) {
+        if (typeof value === 'string') textContexts[key] = value.slice(0, AI_TEXT_MAX_LENGTH)
+      }
+    }
 
     return {
-      sessions: parsed,
-      activeSessionId: active,
-      targetTechnology:
-        typeof payload.targetTechnology === 'string' ? payload.targetTechnology : '',
-      knownTechnologies: Array.isArray(payload.knownTechnologies)
-        ? payload.knownTechnologies.filter((item): item is string => typeof item === 'string')
+      draft: typeof parsed.draft === 'string' ? parsed.draft : '',
+      targetTechnology: typeof parsed.targetTechnology === 'string' ? parsed.targetTechnology : '',
+      knownTechnologies: Array.isArray(parsed.knownTechnologies)
+        ? parsed.knownTechnologies.filter((item): item is string => typeof item === 'string')
         : [],
+      textContexts,
+      drafts: parseDraftSnapshots(parsed.drafts),
+      activeDraftId: typeof parsed.activeDraftId === 'string' ? parsed.activeDraftId : null,
     }
   } catch {
-    return null
+    return empty
   }
 }
 
-function serializeSession(session: LocalSession): StoredSession {
-  return {
-    id: session.id,
-    title: session.title,
-    workflow: session.workflow,
-    conversationId: session.conversationId,
-    messages: session.messages.map((message) => ({
-      id: message.id,
-      role: message.role,
-      content: message.content,
-      status: message.status === 'done' || message.status === 'error' ? message.status : 'stopped',
-      error: message.error,
-      request: message.request,
-    })),
-    references: session.references,
-    referencesQuestion: session.referencesQuestion,
-    referencesLoaded: session.referencesLoaded,
-    stageReferences: session.stageReferences.map((stage) => ({
-      index: stage.index,
-      title: stage.title,
-      id: stage.id,
-      technologies: stage.technologies,
-      references: stage.references,
-      loaded: stage.loaded,
-    })),
-    routeTarget: session.routeTarget,
-  }
-}
-
-function saveState(): void {
+/** 只落草稿：输入、路线参数、未上服务端的会话；服务端会话内容以接口为准。 */
+function saveDraft(): void {
   try {
-    const payload: StoredPayload = {
-      version: STORAGE_VERSION,
-      sessions: sessions.value.slice(0, MAX_SESSIONS).map(serializeSession),
-      activeSessionId: activeSessionId.value,
+    const textContexts: Record<string, string> = Object.fromEntries(cachedTextContexts)
+    for (const session of sessions.value) {
+      if (!session.textContext) continue
+      textContexts[session.conversationId ?? session.id] = session.textContext
+    }
+
+    const payload: DraftCache = {
+      draft: draft.value,
       targetTechnology: targetTechnology.value,
       knownTechnologies: [...knownTechnologies.value],
+      textContexts,
+      drafts: serializeDrafts(),
+      activeDraftId: drafts.value.some((session) => session.id === activeSessionId.value)
+        ? activeSessionId.value
+        : null,
     }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload))
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(payload))
   } catch {
-    // 隐私模式 / 存储配额不足时静默失败，不影响对话
+    // 隐私模式 / 存储配额不足时静默跳过，不影响对话
   }
 }
 
-function scheduleSave(): void {
-  if (saveTimer !== null) window.clearTimeout(saveTimer)
-  saveTimer = window.setTimeout(() => {
-    saveTimer = null
-    saveState()
+function scheduleDraftSave(): void {
+  if (draftTimer !== null) window.clearTimeout(draftTimer)
+  draftTimer = window.setTimeout(() => {
+    draftTimer = null
+    saveDraft()
   }, 300)
 }
 
-function trimSessions(): void {
-  while (sessions.value.length > MAX_SESSIONS) {
-    const removed = sessions.value.pop()
-    if (removed && streaming.value?.sessionId === removed.id) {
-      activeController?.abort()
-      streaming.value = null
+function toSessionSummary(item: ConversationItemVO): LocalSession {
+  return {
+    id: item.id,
+    title: item.title || '新的对话',
+    workflow: isWorkflowKind(item.workflow) ? item.workflow : WORKFLOW.QA,
+    conversationId: item.id,
+    messages: [],
+    stageReferences: [],
+    routeTarget: '',
+    textContext: cachedTextContexts.get(item.id)?.slice(0, AI_TEXT_MAX_LENGTH) ?? '',
+    detailLoaded: false,
+  }
+}
+
+async function bootstrapSessions(): Promise<void> {
+  sessionsLoading.value = true
+  try {
+    const result = await listConversations(
+      { page: 1, pageSize: SESSIONS_PAGE_SIZE },
+      { skipErrorToast: true },
+    )
+    const summaries = result.items.map(toSessionSummary)
+    sessionPage.value = result.page
+    sessionTotal.value = result.total
+    hasMore.value = result.page < result.pages
+    sessions.value = summaries
+
+    const restored = drafts.value.find((session) => session.id === restoredActiveDraftId)
+    if (restored) {
+      activeSessionId.value = restored.id
+      workflow.value = restored.workflow
+      return
     }
+
+    if (summaries.length) {
+      const first = summaries[0]
+      activeSessionId.value = first.id
+      workflow.value = first.workflow
+      await loadSessionDetail(first)
+      return
+    }
+
+    if (!drafts.value.length) drafts.value.push(createDraftSession(createId(), WORKFLOW.QA))
+    const draft = drafts.value[0]
+    activeSessionId.value = draft.id
+    workflow.value = draft.workflow
+  } catch {
+    sessionPage.value = 1
+    sessionTotal.value = 0
+    hasMore.value = false
+    sessions.value = []
+    if (!drafts.value.length) drafts.value.push(createDraftSession(createId(), WORKFLOW.QA))
+    const draft = drafts.value[0]
+    activeSessionId.value = draft.id
+    workflow.value = draft.workflow
+    toast.warning('会话列表加载失败，已切换为本地新建对话')
+  } finally {
+    sessionsLoading.value = false
+  }
+}
+
+/** 追加下一页；服务端按 updated_at 排序，客户端只按会话 id 去重、不重排。 */
+async function loadMoreSessions(): Promise<void> {
+  if (loadingMore.value || sessionsLoading.value || deletingId.value || !hasMore.value) return
+
+  loadingMore.value = true
+  try {
+    const result = await listConversations(
+      { page: sessionPage.value + 1, pageSize: SESSIONS_PAGE_SIZE },
+      { skipErrorToast: true },
+    )
+    const knownIds = new Set(
+      sessions.value
+        .map((session) => session.conversationId)
+        .filter((id): id is string => id !== null),
+    )
+    const appended = result.items.filter((item) => !knownIds.has(item.id)).map(toSessionSummary)
+
+    if (appended.length) sessions.value.push(...appended)
+    sessionPage.value = result.page
+    sessionTotal.value = result.total
+    hasMore.value = result.page < result.pages
+  } catch {
+    toast.error('加载更多会话失败，请重试')
+  } finally {
+    loadingMore.value = false
+  }
+}
+
+async function loadSessionDetail(session: LocalSession): Promise<void> {
+  const conversationId = session.conversationId
+  if (session.detailLoaded || !conversationId || detailTickets.has(session.id)) return
+
+  const ticket = ++detailTicket
+  detailTickets.set(session.id, ticket)
+  if (activeSessionId.value === session.id) detailLoading.value = true
+
+  try {
+    const detail = await getConversation(conversationId, { skipErrorToast: true })
+    // 请求期间切换 / 重载会话时，旧响应直接丢弃，避免串到别的会话
+    if (detailTickets.get(session.id) !== ticket) return
+    if (!sessions.value.includes(session)) return
+    applyDetail(session, detail)
+  } catch {
+    if (detailTickets.get(session.id) === ticket && activeSessionId.value === session.id) {
+      toast.error('会话详情加载失败，请稍后重试')
+    }
+  } finally {
+    if (detailTickets.get(session.id) === ticket) {
+      detailTickets.delete(session.id)
+      if (activeSessionId.value === session.id) detailLoading.value = false
+    }
+  }
+}
+
+function applyDetail(session: LocalSession, detail: ConversationDetailVO): void {
+  session.messages = detail.messages.map((message) => ({
+    id: message.id,
+    role: message.role,
+    content: message.content,
+    status: message.status === 'done' ? 'done' : message.status === 'error' ? 'error' : 'stopped',
+    steps: Array.isArray(message.steps) ? message.steps.filter(isAgentStep) : [],
+    html: renderMarkdown(message.content),
+  }))
+  session.detailLoaded = true
+  if (detail.title) session.title = detail.title
+
+  let nextWorkflow: WorkflowKind | null = isWorkflowKind(detail.workflow) ? detail.workflow : null
+  if (nextWorkflow === null) {
+    for (let index = detail.messages.length - 1; index >= 0; index -= 1) {
+      const itemWorkflow = detail.messages[index].workflow
+      if (isWorkflowKind(itemWorkflow)) {
+        nextWorkflow = itemWorkflow
+        break
+      }
+    }
+  }
+  if (nextWorkflow !== null) session.workflow = nextWorkflow
+
+  let route: AgentRoute | null = null
+  for (let index = detail.messages.length - 1; index >= 0; index -= 1) {
+    const item = detail.messages[index]
+    if (item.role === 'assistant' && item.artifacts?.route) {
+      route = item.artifacts.route
+      break
+    }
+  }
+  if (route) {
+    applyRoute(session, route)
+  } else {
+    session.routeTarget = ''
+    session.stageReferences = []
+  }
+
+  if (session.workflow === WORKFLOW.TEXT_QA) {
+    session.textContext =
+      cachedTextContexts.get(session.conversationId ?? session.id)?.slice(0, AI_TEXT_MAX_LENGTH) ??
+      ''
+  }
+
+  if (activeSessionId.value === session.id) {
+    workflow.value = session.workflow
+    atBottom.value = true
+    void nextTick(scrollToBottom)
   }
 }
 
 async function removeSession(session: LocalSession): Promise<void> {
+  if (deletingId.value) return
+
+  const isDraft = session.conversationId === null
   const ok = await confirm({
-    title: '删除会话',
-    message: `删除后本机保存的这段对话会消失，确定删除「${session.title}」？`,
+    title: isDraft ? '删除草稿' : '删除会话',
+    message: isDraft
+      ? `删除后草稿「${session.title}」中未发送的内容将无法恢复，确定删除？`
+      : `删除后「${session.title}」与其中的消息将无法恢复，确定删除？`,
     confirmText: '删除',
     danger: true,
   })
   if (!ok) return
 
-  if (streaming.value?.sessionId === session.id) {
-    activeController?.abort()
-    streaming.value = null
+  if (isDraft) {
+    removeDraftSession(session)
+    scheduleDraftSave()
+    toast.success('草稿已删除')
+    return
   }
+
+  const conversationId = session.conversationId
+  if (!conversationId) return
+
+  deletingId.value = session.id
+  try {
+    await deleteConversation(conversationId, { skipErrorToast: true })
+    removeServerSession(session)
+    scheduleDraftSave()
+    toast.success('会话已删除')
+    await refreshSessionsAfterDelete()
+  } catch (error) {
+    if (isApiError(error) && error.code === 404) {
+      // 已被其他端删除或不属于当前用户：按“已删除”收口
+      removeServerSession(session)
+      scheduleDraftSave()
+      toast.info('会话不存在或已被删除，已从列表移除')
+      await refreshSessionsAfterDelete()
+    } else {
+      toast.error(isApiError(error) ? error.message : '删除失败，请稍后重试')
+    }
+  } finally {
+    deletingId.value = null
+  }
+}
+
+function stopSessionStream(session: LocalSession): void {
+  if (streaming.value?.sessionId !== session.id) return
+  activeController?.abort()
+  streaming.value = null
+}
+
+/** 草稿只存在于本地：删除不调接口，也不影响服务端会话总数。 */
+function removeDraftSession(session: LocalSession): void {
+  stopSessionStream(session)
+
+  const index = drafts.value.findIndex((item) => item.id === session.id)
+  if (index < 0) return
+  drafts.value.splice(index, 1)
+
+  if (activeSessionId.value !== session.id) return
+
+  const next = drafts.value[index] ?? drafts.value[0] ?? sessions.value[0]
+  if (next) {
+    activateSession(next)
+    return
+  }
+  const fresh = createDraftSession(createId(), session.workflow)
+  if (session.workflow === WORKFLOW.TEXT_QA) fresh.textContext = session.textContext
+  drafts.value.push(fresh)
+  activeSessionId.value = fresh.id
+  workflow.value = fresh.workflow
+  detailLoading.value = false
+  draft.value = ''
+}
+
+function removeServerSession(session: LocalSession): void {
+  stopSessionStream(session)
 
   const index = sessions.value.findIndex((item) => item.id === session.id)
   if (index < 0) return
   sessions.value.splice(index, 1)
 
-  if (!sessions.value.length) {
-    const next = createSession(createId(), workflow.value)
-    sessions.value.push(next)
-    activeSessionId.value = next.id
-    draft.value = ''
-  } else if (activeSessionId.value === session.id) {
-    const next = sessions.value[Math.min(index, sessions.value.length - 1)] ?? sessions.value[0]
-    if (next) {
-      activeSessionId.value = next.id
-      workflow.value = next.workflow
-      atBottom.value = true
-      void nextTick(scrollToBottom)
-    }
-  }
+  sessionTotal.value = Math.max(0, sessionTotal.value - 1)
+  hasMore.value = sessions.value.length < sessionTotal.value
 
-  saveState()
-  toast.success('会话已删除')
+  if (activeSessionId.value !== session.id) return
+
+  const next =
+    sessions.value[Math.min(index, sessions.value.length - 1)] ??
+    sessions.value[0] ??
+    drafts.value[0]
+  if (next) {
+    activateSession(next)
+    return
+  }
+  const fresh = createDraftSession(createId(), session.workflow)
+  if (session.workflow === WORKFLOW.TEXT_QA) fresh.textContext = session.textContext
+  drafts.value.push(fresh)
+  activeSessionId.value = fresh.id
+  workflow.value = fresh.workflow
+  detailLoading.value = false
+  draft.value = ''
+}
+
+/** 删除后同步列表：只回第一页，按会话 id 复用已加载对象，避免 offset 分页漂移。 */
+async function refreshSessionsAfterDelete(): Promise<void> {
+  try {
+    const result = await listConversations(
+      { page: 1, pageSize: SESSIONS_PAGE_SIZE },
+      { skipErrorToast: true },
+    )
+    const existing = new Map<string, LocalSession>()
+    for (const session of sessions.value) {
+      if (session.conversationId) existing.set(session.conversationId, session)
+    }
+    const firstPage = result.items.map((item) => existing.get(item.id) ?? toSessionSummary(item))
+
+    sessions.value = firstPage
+    sessionPage.value = result.page
+    sessionTotal.value = result.total
+    hasMore.value = result.page < result.pages
+
+    const activeIsDraft = drafts.value.some((session) => session.id === activeSessionId.value)
+    if (!activeIsDraft && !sessions.value.some((session) => session.id === activeSessionId.value)) {
+      const next = drafts.value[0] ?? sessions.value[0]
+      if (next) activateSession(next)
+    }
+  } catch {
+    // 删除已经生效，刷新失败时沿用本地移除结果
+  }
+}
+
+/** 首次 meta 到达：草稿晋升为服务端会话，进入服务端列表并计入总数。 */
+function promoteDraft(session: LocalSession): void {
+  const index = drafts.value.findIndex((item) => item.id === session.id)
+  if (index < 0) return
+  drafts.value.splice(index, 1)
+  sessions.value.unshift(session)
+  sessionTotal.value += 1
+  hasMore.value = sessions.value.length < sessionTotal.value
+}
+
+function activateSession(session: LocalSession): void {
+  activeSessionId.value = session.id
+  workflow.value = session.workflow
+  atBottom.value = true
+  detailLoading.value = !session.detailLoaded && session.conversationId !== null
+  void nextTick(scrollToBottom)
+  if (!session.detailLoaded) void loadSessionDetail(session)
 }
 
 function focusInput(): void {
   void nextTick(() => inputRef.value?.focus())
 }
 
-function selectWorkflow(next: Workflow): void {
+function selectWorkflow(next: WorkflowKind): void {
   if (workflow.value === next) return
   workflow.value = next
 
   const session = activeSession.value
   if (session) {
     // 已有消息的会话不混用模式，切模式时开一个新会话
-    if (session.messages.length > 0 && session.workflow !== next) newSession()
-    else session.workflow = next
+    if (session.messages.length > 0 && session.workflow !== next) {
+      newSession()
+    } else {
+      session.workflow = next
+      if (next !== WORKFLOW.TEXT_QA) session.textContext = ''
+    }
   }
 
-  if (next === 'learning_path') void dict.loadTags()
-  saveState()
+  if (next === WORKFLOW.LEARNING_PATH) void dict.loadTags()
+  scheduleDraftSave()
 }
 
 function selectSession(session: LocalSession): void {
@@ -557,21 +900,26 @@ function selectSession(session: LocalSession): void {
   workflow.value = session.workflow
   draft.value = ''
   atBottom.value = true
+  detailLoading.value = !session.detailLoaded && session.conversationId !== null
   void nextTick(scrollToBottom)
-  saveState()
+  scheduleDraftSave()
+  if (!session.detailLoaded) void loadSessionDetail(session)
 }
 
 function newSession(): void {
-  const session = createSession(createId(), workflow.value)
-  sessions.value.unshift(session)
+  // 空白草稿复用，不产生多条空会话；已有内容的草稿保留
+  const emptyDraft = drafts.value.find((session) => session.messages.length === 0)
+  const session = emptyDraft ?? createDraftSession(createId(), workflow.value)
+  if (!emptyDraft) drafts.value.unshift(session)
+
+  session.workflow = workflow.value
+  session.textContext = workflow.value === WORKFLOW.TEXT_QA ? activeTextContext.value : ''
   activeSessionId.value = session.id
+  workflow.value = session.workflow
   draft.value = ''
   atBottom.value = true
 
-  const overflowed = sessions.value.length > MAX_SESSIONS
-  trimSessions()
-  saveState()
-  if (overflowed) toast.info('最多保留 30 个会话，最早的会话已移除')
+  scheduleDraftSave()
   focusInput()
 }
 
@@ -621,16 +969,21 @@ useClickOutside(targetPickerRef, () => {
   targetOpen.value = false
 })
 
-watch([targetTechnology, knownTechnologies], scheduleSave, { deep: true })
+watch([targetTechnology, knownTechnologies], scheduleDraftSave, { deep: true })
+watch(draft, scheduleDraftSave)
 
 function submit(): void {
-  if (isStreaming.value) return
+  if (isStreaming.value || sessionsLoading.value || detailLoading.value) return
   const question = draft.value.trim()
   if (!question) return
 
   const session = activeSession.value
   if (!session) return
-  void sendMessage(session, question, 'qa')
+  if (workflow.value === WORKFLOW.TEXT_QA && !session.textContext) {
+    toast.info('选中文本已失效，请回到文章中重新选择文本')
+    return
+  }
+  void sendMessage(session, question, workflow.value)
 }
 
 function generateRoute(): void {
@@ -648,13 +1001,15 @@ function generateRoute(): void {
 
   targetTechnology.value = matched.name
   const question = `请为我规划 ${matched.name} 的学习路线`
-  void sendMessage(session, question, 'learning_path', matched.name, [...knownTechnologies.value])
+  void sendMessage(session, question, WORKFLOW.LEARNING_PATH, matched.name, [
+    ...knownTechnologies.value,
+  ])
 }
 
 async function sendMessage(
   session: LocalSession,
   question: string,
-  mode: Workflow,
+  mode: WorkflowKind,
   technology?: string,
   known?: string[],
 ): Promise<void> {
@@ -665,44 +1020,41 @@ async function sendMessage(
     technology,
     knownTechnologies: known ?? [],
   }
-  const user: ChatMessage = { id: createId(), role: 'user', content: question, status: 'done' }
+  const user: ChatMessage = {
+    id: createId(),
+    role: 'user',
+    content: question,
+    status: 'done',
+    steps: [],
+  }
   // reactive：流式增量要直接触发视图更新，不能只改数组里的原始对象
   const assistant = reactive<ChatMessage>({
     id: createId(),
     role: 'assistant',
     content: '',
     status: 'streaming',
+    steps: [],
     request,
   })
 
   session.messages.push(user, assistant)
   if (session.title === '新的对话') {
     session.title = truncate(
-      mode === 'learning_path' ? `规划 ${technology ?? question}` : question,
+      mode === WORKFLOW.LEARNING_PATH ? `规划 ${technology ?? question}` : question,
       18,
     )
   }
   session.workflow = mode
-  session.routeTarget = mode === 'learning_path' ? (technology ?? '') : ''
+  session.routeTarget = mode === WORKFLOW.LEARNING_PATH ? (technology ?? '') : ''
+  session.stageReferences = []
   workflow.value = mode
   draft.value = ''
-  resetReferences(session, request)
-  saveState()
+  scheduleDraftSave()
 
   atBottom.value = true
   void nextTick(scrollToBottom)
 
   await runStream(session, assistant)
-}
-
-function resetReferences(session: LocalSession, request: StreamRequest): void {
-  session.references = []
-  session.referencesQuestion = request.workflow === 'qa' ? request.question : ''
-  session.referencesError = ''
-  session.referencesLoading = false
-  session.referencesLoaded = false
-  session.referenceRequest += 1
-  session.stageReferences = []
 }
 
 async function runStream(session: LocalSession, assistant: ChatMessage): Promise<void> {
@@ -744,27 +1096,41 @@ async function runStream(session: LocalSession, assistant: ChatMessage): Promise
     assistant.error = error
 
     if (status !== 'streaming') {
-      if (request.workflow === 'learning_path') {
-        const route = parseRoute(assistant.content)
-        assistant.html = route.html
-        if (status === 'done') void loadStageReferences(session, route.stages)
-      } else {
-        assistant.html = renderMarkdown(assistant.content)
-        if (status === 'done') void loadReferences(session, request.question)
-      }
+      assistant.html = renderMarkdown(assistant.content)
     }
 
     if (activeSessionId.value === session.id && atBottom.value) {
       void nextTick(scrollToBottom)
     }
 
-    saveState()
+    scheduleDraftSave()
   }
 
   const handleEvent = (event: AgentEvent): void => {
     if (event.event === 'meta') {
+      const previousId = session.conversationId
       session.conversationId = event.data.conversationId
-      saveState()
+      session.detailLoaded = true
+      promoteDraft(session)
+      if (session.textContext) {
+        if (previousId) cachedTextContexts.delete(previousId)
+        // 草稿阶段可能按本地 id 记过选中文本，晋升后统一挂到会话 id 上
+        if (session.id !== session.conversationId) cachedTextContexts.delete(session.id)
+        cachedTextContexts.set(session.conversationId, session.textContext)
+      }
+      const request = assistant.request
+      if (request && request.messageId !== event.data.messageId) {
+        request.messageId = event.data.messageId
+      }
+      scheduleDraftSave()
+      return
+    }
+    if (event.event === 'route') {
+      applyRoute(session, event.data)
+      return
+    }
+    if (event.event === 'steps') {
+      assistant.steps = event.data.steps
       return
     }
     if (event.event === 'delta') {
@@ -775,6 +1141,7 @@ async function runStream(session: LocalSession, assistant: ChatMessage): Promise
     if (event.event === 'done') {
       terminal = true
       finalize('done')
+      void syncTurnDetail(session, assistant)
       return
     }
     if (event.event === 'error') {
@@ -783,25 +1150,34 @@ async function runStream(session: LocalSession, assistant: ChatMessage): Promise
     }
   }
 
+  const endpoint = WORKFLOW_ENDPOINTS[request.workflow]
+  const payload: ChatRequest =
+    request.workflow === WORKFLOW.LEARNING_PATH
+      ? {
+          conversationId: session.conversationId,
+          messageId: request.messageId,
+          question: request.question,
+          technology: request.technology ?? '',
+          knownTechnologies: request.knownTechnologies ?? [],
+        }
+      : request.workflow === WORKFLOW.TEXT_QA
+        ? {
+            conversationId: session.conversationId,
+            messageId: request.messageId,
+            question: request.question,
+            text: session.textContext,
+          }
+        : {
+            conversationId: session.conversationId,
+            messageId: request.messageId,
+            question: request.question,
+          }
+
   try {
-    await chatStream(
-      {
-        conversationId: session.conversationId,
-        messageId: request.messageId,
-        workflow: request.workflow,
-        question: request.question,
-        ...(request.workflow === 'learning_path'
-          ? {
-              technology: request.technology ?? null,
-              knownTechnologies: request.knownTechnologies ?? [],
-            }
-          : {}),
-      },
-      {
-        signal: controller.signal,
-        onEvent: handleEvent,
-      },
-    )
+    await chatStream(endpoint, payload, {
+      signal: controller.signal,
+      onEvent: handleEvent,
+    })
 
     if (controller.signal.aborted) {
       finalize('stopped')
@@ -839,13 +1215,15 @@ function retryMessage(message: ChatMessage): void {
   message.content = ''
   message.error = undefined
   message.html = undefined
+  message.steps = []
   message.status = 'streaming'
 
   session.workflow = request.workflow
-  session.routeTarget = request.workflow === 'learning_path' ? (request.technology ?? '') : ''
+  session.routeTarget =
+    request.workflow === WORKFLOW.LEARNING_PATH ? (request.technology ?? '') : ''
   workflow.value = request.workflow
-  resetReferences(session, request)
-  saveState()
+  session.stageReferences = []
+  scheduleDraftSave()
 
   atBottom.value = true
   void nextTick(scrollToBottom)
@@ -866,130 +1244,42 @@ function handleOnline(): void {
   toast.success('网络已恢复，可重试失败的问答')
 }
 
-async function loadReferences(session: LocalSession, question: string): Promise<void> {
-  const request = (session.referenceRequest += 1)
-  session.referencesQuestion = question
-  session.referencesLoading = true
-  session.referencesError = ''
-  session.referencesLoaded = false
+/** route 事件直出阶段数据：不再解析模型输出的 markdown。 */
+function applyRoute(session: LocalSession, route: AgentRoute): void {
+  session.routeTarget = route.target.name
+  session.stageReferences = route.stages.map((stage) => ({
+    id: `stage-${stage.depth}`,
+    depth: stage.depth,
+    tags: [...stage.tags],
+  }))
+}
 
-  try {
-    const result = await searchArticles(
-      { keyword: question, pageSize: 5 },
-      { skipErrorToast: true },
-    )
-    if (request !== session.referenceRequest) return
+/** done 后以服务端详情为准回填终态：SSE 漏包或 REPLAY 时补齐 steps / artifacts。 */
+async function syncTurnDetail(session: LocalSession, assistant: ChatMessage): Promise<void> {
+  const conversationId = session.conversationId
+  const request = assistant.request
+  if (!conversationId || !request) return
 
-    session.references = result.items.map((item) => ({
-      articleId: item.articleId,
-      title: item.title,
-      summary: item.summary,
-      tags: item.tags ?? [],
-    }))
-    session.referencesLoaded = true
-  } catch (error) {
-    if (request !== session.referenceRequest) return
-    session.referencesError = isApiError(error) ? error.message : '参考资料加载失败。'
-  } finally {
-    if (request === session.referenceRequest) {
-      session.referencesLoading = false
-      saveState()
-    }
+  const detail = await getConversation(conversationId, { skipErrorToast: true }).catch(() => null)
+  if (!detail) return
+  if (assistant.request !== request || assistant.status !== 'done') return
+
+  const message = detail.messages.find(
+    (item) => item.messageId === request.messageId && item.role === 'assistant',
+  )
+  if (!message) return
+
+  if (message.content) {
+    assistant.content = message.content
+    assistant.html = renderMarkdown(message.content)
   }
-}
+  if (message.steps) assistant.steps = message.steps.filter(isAgentStep)
+  if (message.artifacts?.route) applyRoute(session, message.artifacts.route)
 
-function retryReferences(): void {
-  const session = activeSession.value
-  if (!session?.referencesQuestion) return
-  void loadReferences(session, session.referencesQuestion)
-}
+  if (message.status === 'error') assistant.status = 'error'
+  else if (message.status === 'aborted') assistant.status = 'stopped'
 
-function parseRoute(markdown: string): { html: string; stages: RouteStage[] } {
-  const headingPattern = /^##\s*第\s*(\d+)\s*阶段[：:]\s*(.+)$/gm
-  const techPattern = /^-\s*技术[：:]\s*\[([^\]]+)\]\(\/tag\/([^)]*)\)/gm
-  const matches = [...markdown.matchAll(headingPattern)]
-
-  const stages: RouteStage[] = matches.map((match, index) => {
-    const start = (match.index ?? 0) + match[0].length
-    const end = matches[index + 1]?.index ?? markdown.length
-    const section = markdown.slice(start, end)
-    const technologies = [...new Set([...section.matchAll(techPattern)].map((item) => item[1]))]
-    return {
-      index: Number(match[1]) || index + 1,
-      title: match[2].trim(),
-      id: `stage-${index + 1}`,
-      technologies,
-    }
-  })
-
-  const template = document.createElement('template')
-  template.innerHTML = renderMarkdown(markdown)
-
-  let stageNo = 0
-  for (const heading of template.content.querySelectorAll('h2')) {
-    if (/^第\s*\d+\s*阶段/.test(heading.textContent?.trim() ?? '')) {
-      stageNo += 1
-      heading.id = `stage-${stageNo}`
-    }
-  }
-
-  return { html: template.innerHTML, stages }
-}
-
-function createStageReference(stage: RouteStage): StageReference {
-  return reactive<StageReference>({
-    ...stage,
-    references: [],
-    loading: true,
-    error: '',
-    loaded: false,
-    request: 0,
-  })
-}
-
-async function loadStageReferences(session: LocalSession, stages: RouteStage[]): Promise<void> {
-  const stageRefs = stages.map((stage) => createStageReference(stage))
-  session.stageReferences = stageRefs
-  await Promise.all(stageRefs.map((stage) => loadStageReference(stage)))
-}
-
-async function loadStageReference(stage: StageReference): Promise<void> {
-  const request = (stage.request += 1)
-  stage.loading = true
-  stage.error = ''
-  stage.loaded = false
-
-  const keyword = stage.technologies[0] ?? stage.title
-  try {
-    const result = await searchArticles({ keyword, pageSize: 3 }, { skipErrorToast: true })
-    if (request !== stage.request) return
-
-    stage.references = result.items.map((item) => ({
-      articleId: item.articleId,
-      title: item.title,
-      summary: item.summary,
-      tags: item.tags ?? [],
-    }))
-    stage.loaded = true
-  } catch (error) {
-    if (request !== stage.request) return
-    stage.error = isApiError(error) ? error.message : '参考资料加载失败。'
-  } finally {
-    if (request === stage.request) {
-      stage.loading = false
-      saveState()
-    }
-  }
-}
-
-function retryStage(stage: StageReference): void {
-  void loadStageReference(stage)
-}
-
-function scrollToStage(id: string): void {
-  if (!id) return
-  const target = messagesRef.value?.querySelector<HTMLElement>(`[id="${id}"]`)
-  target?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  if (detail.title) session.title = detail.title
 }
 
 function resetRoute(): void {
@@ -1070,21 +1360,30 @@ function truncate(text: string, max: number): string {
   return value.length > max ? `${value.slice(0, max)}…` : value
 }
 
-onMounted(() => {
-  void dict.loadTags()
-  window.addEventListener('pagehide', saveState)
+watch(
+  () => route.query,
+  () => {
+    void applyEntryQuery()
+  },
+)
+
+onMounted(async () => {
+  window.addEventListener('pagehide', saveDraft)
   window.addEventListener('offline', handleOffline)
   window.addEventListener('online', handleOnline)
+  void dict.loadTags()
+  await bootstrapSessions()
+  await applyEntryQuery()
 })
 
 onBeforeUnmount(() => {
-  window.removeEventListener('pagehide', saveState)
+  window.removeEventListener('pagehide', saveDraft)
   window.removeEventListener('offline', handleOffline)
   window.removeEventListener('online', handleOnline)
-  saveState()
+  saveDraft()
   activeController?.abort()
   if (flushTimer !== null) window.clearTimeout(flushTimer)
-  if (saveTimer !== null) window.clearTimeout(saveTimer)
+  if (draftTimer !== null) window.clearTimeout(draftTimer)
 })
 
 useSeo({
@@ -1095,7 +1394,7 @@ useSeo({
 
 <template>
   <section class="ai-page">
-    <div class="ai-shell">
+    <div class="ai-shell" :class="{ 'ai-shell--solo': workflow !== WORKFLOW.LEARNING_PATH }">
       <aside class="ai-side ai-side--sessions" aria-label="会话与模式">
         <header class="ai-brand">
           <p class="ai-eyebrow">[ AI / TUTOR ]</p>
@@ -1124,10 +1423,10 @@ useSeo({
             <button class="ai-sessions__new" type="button" @click="newSession">＋ 新建</button>
           </div>
 
-          <p class="ai-sessions__local">仅保存在本机 · 最多 30 个会话</p>
+          <p class="ai-sessions__local">{{ sessionsMeta }}</p>
 
           <ul class="ai-sessions__list">
-            <li v-for="session in sessions" :key="session.id" class="ai-session-row">
+            <li v-for="session in listedSessions" :key="session.id" class="ai-session-row">
               <button
                 class="ai-session"
                 :class="{ 'is-active': session.id === activeSessionId }"
@@ -1135,14 +1434,23 @@ useSeo({
                 @click="selectSession(session)"
               >
                 <span class="ai-session__title">{{ session.title }}</span>
+                <span v-if="session.conversationId === null" class="ai-session__draft">草稿</span>
                 <span class="ai-session__mode">
-                  {{ session.workflow === 'qa' ? '问答' : '路线' }}
+                  {{
+                    session.workflow === WORKFLOW.QA
+                      ? '问答'
+                      : session.workflow === WORKFLOW.LEARNING_PATH
+                        ? '路线'
+                        : '文本'
+                  }}
                 </span>
               </button>
               <button
                 class="ai-session__delete"
                 type="button"
                 :aria-label="`删除会话 ${session.title}`"
+                :aria-busy="deletingId === session.id"
+                :disabled="deletingId === session.id"
                 title="删除会话"
                 @click="removeSession(session)"
               >
@@ -1151,7 +1459,18 @@ useSeo({
             </li>
           </ul>
 
-          <p class="ai-sessions__hint">刷新后会恢复；换浏览器或设备不会同步。</p>
+          <button
+            v-if="hasMore"
+            class="ai-sessions__more"
+            type="button"
+            :disabled="loadingMore"
+            :aria-busy="loadingMore"
+            @click="loadMoreSessions"
+          >
+            {{ loadingMore ? '加载中…' : '加载更多' }}
+          </button>
+
+          <p class="ai-sessions__hint">登录同一账号可在其他设备继续对话。</p>
         </div>
 
         <p class="ai-side__foot">WISDOMHUB · KNOWLEDGE IS A NETWORK</p>
@@ -1160,9 +1479,7 @@ useSeo({
       <main class="ai-main">
         <header class="ai-main__head">
           <div>
-            <p class="ai-eyebrow">
-              {{ workflow === 'qa' ? '[ QA / WORKBENCH ]' : '[ LEARNING / WORKBENCH ]' }}
-            </p>
+            <p class="ai-eyebrow">{{ workbenchEyebrow }}</p>
             <h2>{{ workflowLabel }}</h2>
           </div>
           <div class="ai-main__head-right">
@@ -1171,7 +1488,7 @@ useSeo({
               {{ statusLabel }}
             </p>
             <WhButton
-              v-if="isStreaming && workflow === 'learning_path'"
+              v-if="isStreaming && workflow === WORKFLOW.LEARNING_PATH"
               size="sm"
               variant="danger"
               @click="stopStreaming"
@@ -1179,7 +1496,7 @@ useSeo({
               停止生成
             </WhButton>
             <button
-              v-else-if="workflow === 'learning_path' && activeMessages.length"
+              v-else-if="workflow === WORKFLOW.LEARNING_PATH && activeMessages.length"
               class="ai-main__reset"
               type="button"
               @click="resetRoute"
@@ -1194,12 +1511,30 @@ useSeo({
 
         <div class="ai-messages-wrap">
           <div ref="messagesRef" class="ai-messages" aria-live="polite" @scroll="onMessagesScroll">
-            <div v-if="!activeMessages.length" class="ai-empty">
+            <div v-if="sessionsLoading" class="ai-empty">
+              <p class="ai-empty__eyebrow">[ SYNC / CONVERSATIONS ]</p>
+              <h3>正在载入会话…</h3>
+              <p>从服务端读取历史对话，请稍候。</p>
+            </div>
+
+            <div v-else-if="detailLoading" class="ai-empty">
+              <p class="ai-empty__eyebrow">[ SYNC / DETAIL ]</p>
+              <h3>正在载入对话…</h3>
+              <p>历史消息与阶段数据正在同步。</p>
+            </div>
+
+            <div v-else-if="!activeMessages.length" class="ai-empty">
               <p class="ai-empty__eyebrow">
-                {{ workflow === 'qa' ? '[ EMPTY / QA ]' : '[ EMPTY / PATH ]' }}
+                {{
+                  workflow === WORKFLOW.QA
+                    ? '[ EMPTY / QA ]'
+                    : workflow === WORKFLOW.TEXT_QA
+                      ? '[ EMPTY / TEXT ]'
+                      : '[ EMPTY / PATH ]'
+                }}
               </p>
 
-              <template v-if="workflow === 'qa'">
+              <template v-if="workflow === WORKFLOW.QA">
                 <h3>把问题问清楚，剩下的交给知识网络</h3>
                 <p>描述现象、运行环境与已经尝试过的方案；回答里的技术标签可以继续跳转。</p>
                 <div class="ai-samples" aria-label="示例问题">
@@ -1213,6 +1548,14 @@ useSeo({
                     {{ sample }}
                   </button>
                 </div>
+              </template>
+
+              <template v-else-if="workflow === WORKFLOW.TEXT_QA">
+                <h3>就选中的文本提问</h3>
+                <p v-if="activeTextContext">
+                  选中的文本已在下方带入，可以追问概念、让 AI 解释段落或总结要点。
+                </p>
+                <p v-else>未读取到选中的文本，请回到文章中重新选择。</p>
               </template>
 
               <template v-else>
@@ -1409,6 +1752,27 @@ useSeo({
                     {{ message.content }}
                   </p>
                   <template v-else>
+                    <ol v-if="message.steps.length" class="ai-steps" aria-label="执行步骤">
+                      <li
+                        v-for="step in message.steps"
+                        :key="step.id"
+                        class="ai-step"
+                        :class="`is-${step.status}`"
+                      >
+                        <div class="ai-step__head">
+                          <span class="ai-step__label">{{ step.label }}</span>
+                          <span class="ai-step__status">{{ STEP_STATUS_LABELS[step.status] }}</span>
+                        </div>
+                        <p v-if="step.summary" class="ai-step__summary">{{ step.summary }}</p>
+                      </li>
+                    </ol>
+                    <p
+                      v-if="message.steps.some((step) => step.status === 'error')"
+                      class="ai-steps__error"
+                      role="alert"
+                    >
+                      部分步骤执行失败，回答可能不完整。
+                    </p>
                     <div v-if="message.status === 'streaming'" class="ai-message__stream">
                       {{ message.content }}<span class="ai-cursor" aria-hidden="true"></span>
                     </div>
@@ -1451,14 +1815,44 @@ useSeo({
           </button>
         </div>
 
-        <form v-if="workflow === 'qa'" class="ai-composer" @submit.prevent="submit">
-          <label class="ai-composer__label" for="ai-input">输入你的问题</label>
+        <form
+          v-if="workflow !== WORKFLOW.LEARNING_PATH"
+          class="ai-composer"
+          @submit.prevent="submit"
+        >
+          <div v-if="workflow === WORKFLOW.TEXT_QA" class="ai-text-context">
+            <div class="ai-text-context__head">
+              <span class="ai-text-context__label">[ TEXT ] 选中文本</span>
+              <span class="ai-text-context__count">
+                {{ activeTextContext.length }} / {{ AI_TEXT_MAX_LENGTH }} 字
+              </span>
+              <span
+                v-if="activeTextContext.length >= AI_TEXT_MAX_LENGTH"
+                class="ai-text-context__warn"
+              >
+                仅保留前 {{ AI_TEXT_MAX_LENGTH }} 字
+              </span>
+            </div>
+            <p v-if="activeTextContext" class="ai-text-context__body">
+              {{ activeTextContext }}
+            </p>
+            <p v-else class="ai-text-context__body is-empty">
+              未读取到选中的文本，请回到文章中重新选择。
+            </p>
+          </div>
+          <label class="ai-composer__label" for="ai-input">
+            {{ workflow === WORKFLOW.TEXT_QA ? '针对选中文本提问' : '输入你的问题' }}
+          </label>
           <textarea
             id="ai-input"
             ref="inputRef"
             v-model="draft"
             class="ai-composer__input"
-            placeholder="描述你的问题、运行环境和已经尝试过的方案…"
+            :placeholder="
+              workflow === WORKFLOW.TEXT_QA
+                ? '这段文本里的概念、结论或写法，想问什么？'
+                : '描述你的问题、运行环境和已经尝试过的方案…'
+            "
             rows="3"
             @keydown.enter.exact.prevent="submit"
           ></textarea>
@@ -1472,123 +1866,46 @@ useSeo({
         </form>
       </main>
 
-      <aside class="ai-side ai-side--refs" aria-label="参考资料">
+      <aside
+        v-if="workflow === WORKFLOW.LEARNING_PATH"
+        class="ai-side ai-side--refs"
+        aria-label="路线阶段"
+      >
         <header class="ai-refs__head">
-          <p class="ai-eyebrow">[ REFERENCES ]</p>
-          <h2>参考资料</h2>
-          <p v-if="workflow === 'qa' && referencesQuestion" class="ai-refs__query">
-            Q / {{ referencesQuestion }}
-          </p>
-          <p v-else-if="workflow === 'learning_path' && routeTarget" class="ai-refs__query">
-            ROUTE / {{ routeTarget }}
-          </p>
+          <p class="ai-eyebrow">[ PLAN ]</p>
+          <h2>路线阶段</h2>
+          <p v-if="routeTarget" class="ai-refs__query">ROUTE / {{ routeTarget }}</p>
         </header>
 
-        <template v-if="workflow === 'learning_path'">
-          <div v-if="!stageReferences.length" class="ai-refs__empty">
-            <p v-if="routeTarget">路线生成后，这里会按阶段列出参考文章。</p>
-            <p v-else>填写目标技术后，这里会按阶段列出参考文章。</p>
-            <RouterLink class="ai-refs__link" :to="{ name: 'article-list' }">
-              先去逛逛文章 →
-            </RouterLink>
-          </div>
+        <div v-if="!stageReferences.length" class="ai-refs__empty">
+          <p v-if="routeMissing" class="ai-refs__missing">本次未返回路线阶段，请重新生成路线。</p>
+          <p v-else-if="routeTarget">路线生成后，这里会按阶段列出先修技术。</p>
+          <p v-else>填写目标技术后，这里会按阶段列出先修技术。</p>
+          <RouterLink class="ai-refs__link" :to="{ name: 'article-list' }">
+            先去逛逛文章 →
+          </RouterLink>
+        </div>
 
-          <div v-else class="ai-stages">
-            <section v-for="stage in stageReferences" :key="stage.id" class="ai-stage-ref">
-              <button class="ai-stage-ref__title" type="button" @click="scrollToStage(stage.id)">
-                <span class="ai-stage-ref__index">
-                  STAGE {{ String(stage.index).padStart(2, '0') }}
-                </span>
-                <span>{{ stage.title }}</span>
-              </button>
+        <div v-else class="ai-stages">
+          <section v-for="stage in stageReferences" :key="stage.id" class="ai-stage-ref">
+            <div class="ai-stage-ref__title">
+              <span class="ai-stage-ref__index">
+                STAGE {{ String(stage.depth).padStart(2, '0') }}
+              </span>
+              <span>阶段 {{ stage.depth }}</span>
+            </div>
 
-              <div v-if="stage.technologies.length" class="ai-refs__tags">
-                <RouterLink
-                  v-for="technology in stage.technologies"
-                  :key="technology"
-                  :to="{ name: 'search', query: { type: 'tag', keyword: technology } }"
-                >
-                  {{ technology }}
-                </RouterLink>
-              </div>
-
-              <div v-if="stage.loading" class="ai-refs__state">检索中…</div>
-              <div
-                v-else-if="stage.error"
-                class="ai-refs__state ai-refs__state--error"
-                role="alert"
-              >
-                <p>{{ stage.error }}</p>
-                <button class="ai-refs__retry" type="button" @click="retryStage(stage)">
-                  重试
-                </button>
-              </div>
-              <ul v-else-if="stage.references.length" class="ai-stage-ref__list">
-                <li v-for="(reference, index) in stage.references" :key="reference.articleId">
-                  <span class="ai-refs__index">{{ String(index + 1).padStart(2, '0') }}</span>
-                  <RouterLink
-                    class="ai-stage-ref__article"
-                    :to="{
-                      name: 'article-detail',
-                      params: { articleId: reference.articleId },
-                    }"
-                  >
-                    {{ reference.title }}
-                  </RouterLink>
-                </li>
-              </ul>
-              <p v-else-if="stage.loaded" class="ai-refs__state">暂无参考文章。</p>
-            </section>
-          </div>
-        </template>
-
-        <template v-else>
-          <div v-if="referencesLoading" class="ai-refs__state" aria-live="polite">
-            正在检索相关文章…
-          </div>
-
-          <div
-            v-else-if="referencesError"
-            class="ai-refs__state ai-refs__state--error"
-            role="alert"
-          >
-            <p>{{ referencesError }}</p>
-            <button class="ai-refs__retry" type="button" @click="retryReferences">重试</button>
-          </div>
-
-          <ul v-else-if="references.length" class="ai-refs__list">
-            <li v-for="(reference, index) in references" :key="reference.articleId">
-              <span class="ai-refs__index">{{ String(index + 1).padStart(2, '0') }}</span>
+            <div v-if="stage.tags.length" class="ai-refs__tags">
               <RouterLink
-                class="ai-refs__title"
-                :to="{ name: 'article-detail', params: { articleId: reference.articleId } }"
+                v-for="tag in stage.tags"
+                :key="tag.tagId"
+                :to="{ name: 'tech-detail', params: { tagId: tag.tagId } }"
               >
-                {{ reference.title }}
+                {{ tag.name }}
               </RouterLink>
-              <p class="ai-refs__summary">{{ reference.summary }}</p>
-              <div v-if="reference.tags.length" class="ai-refs__tags">
-                <RouterLink
-                  v-for="tag in reference.tags"
-                  :key="tag.tagId"
-                  :to="{ name: 'tech-detail', params: { tagId: tag.tagId } }"
-                >
-                  {{ tag.name }}
-                </RouterLink>
-              </div>
-            </li>
-          </ul>
-
-          <div v-else class="ai-refs__empty">
-            <p v-if="referencesQuestion && referencesLoaded">没有检索到相关文章，换个问法试试。</p>
-            <p v-else-if="referencesQuestion">回答完成后，这里会列出相关文章。</p>
-            <p v-else>对话开始后，这里会列出回答引用的文章、问题与标签。</p>
-            <RouterLink class="ai-refs__link" :to="{ name: 'article-list' }">
-              先去逛逛文章 →
-            </RouterLink>
-          </div>
-        </template>
-
-        <p class="ai-side__foot">CITATIONS · LAZY LOAD</p>
+            </div>
+          </section>
+        </div>
       </aside>
     </div>
   </section>
@@ -1610,6 +1927,9 @@ useSeo({
   border: 1px solid var(--ink);
   background: var(--paper);
   box-shadow: var(--shadow-hard);
+}
+.ai-shell--solo {
+  grid-template-columns: 280px minmax(0, 1fr);
 }
 
 .ai-side {
@@ -1759,6 +2079,28 @@ useSeo({
   list-style: none;
 }
 
+.ai-sessions__more {
+  justify-self: center;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--line-inverse);
+  color: rgb(242 237 223 / 65%);
+  font-family: var(--mono);
+  font-size: var(--text-2xs);
+  letter-spacing: var(--tracking-wide);
+  transition:
+    color var(--dur) var(--ease),
+    border-color var(--dur) var(--ease);
+}
+
+.ai-sessions__more:hover:not(:disabled) {
+  border-color: rgb(242 237 223 / 35%);
+  color: var(--bone);
+}
+
+.ai-sessions__more:disabled {
+  color: rgb(242 237 223 / 35%);
+}
+
 .ai-session-row {
   display: flex;
   align-items: stretch;
@@ -1797,9 +2139,14 @@ useSeo({
     color var(--dur) var(--ease);
 }
 
-.ai-session-row:hover .ai-session__delete,
+.ai-session-row:hover .ai-session__delete:not(:disabled),
 .ai-session__delete:focus-visible {
   opacity: 1;
+}
+
+.ai-session__delete:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .ai-session__delete:hover {
@@ -1821,6 +2168,23 @@ useSeo({
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.ai-session__draft {
+  flex: none;
+  margin-left: auto;
+  padding: 1px 5px;
+  border: 1px solid rgb(242 237 223 / 22%);
+  color: rgb(242 237 223 / 60%);
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  line-height: 1.4;
+}
+
+.ai-session.is-active .ai-session__draft {
+  border-color: rgb(201 255 46 / 45%);
+  color: var(--acid);
 }
 
 .ai-session__mode {
@@ -2300,6 +2664,87 @@ useSeo({
   overflow-wrap: anywhere;
 }
 
+.ai-steps {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-3);
+  padding: 0 0 0 var(--space-3);
+  border-left: 1px solid var(--line-strong);
+  list-style: none;
+}
+
+.ai-step {
+  position: relative;
+  display: grid;
+  gap: 2px;
+}
+
+.ai-step::before {
+  position: absolute;
+  top: 5px;
+  left: calc(-1 * var(--space-3) - 3px);
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--line-strong);
+  content: '';
+}
+
+.ai-step.is-running::before {
+  background: var(--verm);
+  animation: ai-blink 1s steps(1) infinite;
+}
+
+.ai-step.is-done::before {
+  background: var(--ink);
+}
+
+.ai-step.is-error::before {
+  background: var(--verm);
+}
+
+.ai-steps__error {
+  margin: 0 0 var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--verm);
+  background: rgb(255 59 31 / 8%);
+  color: var(--verm-deep);
+  font-size: var(--text-xs);
+}
+
+.ai-step__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.ai-step__label {
+  color: var(--ink);
+  font-size: var(--text-xs);
+}
+
+.ai-step__status {
+  color: var(--text-muted);
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+}
+
+.ai-step.is-running .ai-step__status,
+.ai-step.is-error .ai-step__status {
+  color: var(--verm-deep);
+}
+
+.ai-step__summary {
+  color: var(--text-muted);
+  font-family: var(--mono);
+  font-size: 10px;
+  line-height: var(--leading-relaxed);
+  overflow-wrap: anywhere;
+}
+
 .ai-cursor {
   display: inline-block;
   width: 6px;
@@ -2490,6 +2935,50 @@ useSeo({
   background: var(--paper);
 }
 
+.ai-text-context {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--line-strong);
+  border-left: 3px solid var(--ink);
+  background: var(--bone);
+}
+
+.ai-text-context__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  color: var(--text-muted);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+}
+
+.ai-text-context__label {
+  color: var(--ink);
+}
+
+.ai-text-context__warn {
+  color: var(--verm-deep);
+}
+
+.ai-text-context__body {
+  max-height: 120px;
+  margin: 0;
+  overflow: auto;
+  color: var(--ink);
+  font-size: var(--text-sm);
+  line-height: var(--leading-relaxed);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.ai-text-context__body.is-empty {
+  color: var(--verm-deep);
+}
+
 .ai-composer__label {
   color: var(--text-muted);
   font-family: var(--mono);
@@ -2558,67 +3047,6 @@ useSeo({
   overflow-wrap: anywhere;
 }
 
-.ai-refs__state {
-  color: var(--text-muted);
-  font-size: var(--text-sm);
-}
-
-.ai-refs__state--error {
-  display: grid;
-  justify-items: start;
-  gap: var(--space-2);
-  color: var(--verm-deep);
-}
-
-.ai-refs__retry {
-  padding-bottom: 2px;
-  border-bottom: 1px solid currentColor;
-  font-family: var(--mono);
-  font-size: 10px;
-}
-
-.ai-refs__list {
-  display: grid;
-  gap: var(--space-4);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.ai-refs__list li {
-  display: grid;
-  gap: var(--space-1);
-  padding-bottom: var(--space-3);
-  border-bottom: 1px solid var(--line);
-}
-
-.ai-refs__index {
-  color: var(--text-muted);
-  font-family: var(--mono);
-  font-size: 9px;
-}
-
-.ai-refs__title {
-  font-family: var(--serif);
-  font-size: var(--text-md);
-  font-weight: var(--weight-semibold);
-  line-height: var(--leading-snug);
-}
-
-.ai-refs__title:hover {
-  color: var(--verm-deep);
-}
-
-.ai-refs__summary {
-  display: -webkit-box;
-  overflow: hidden;
-  color: var(--text-muted);
-  font-size: var(--text-xs);
-  line-height: var(--leading-relaxed);
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-}
-
 .ai-refs__tags {
   display: flex;
   flex-wrap: wrap;
@@ -2658,10 +3086,6 @@ useSeo({
   text-align: left;
 }
 
-.ai-stage-ref__title:hover {
-  color: var(--verm-deep);
-}
-
 .ai-stage-ref__index {
   color: var(--verm-deep);
   font-family: var(--mono);
@@ -2676,37 +3100,16 @@ useSeo({
   line-height: var(--leading-snug);
 }
 
-.ai-stage-ref__list {
-  display: grid;
-  gap: var(--space-2);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.ai-stage-ref__list li {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: var(--space-2);
-  align-items: start;
-}
-
-.ai-stage-ref__article {
-  color: var(--text-body);
-  font-size: var(--text-xs);
-  line-height: var(--leading-relaxed);
-}
-
-.ai-stage-ref__article:hover {
-  color: var(--verm-deep);
-}
-
 .ai-refs__empty {
   display: grid;
   gap: var(--space-3);
   color: var(--text-muted);
   font-size: var(--text-sm);
   line-height: var(--leading-relaxed);
+}
+
+.ai-refs__missing {
+  color: var(--verm-deep);
 }
 
 .ai-refs__link {
@@ -2723,13 +3126,12 @@ useSeo({
   border-color: var(--verm-deep);
 }
 
-.ai-side--refs .ai-side__foot {
-  color: var(--text-muted);
-}
-
 @media (max-width: 1279px) {
   .ai-shell {
     grid-template-columns: 240px minmax(0, 1fr) 270px;
+  }
+  .ai-shell--solo {
+    grid-template-columns: 240px minmax(0, 1fr);
   }
 }
 
