@@ -42,4 +42,5 @@ export interface TagProposalVO {
 export interface TagProposalQuery extends PageQuery {
   status?: TagProposalStatus
   proposalType?: TagProposalType
+  proposerType?: TagProposerType
 }

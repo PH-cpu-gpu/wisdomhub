@@ -1131,15 +1131,21 @@ export async function handleMockRequest(
     const params = (config.params ?? {}) as {
       status?: number | string
       proposalType?: number | string
+      proposerType?: number | string
     }
     const status = params.status === undefined || params.status === '' ? null : Number(params.status)
     const proposalType =
       params.proposalType === undefined || params.proposalType === ''
         ? null
         : Number(params.proposalType)
+    const proposerType =
+      params.proposerType === undefined || params.proposerType === ''
+        ? null
+        : Number(params.proposerType)
     const items = mockProposalState
       .filter((proposal) => status === null || proposal.status === status)
       .filter((proposal) => proposalType === null || proposal.proposalType === proposalType)
+      .filter((proposal) => proposerType === null || proposal.proposerType === proposerType)
       .sort((left, right) => right.createTime.localeCompare(left.createTime))
     return response(config, pageOf(items, config))
   }

@@ -14,7 +14,7 @@ import { usePagination } from '@/composables/usePagination'
 import { useSeo } from '@/composables/useSeo'
 import { useDictStore } from '@/stores'
 import type { ID } from '@/types/common'
-import type { TagProposalStatus, TagProposalVO } from '@/types/tag-proposal'
+import type { TagProposalStatus, TagProposalVO, TagProposerType } from '@/types/tag-proposal'
 import {
   PROPOSAL_STATUS_LABELS,
   PROPOSAL_TYPE_LABELS,
@@ -25,6 +25,7 @@ import {
 } from '@/utils'
 
 type StatusFilter = 'all' | `${TagProposalStatus}`
+type SourceFilter = 'all' | '1' | '3'
 
 const STATUS_TABS = [
   { label: '全部', value: 'all' },
@@ -34,19 +35,26 @@ const STATUS_TABS = [
   { label: '已过期', value: '3' },
 ]
 
+const SOURCE_TABS = [
+  { label: '全部', value: 'all' },
+  { label: 'AI', value: '1' },
+  { label: '系统', value: '3' },
+]
+
 const dict = useDictStore()
 const proposals = ref<TagProposalVO[]>([])
 const loading = ref(false)
 const error = ref('')
 const status = ref<StatusFilter>('all')
+const source = ref<SourceFilter>('all')
 const { page, pageSize, total, setTotal } = usePagination({ pageSize: 10 })
 
 let requestId = 0
 
 const emptyHint = computed(() =>
-  status.value === 'all'
+  status.value === 'all' && source.value === 'all'
     ? '被抽取丢弃的实体攒够文章证据后会升级成提案，AI 也可以在对话里主动申请。'
-    : '当前状态下没有提案，换个状态看看。',
+    : '当前筛选下没有提案，换个条件看看。',
 )
 
 function tagName(tagId: ID | null | undefined): string {
@@ -79,6 +87,8 @@ async function loadProposals(): Promise<void> {
     const result = await listProposals(
       {
         status: status.value === 'all' ? undefined : (Number(status.value) as TagProposalStatus),
+        proposerType:
+          source.value === 'all' ? undefined : (Number(source.value) as TagProposerType),
         page: page.value,
         pageSize: pageSize.value,
       },
@@ -104,7 +114,13 @@ function changeStatus(value: string): void {
   if (page.value !== 1) page.value = 1
 }
 
-watch([status, page, pageSize], () => void loadProposals(), { immediate: true })
+function changeSource(value: string): void {
+  if (value === source.value) return
+  source.value = value as SourceFilter
+  if (page.value !== 1) page.value = 1
+}
+
+watch([status, source, page, pageSize], () => void loadProposals(), { immediate: true })
 
 void dict.loadTags()
 
@@ -132,7 +148,13 @@ useSeo({
         </div>
       </header>
 
-      <WhTabs :model-value="status" :items="STATUS_TABS" size="sm" @change="changeStatus" />
+      <div class="inbox-filters">
+        <WhTabs :model-value="status" :items="STATUS_TABS" size="sm" @change="changeStatus" />
+        <div class="inbox-source">
+          <span class="inbox-source__label">来源</span>
+          <WhTabs :model-value="source" :items="SOURCE_TABS" size="sm" @change="changeSource" />
+        </div>
+      </div>
 
       <div v-if="loading" class="inbox-skeletons" aria-live="polite">
         <div v-for="index in 3" :key="index" class="inbox-skeleton">
@@ -250,6 +272,25 @@ useSeo({
 .inbox-back:hover {
   color: var(--verm-deep);
   border-color: var(--verm-deep);
+}
+
+.inbox-filters {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.inbox-source {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.inbox-source__label {
+  color: var(--text-muted);
+  font-family: var(--mono);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.08em;
 }
 
 .inbox-skeletons {
