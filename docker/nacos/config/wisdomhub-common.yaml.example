@@ -35,6 +35,14 @@ wisdomhub:
       timestamp-window-seconds: 300
       nonce-ttl-seconds: 300
 spring:
+  datasource:
+    hikari:
+      # 同机 21 个容器共享一台 MySQL（max-connections=50）：
+      # 6 个用库服务 × 4 + xxl-job-admin 默认 10 = 34，留出余量。
+      # 不显式设的话 Hikari 默认 max=min=10，六七个服务就会把 50 条连接打满。
+      maximum-pool-size: 4
+      minimum-idle: 1
+      connection-timeout: 10000
   jackson:
     deserialization:
       adjust-dates-to-context-time-zone: false

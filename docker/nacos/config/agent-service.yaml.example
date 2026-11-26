@@ -4,6 +4,11 @@
 # Group    : DEFAULT_GROUP
 # Namespace: wisdomhub
 #
+# 注意：当前没有任何 Java 服务 import 这个 DataId（各 application-local.yml
+# 均未引用），Python Agent 也只读 wisdomhub-common.yaml / wisdomhub-env.yaml。
+# 它属于预留模板，导入后不生效；调 Agent 的 Redis/Mongo/OpenAPI 配置请改
+# wisdomhub-common.yaml 或 wisdomhub-env.yaml。
+#
 # 导入前请把 change-me / your-xxx 占位符替换为实际值。
 # 导入方式见 docker/nacos/README.md
 # =============================================================================

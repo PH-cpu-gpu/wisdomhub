@@ -41,6 +41,7 @@ wisdomhub:
     upload:
       max-size-bytes: 2147483648   # 2 GiB，B6.13 再按用户收紧
       ticket-ttl-seconds: 900      # 预签名 URL 有效期
+      upload-timeout-minutes: 120  # 待上传资产超时：须覆盖凭证有效期与大文件慢速直传
     quota:
       daily-upload-limit: 10       # 每个用户每日上传凭证数
       max-duration-seconds: 1800   # 单个视频时长上限（30 分钟）

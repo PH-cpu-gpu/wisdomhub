@@ -54,3 +54,6 @@ infra:
   rabbitmq-vhost: /
   rabbitmq-username: wisdomhub
   rabbitmq-password: change-me
+
+  # order/content 的 seata.service.grouplist 引用该值；容器部署改成 seata
+  seata-host: localhost

@@ -29,6 +29,11 @@ xxl:
       log-retention-days: 30
 
 wisdomhub:
+  notification:
+    session:
+      # 是否按时扫描到期会话、并复查黑名单（兜住登出广播丢失）
+      enabled: true
+      sweep-interval-seconds: 60
   mq:
     dlq-replay:
       enabled: true

@@ -1,7 +1,7 @@
 # 9 个 Java 服务共用的运行镜像。
 # 只负责 run：jar 由开发机 mvn 打好，构建上下文是各模块目录。
 #   docker build -f docker/java/Dockerfile --build-arg JAR_FILE=target/wisdomhub-user-1.0.0-SNAPSHOT.jar wisdomhub-user
-# JVM 参数全部由 JAVA_TOOL_OPTIONS 注入，见 docker-compose.prod.yml。
+# JVM 参数全部由 JAVA_TOOL_OPTIONS 注入，见仓库根目录 部署方案.md。
 
 FROM eclipse-temurin:21-jre-alpine
 

@@ -30,6 +30,7 @@ seata:
     vgroup-mapping:
       default_tx_group: default
     grouplist:
-      default: 127.0.0.1:8091
+      # 容器部署时由 wisdomhub-env.yaml 的 infra.seata-host=seata 提供；本地开发回退到 127.0.0.1
+      default: ${infra.seata-host:127.0.0.1}:8091
   registry:
     type: file

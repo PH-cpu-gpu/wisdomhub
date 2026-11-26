@@ -56,6 +56,7 @@ logs/
 /agent实现任务表.md
 /前端页面开发计划表.md
 /互动服务与视频服务任务表.md
+/部署方案.md
 
 ### 部署产物（docker save 的镜像包常见数百 MB）###
 *.tar.gz
