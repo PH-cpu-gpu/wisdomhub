@@ -12,6 +12,7 @@ import com.wisdomhub.interaction.domain.entity.ContentFavorite;
 import com.wisdomhub.interaction.mapper.ContentFavoriteMapper;
 import com.wisdomhub.interaction.mapper.InteractionCountMapper;
 import com.wisdomhub.interaction.service.FavoriteService;
+import com.wisdomhub.interaction.service.InteractionCountCache;
 import com.wisdomhub.interaction.service.InteractionEventPublisher;
 import com.wisdomhub.interaction.service.InteractionGate;
 import com.wisdomhub.interaction.service.TargetValidator;
@@ -38,6 +39,7 @@ public class FavoriteServiceImpl implements FavoriteService {
     private final TargetValidator targetValidator;
     private final InteractionGate interactionGate;
     private final InteractionEventPublisher eventPublisher;
+    private final InteractionCountCache interactionCountCache;
 
     @Override
     @Transactional
@@ -72,6 +74,7 @@ public class FavoriteServiceImpl implements FavoriteService {
 
         interactionCountMapper.addFavoriteCount(IdWorker.getId(), type, targetId, 1,
                 LocalDateTime.now(ZoneOffset.UTC));
+        interactionCountCache.evictAfterCommit(type, targetId);
         if (type == ContentTargetTypeConstants.ARTICLE || type == ContentTargetTypeConstants.VIDEO) {
             eventPublisher.behaviorRecorded(type, targetId, userId, BehaviorTypeConstants.COLLECT);
         }
@@ -96,6 +99,7 @@ public class FavoriteServiceImpl implements FavoriteService {
         }
         interactionCountMapper.addFavoriteCount(IdWorker.getId(), type, targetId, -1,
                 LocalDateTime.now(ZoneOffset.UTC));
+        interactionCountCache.evictAfterCommit(type, targetId);
         return readFavoriteCount(type, targetId);
     }
 

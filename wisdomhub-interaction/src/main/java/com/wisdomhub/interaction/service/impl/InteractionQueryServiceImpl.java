@@ -21,6 +21,7 @@ import com.wisdomhub.interaction.domain.vo.InteractionStateVO;
 import com.wisdomhub.interaction.mapper.ContentFavoriteMapper;
 import com.wisdomhub.interaction.mapper.ContentLikeMapper;
 import com.wisdomhub.interaction.mapper.InteractionCountMapper;
+import com.wisdomhub.interaction.service.InteractionCountCache;
 import com.wisdomhub.interaction.service.InteractionQueryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -40,6 +41,7 @@ public class InteractionQueryServiceImpl implements InteractionQueryService {
     private final InteractionCountMapper interactionCountMapper;
     private final ContentLikeMapper contentLikeMapper;
     private final ContentFavoriteMapper contentFavoriteMapper;
+    private final InteractionCountCache interactionCountCache;
 
     @Override
     public InteractionStateVO getState(Integer targetType, Long targetId) {
@@ -47,9 +49,7 @@ public class InteractionQueryServiceImpl implements InteractionQueryService {
         if (targetId == null) {
             throw new BusinessException(CommonErrorCode.BAD_REQUEST, "targetId 不能为空");
         }
-        InteractionCount count = interactionCountMapper.selectOne(new LambdaQueryWrapper<InteractionCount>()
-                .eq(InteractionCount::getTargetType, (byte) type)
-                .eq(InteractionCount::getTargetId, targetId));
+        InteractionCountCache.Counts counts = loadCounts(type, targetId);
 
         Long userId = UserContext.getUserId();
         boolean liked = userId != null && contentLikeMapper.exists(new LambdaQueryWrapper<ContentLike>()
@@ -64,9 +64,9 @@ public class InteractionQueryServiceImpl implements InteractionQueryService {
         return InteractionStateVO.builder()
                 .liked(liked)
                 .collected(collected)
-                .likeCount(count == null ? 0 : nvl(count.getLikeCount()))
-                .commentCount(count == null ? 0 : nvl(count.getCommentCount()))
-                .favoriteCount(count == null ? 0 : nvl(count.getFavoriteCount()))
+                .likeCount(counts.likeCount())
+                .commentCount(counts.commentCount())
+                .favoriteCount(counts.favoriteCount())
                 .build();
     }
 
@@ -89,29 +89,52 @@ public class InteractionQueryServiceImpl implements InteractionQueryService {
             idsByType.computeIfAbsent(type, k -> new LinkedHashSet<>()).add(item.getTargetId());
         }
 
-        Map<String, InteractionCount> countByKey = new HashMap<>();
+        Map<String, InteractionCountCache.Counts> countByKey = new HashMap<>();
         for (Map.Entry<Integer, Set<Long>> entry : idsByType.entrySet()) {
-            List<InteractionCount> rows = interactionCountMapper.selectList(
-                    new LambdaQueryWrapper<InteractionCount>()
-                            .select(InteractionCount::getTargetType, InteractionCount::getTargetId,
-                                    InteractionCount::getLikeCount, InteractionCount::getCommentCount,
-                                    InteractionCount::getFavoriteCount)
-                            .eq(InteractionCount::getTargetType, entry.getKey().byteValue())
-                            .in(InteractionCount::getTargetId, entry.getValue()));
-            for (InteractionCount row : rows) {
-                countByKey.put(key(row.getTargetType().intValue(), row.getTargetId()), row);
+            int type = entry.getKey();
+            Set<Long> ids = entry.getValue();
+            Map<Long, InteractionCountCache.Counts> counts = interactionCountCache.getAll(type, ids);
+
+            List<Long> missing = new ArrayList<>(ids.size());
+            for (Long id : ids) {
+                if (!counts.containsKey(id)) {
+                    missing.add(id);
+                }
+            }
+            if (!missing.isEmpty()) {
+                List<InteractionCount> rows = interactionCountMapper.selectList(
+                        new LambdaQueryWrapper<InteractionCount>()
+                                .select(InteractionCount::getTargetType, InteractionCount::getTargetId,
+                                        InteractionCount::getLikeCount, InteractionCount::getCommentCount,
+                                        InteractionCount::getFavoriteCount)
+                                .eq(InteractionCount::getTargetType, (byte) type)
+                                .in(InteractionCount::getTargetId, missing));
+                Map<Long, InteractionCount> rowByTargetId = new HashMap<>(rows.size());
+                for (InteractionCount row : rows) {
+                    rowByTargetId.put(row.getTargetId(), row);
+                }
+                Map<Long, InteractionCountCache.Counts> loaded = new HashMap<>(missing.size());
+                for (Long id : missing) {
+                    loaded.put(id, InteractionCountCache.Counts.of(rowByTargetId.get(id)));
+                }
+                interactionCountCache.putAll(type, loaded);
+                counts = new HashMap<>(counts);
+                counts.putAll(loaded);
+            }
+            for (Map.Entry<Long, InteractionCountCache.Counts> count : counts.entrySet()) {
+                countByKey.put(key(type, count.getKey()), count.getValue());
             }
         }
 
         List<InteractionCountVO> result = new ArrayList<>(items.size());
         for (InteractionCountQueryDTO item : items) {
-            InteractionCount count = countByKey.get(key(item.getTargetType(), item.getTargetId()));
+            InteractionCountCache.Counts count = countByKey.get(key(item.getTargetType(), item.getTargetId()));
             result.add(InteractionCountVO.builder()
                     .targetType(item.getTargetType())
                     .targetId(item.getTargetId())
-                    .likeCount(count == null ? 0 : nvl(count.getLikeCount()))
-                    .commentCount(count == null ? 0 : nvl(count.getCommentCount()))
-                    .favoriteCount(count == null ? 0 : nvl(count.getFavoriteCount()))
+                    .likeCount(count == null ? 0 : count.likeCount())
+                    .commentCount(count == null ? 0 : count.commentCount())
+                    .favoriteCount(count == null ? 0 : count.favoriteCount())
                     .build());
         }
         return InteractionCountBatchVO.builder().items(result).build();
@@ -139,6 +162,19 @@ public class InteractionQueryServiceImpl implements InteractionQueryService {
         return PageUtil.toResponse(result, items);
     }
 
+    private InteractionCountCache.Counts loadCounts(int targetType, Long targetId) {
+        InteractionCountCache.Counts cached = interactionCountCache.get(targetType, targetId);
+        if (cached != null) {
+            return cached;
+        }
+        InteractionCount row = interactionCountMapper.selectOne(new LambdaQueryWrapper<InteractionCount>()
+                .eq(InteractionCount::getTargetType, (byte) targetType)
+                .eq(InteractionCount::getTargetId, targetId));
+        InteractionCountCache.Counts counts = InteractionCountCache.Counts.of(row);
+        interactionCountCache.put(targetType, targetId, counts);
+        return counts;
+    }
+
     private int requireValidType(Integer targetType) {
         if (targetType == null || !ContentTargetTypeConstants.isValid(targetType)) {
             throw new BusinessException(CommonErrorCode.BAD_REQUEST, "targetType 不合法");
@@ -148,9 +184,5 @@ public class InteractionQueryServiceImpl implements InteractionQueryService {
 
     private String key(int targetType, Long targetId) {
         return targetType + ":" + targetId;
-    }
-
-    private int nvl(Integer value) {
-        return value == null ? 0 : value;
     }
 }

@@ -7,11 +7,13 @@ import com.wisdomhub.common.core.exception.BusinessException;
 import com.wisdomhub.common.core.result.CommonErrorCode;
 import com.wisdomhub.common.feign.dto.TargetInfoDTO;
 import com.wisdomhub.common.mq.constants.BehaviorTypeConstants;
+import com.wisdomhub.common.redis.constants.RedisTtl;
 import com.wisdomhub.common.web.util.CurrentUserUtil;
 import com.wisdomhub.interaction.constants.InteractionRedisKeyConstants;
 import com.wisdomhub.interaction.domain.entity.ContentLike;
 import com.wisdomhub.interaction.mapper.ContentLikeMapper;
 import com.wisdomhub.interaction.mapper.InteractionCountMapper;
+import com.wisdomhub.interaction.service.InteractionCountCache;
 import com.wisdomhub.interaction.service.InteractionEventPublisher;
 import com.wisdomhub.interaction.service.InteractionGate;
 import com.wisdomhub.interaction.service.LikeService;
@@ -39,12 +41,17 @@ public class LikeServiceImpl implements LikeService {
     private final TargetValidator targetValidator;
     private final InteractionGate interactionGate;
     private final InteractionEventPublisher eventPublisher;
+    private final InteractionCountCache interactionCountCache;
 
     @Override
     @Transactional
     public int like(Integer targetType, Long targetId) {
         int type = resolveTargetType(targetType);
         Long userId = CurrentUserUtil.id();
+        // 取消后的冷却期内直接拒绝，别把反复切换的流量放到库上
+        if (interactionGate.cooling(InteractionRedisKeyConstants.likeCooldown(type, userId, targetId))) {
+            throw new BusinessException(CommonErrorCode.TOO_MANY_REQUESTS);
+        }
         targetValidator.requireVisible(type, targetId);
 
         String gateKey = InteractionRedisKeyConstants.likeGate(type, userId, targetId);
@@ -74,6 +81,7 @@ public class LikeServiceImpl implements LikeService {
 
         interactionCountMapper.addLikeCount(IdWorker.getId(), type, targetId, 1,
                 LocalDateTime.now(ZoneOffset.UTC));
+        interactionCountCache.evictAfterCommit(type, targetId);
         if (type == ContentTargetTypeConstants.ARTICLE) {
             eventPublisher.articleLiked(targetId, userId, target.getOwnerId());
             eventPublisher.behaviorRecorded(type, targetId, userId, BehaviorTypeConstants.LIKE);
@@ -104,6 +112,10 @@ public class LikeServiceImpl implements LikeService {
         }
         interactionCountMapper.addLikeCount(IdWorker.getId(), type, targetId, -1,
                 LocalDateTime.now(ZoneOffset.UTC));
+        interactionCountCache.evictAfterCommit(type, targetId);
+        // 冷却期内 like() 拒绝，挡住“取消→立刻再点”的抖动
+        interactionGate.cooldown(InteractionRedisKeyConstants.likeCooldown(type, userId, targetId),
+                RedisTtl.LIKE_COOLDOWN);
         return readLikeCount(type, targetId);
     }
 

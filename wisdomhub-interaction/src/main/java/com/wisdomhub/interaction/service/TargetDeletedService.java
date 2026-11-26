@@ -32,6 +32,7 @@ public class TargetDeletedService {
     private final ContentLikeMapper contentLikeMapper;
     private final ContentFavoriteMapper contentFavoriteMapper;
     private final InteractionCountMapper interactionCountMapper;
+    private final InteractionCountCache interactionCountCache;
     private final QuestionAnswerFeign questionAnswerFeign;
 
     @Transactional
@@ -71,5 +72,6 @@ public class TargetDeletedService {
         interactionCountMapper.delete(new LambdaQueryWrapper<InteractionCount>()
                 .eq(InteractionCount::getTargetType, (byte) targetType)
                 .in(InteractionCount::getTargetId, targetIds));
+        interactionCountCache.evictAllAfterCommit(targetType, targetIds);
     }
 }

@@ -6,6 +6,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
+
 /** 点赞/收藏的 Redis 防重快路径；Redis 不可用时放行，正确性由唯一键兜底。 */
 @Slf4j
 @Component
@@ -29,6 +31,24 @@ public class InteractionGate {
             stringRedisTemplate.delete(key);
         } catch (Exception e) {
             log.warn("防重 gate 清除失败, 等 TTL 自愈: key={}", key, e);
+        }
+    }
+
+    /** 冷却期内返回 true；Redis 不可用时放行，正确性由唯一键兜底。 */
+    public boolean cooling(String key) {
+        try {
+            return Boolean.TRUE.equals(stringRedisTemplate.hasKey(key));
+        } catch (Exception e) {
+            log.warn("冷却检查不可用, 放行: key={}", key, e);
+            return false;
+        }
+    }
+
+    public void cooldown(String key, Duration ttl) {
+        try {
+            stringRedisTemplate.opsForValue().set(key, "1", ttl);
+        } catch (Exception e) {
+            log.warn("冷却标记写入失败, 本次不冷却: key={}", key, e);
         }
     }
 }

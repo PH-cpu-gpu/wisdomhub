@@ -19,6 +19,7 @@ import com.wisdomhub.interaction.domain.vo.CommentVO;
 import com.wisdomhub.interaction.mapper.CommentMapper;
 import com.wisdomhub.interaction.mapper.InteractionCountMapper;
 import com.wisdomhub.interaction.service.CommentService;
+import com.wisdomhub.interaction.service.InteractionCountCache;
 import com.wisdomhub.interaction.service.InteractionEventPublisher;
 import com.wisdomhub.interaction.service.TargetValidator;
 import lombok.RequiredArgsConstructor;
@@ -47,6 +48,7 @@ public class CommentServiceImpl implements CommentService {
     private final InteractionCountMapper interactionCountMapper;
     private final TargetValidator targetValidator;
     private final InteractionEventPublisher eventPublisher;
+    private final InteractionCountCache interactionCountCache;
 
     @Override
     @Transactional
@@ -69,6 +71,7 @@ public class CommentServiceImpl implements CommentService {
 
         interactionCountMapper.addCommentCount(IdWorker.getId(), targetType, targetId, 1,
                 LocalDateTime.now(ZoneOffset.UTC));
+        interactionCountCache.evictAfterCommit(targetType, targetId);
         eventPublisher.commentCreated(comment.getId(), targetType, targetId, userId, target.getOwnerId());
         return comment.getId();
     }
@@ -94,6 +97,7 @@ public class CommentServiceImpl implements CommentService {
         }
         interactionCountMapper.addCommentCount(IdWorker.getId(), comment.getTargetType(),
                 comment.getTargetId(), -affected, now);
+        interactionCountCache.evictAfterCommit(comment.getTargetType(), comment.getTargetId());
     }
 
     @Override

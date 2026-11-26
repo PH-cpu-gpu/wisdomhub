@@ -27,6 +27,7 @@ import PageContainer from '@/components/layout/PageContainer.vue'
 import { useAuthorBrief } from '@/composables/useAuthorBrief'
 import { useInteractionCounts } from '@/composables/useInteractionCounts'
 import { useInteractionStates } from '@/composables/useInteractionStates'
+import { useLikeCooldown } from '@/composables/useLikeCooldown'
 import { useSeo } from '@/composables/useSeo'
 import { useAuthStore } from '@/stores'
 import { CONTENT_TARGET_TYPE } from '@/types/interaction'
@@ -72,6 +73,7 @@ onBeforeUnmount(() => {
 })
 
 const { authors, ensureAuthors } = useAuthorBrief()
+const likeCooldown = useLikeCooldown()
 
 const { countsFor, patchCount } = useInteractionCounts(() =>
   answers.value.map((item) => ({
@@ -241,6 +243,7 @@ async function toggleLike(answer: AnswerVO): Promise<void> {
   if (!requireLogin() || likePendingId.value) return
 
   const id = answer.answerId
+  if (likeCooldown.isThrottled(CONTENT_TARGET_TYPE.ANSWER, id)) return
   const state = stateFor(CONTENT_TARGET_TYPE.ANSWER, id)
   const counts = countsFor(CONTENT_TARGET_TYPE.ANSWER, id)
   const previous = {

@@ -25,6 +25,7 @@ import { useArticleAuthors } from '@/composables/useArticleAuthors'
 import { useArticleHistory } from '@/composables/useArticleHistory'
 import { useAuthorBrief } from '@/composables/useAuthorBrief'
 import { useInteractionCounts } from '@/composables/useInteractionCounts'
+import { useLikeCooldown } from '@/composables/useLikeCooldown'
 import { useSeo } from '@/composables/useSeo'
 import { useAuthStore } from '@/stores'
 import type { ArticleDetailVO } from '@/types/content'
@@ -45,6 +46,7 @@ const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
 const { report } = useArticleHistory()
+const likeCooldown = useLikeCooldown()
 
 const articleId = computed(() => String(route.params.articleId ?? ''))
 const detail = ref<ArticleDetailVO | null>(null)
@@ -397,6 +399,7 @@ async function toggleLike(): Promise<void> {
   if (!requireLogin()) return
 
   const id = detail.value.articleId
+  if (likeCooldown.isThrottled(CONTENT_TARGET_TYPE.ARTICLE, id)) return
   const previous = { liked: current.liked, count: current.likeCount }
   const nextLiked = !previous.liked
   interaction.value = {

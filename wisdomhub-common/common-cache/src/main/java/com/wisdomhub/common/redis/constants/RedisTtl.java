@@ -23,6 +23,12 @@ public final class RedisTtl {
     /** 点赞 / 收藏 防重前置拦截 */
     public static final Duration LIKE_ONCE = Duration.ofHours(1);
 
+    /** 取消点赞后的再赞冷却，挡住反复切换 */
+    public static final Duration LIKE_COOLDOWN = Duration.ofSeconds(2);
+
+    /** 互动计数快照读缓存：写后失效，短 TTL 兜住「读回填 vs 写失效」的竞态窗口 */
+    public static final Duration INTERACTION_COUNT = Duration.ofSeconds(5);
+
     /** 阅读防重窗口：同一用户对同一文章 N 小时内只计一次阅读量 */
     public static final Duration VIEW_ONCE = Duration.ofHours(1);
 

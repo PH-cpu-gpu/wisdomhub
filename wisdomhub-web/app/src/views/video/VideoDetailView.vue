@@ -21,6 +21,7 @@ import VideoPlayer from '@/components/video/VideoPlayer.vue'
 import { useAuthorBrief } from '@/composables/useAuthorBrief'
 import { useInteractionCounts } from '@/composables/useInteractionCounts'
 import { useInteractionStates } from '@/composables/useInteractionStates'
+import { useLikeCooldown } from '@/composables/useLikeCooldown'
 import { useSeo } from '@/composables/useSeo'
 import { useAuthStore } from '@/stores'
 import { CONTENT_TARGET_TYPE } from '@/types/interaction'
@@ -53,6 +54,7 @@ const {
     : [],
 )
 const { patchCount } = useInteractionCounts()
+const likeCooldown = useLikeCooldown()
 
 const videoState = computed(() =>
   detail.value ? stateFor(CONTENT_TARGET_TYPE.VIDEO, detail.value.videoId) : undefined,
@@ -108,6 +110,7 @@ async function toggleLike(): Promise<void> {
   if (!requireLogin()) return
 
   const id = detail.value.videoId
+  if (likeCooldown.isThrottled(CONTENT_TARGET_TYPE.VIDEO, id)) return
   const previous = { liked: current.liked, count: current.likeCount }
   const nextLiked = !previous.liked
   patchState(CONTENT_TARGET_TYPE.VIDEO, id, {

@@ -41,6 +41,7 @@ public class InteractionCountReconcileService {
     private final InteractionCountReconcileMapper reconcileMapper;
     private final InteractionCountMapper interactionCountMapper;
     private final CountReconcileProperties properties;
+    private final InteractionCountCache interactionCountCache;
 
     public CountReconcileResult reconcile() {
         CountReconcileResult result = new CountReconcileResult();
@@ -102,6 +103,7 @@ public class InteractionCountReconcileService {
                     try {
                         interactionCountMapper.deleteById(row.getId());
                         deleted++;
+                        interactionCountCache.evict(targetType, row.getTargetId());
                     } catch (RuntimeException e) {
                         log.error("删除孤儿计数行失败, id={}", row.getId(), e);
                         failed++;
@@ -134,6 +136,7 @@ public class InteractionCountReconcileService {
                     if (interactionCountMapper.update(null, update) > 0) {
                         fixedRows++;
                         fixedColumns += changedColumns;
+                        interactionCountCache.evict(targetType, row.getTargetId());
                     }
                 } catch (RuntimeException e) {
                     log.error("修正计数行失败, id={}", row.getId(), e);
@@ -166,9 +169,11 @@ public class InteractionCountReconcileService {
                 try {
                     interactionCountMapper.insert(row);
                     inserted++;
+                    interactionCountCache.evict(targetType, entry.getKey());
                 } catch (DuplicateKeyException e) {
                     // 并发写入已经补上了这一行
                     log.debug("计数行已被并发插入, targetType={}, targetId={}", targetType, entry.getKey());
+                    interactionCountCache.evict(targetType, entry.getKey());
                 } catch (RuntimeException e) {
                     log.error("补插计数行失败, targetType={}, targetId={}", targetType, entry.getKey(), e);
                     failed++;
