@@ -14,6 +14,7 @@ import cn.hutool.crypto.digest.DigestUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wisdomhub.common.core.exception.BusinessException;
 import com.wisdomhub.common.core.result.CommonErrorCode;
 import com.wisdomhub.common.core.result.PageResponse;
@@ -25,6 +26,7 @@ import com.wisdomhub.common.mq.util.EventPublisher;
 import com.wisdomhub.common.web.util.PageUtil;
 import com.wisdomhub.common.redis.constants.RedisSharedConstants;
 import com.wisdomhub.common.redis.constants.RedisTtl;
+import com.wisdomhub.common.redis.message.SessionKickMessage;
 import com.wisdomhub.common.security.constants.SecurityConstants;
 import com.wisdomhub.common.security.context.UserContext;
 import com.wisdomhub.common.security.util.JwtUtil;
@@ -69,6 +71,7 @@ public class UserServiceImpl implements UserService {
     private final JwtPropertyConfiguration jwtPropertyConfiguration;
     private final CosUtil cosUtil;
     private final EventPublisher eventPublisher;
+    private final ObjectMapper objectMapper;
 
     /**
      * 根据手机号获取验证码
@@ -219,8 +222,12 @@ public class UserServiceImpl implements UserService {
         // 将accessToken加入redis黑名单
         // 因为accessToken本身较长, 这里做Hash来减少长度, 从而节约redis的内存
         String rawToken = StrUtil.removePrefix(accessToken, SecurityConstants.TOKEN_PREFIX);
-        String blacklistKey = RedisSharedConstants.BLACKLIST_KEY + DigestUtil.sha256Hex(rawToken);
+        String tokenHash = DigestUtil.sha256Hex(rawToken);
+        String blacklistKey = RedisSharedConstants.BLACKLIST_KEY + tokenHash;
         stringRedisTemplate.opsForValue().set(blacklistKey, "1", RedisTtl.ACCESS_TOKEN);
+
+        // 已建立的 WebSocket 连接不会随黑名单自然断开，广播给通知服务踢线
+        publishSessionKick(userId, tokenHash, false);
     }
 
     /**
@@ -245,6 +252,19 @@ public class UserServiceImpl implements UserService {
         String rawToken = StrUtil.removePrefix(logoutAllDTO.getAccessToken(), SecurityConstants.TOKEN_PREFIX);
         String blacklistKey = RedisSharedConstants.BLACKLIST_KEY + DigestUtil.sha256Hex(rawToken);
         stringRedisTemplate.opsForValue().set(blacklistKey, "1", RedisTtl.ACCESS_TOKEN);
+
+        // 其它设备的 accessToken 在过期前仍然可用，靠踢线立刻断开
+        publishSessionKick(userId, null, true);
+    }
+
+    private void publishSessionKick(Long userId, String tokenHash, boolean all) {
+        try {
+            String payload = objectMapper.writeValueAsString(new SessionKickMessage(userId, tokenHash, all));
+            stringRedisTemplate.convertAndSend(RedisSharedConstants.SESSION_KICK_CHANNEL, payload);
+        } catch (Exception e) {
+            // 黑名单是权威源；广播失败由通知服务的定时扫描兜底
+            log.warn("会话踢线广播失败, userId={}, all={}", userId, all, e);
+        }
     }
 
     /**

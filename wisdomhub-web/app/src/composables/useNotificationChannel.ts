@@ -52,6 +52,11 @@ export function useNotificationChannel() {
     notification.receivePush(payload)
   }
 
+  /** 服务端已踢线（如其它设备退出登录）：清掉本地登录态，导航守卫负责跳登录 */
+  function handleSessionRevoked(): void {
+    auth.clearSession()
+  }
+
   function start(): void {
     if (active) return
     active = true
@@ -59,6 +64,7 @@ export function useNotificationChannel() {
       onMessage: handleMessage,
       onConnected: handleConnected,
       onDisconnected: handleDisconnected,
+      onSessionRevoked: handleSessionRevoked,
     })
     void notification.loadUnreadCount()
     startPolling()

@@ -3,8 +3,10 @@ package com.wisdomhub.notification.interceptor;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.crypto.digest.DigestUtil;
 import com.wisdomhub.common.redis.constants.RedisSharedConstants;
+import com.wisdomhub.common.redis.constants.RedisTtl;
 import com.wisdomhub.common.security.constants.SecurityConstants;
 import com.wisdomhub.common.security.util.JwtUtil;
+import com.wisdomhub.notification.session.StompSessionRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -18,6 +20,7 @@ import org.springframework.messaging.support.ChannelInterceptor;
 import org.springframework.messaging.support.MessageHeaderAccessor;
 import org.springframework.stereotype.Component;
 
+import java.util.Date;
 import java.util.Map;
 
 /**
@@ -29,6 +32,7 @@ import java.util.Map;
 public class StompAuthChannelInterceptor implements ChannelInterceptor {
 
     private final StringRedisTemplate stringRedisTemplate;
+    private final StompSessionRegistry sessionRegistry;
 
     @Value("${jwt.public-key}")
     private String publicKey;
@@ -63,8 +67,21 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
         if (userId == null) {
             throw new MessagingException("token 非法或已过期");
         }
+        String tokenHash = DigestUtil.sha256Hex(token);
+        assertNotBlacklisted(tokenHash);
+        String principal = String.valueOf(userId);
+        accessor.setUser(() -> principal);
+        sessionRegistry.register(accessor.getSessionId(), Long.valueOf(principal), tokenHash, resolveExpireAtMillis(claims));
+        // 登出与建连并发时，注册后再复查一次，缩掉「广播早于注册」的竞态窗口
+        assertNotBlacklisted(tokenHash);
+        // token 不需要转发给 RabbitMQ
+        accessor.removeNativeHeader(SecurityConstants.TOKEN_HEAD_NAME);
+        accessor.removeNativeHeader("authorization");
+    }
+
+    private void assertNotBlacklisted(String tokenHash) {
         try {
-            String blacklistKey = RedisSharedConstants.BLACKLIST_KEY + DigestUtil.sha256Hex(token);
+            String blacklistKey = RedisSharedConstants.BLACKLIST_KEY + tokenHash;
             if (Boolean.TRUE.equals(stringRedisTemplate.hasKey(blacklistKey))) {
                 throw new MessagingException("token 已注销");
             }
@@ -74,10 +91,19 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
             log.warn("STOMP 鉴权黑名单检查失败", e);
             throw new MessagingException("鉴权服务不可用");
         }
-        accessor.setUser(() -> String.valueOf(userId));
-        // token 不需要转发给 RabbitMQ
-        accessor.removeNativeHeader(SecurityConstants.TOKEN_HEAD_NAME);
-        accessor.removeNativeHeader("authorization");
+    }
+
+    private long resolveExpireAtMillis(Map<String, Object> claims) {
+        Object exp = claims.get("exp");
+        if (exp instanceof Number number) {
+            long value = number.longValue();
+            // JWT 标准 exp 是秒；防御性兼容毫秒
+            return value < 10_000_000_000L ? value * 1000 : value;
+        }
+        if (exp instanceof Date date) {
+            return date.getTime();
+        }
+        return System.currentTimeMillis() + RedisTtl.ACCESS_TOKEN.toMillis();
     }
 
     private void authorizeSubscribe(StompHeaderAccessor accessor) {

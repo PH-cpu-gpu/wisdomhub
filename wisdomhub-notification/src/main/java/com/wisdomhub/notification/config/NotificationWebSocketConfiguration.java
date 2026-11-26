@@ -1,6 +1,7 @@
 package com.wisdomhub.notification.config;
 
 import com.wisdomhub.notification.interceptor.StompAuthChannelInterceptor;
+import com.wisdomhub.notification.session.StompSessionRegistry;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
@@ -8,10 +9,13 @@ import org.springframework.messaging.simp.config.ChannelRegistration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
 import org.springframework.messaging.simp.config.StompBrokerRelayRegistration;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
+import org.springframework.web.socket.CloseStatus;
+import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
 import org.springframework.web.socket.config.annotation.WebSocketTransportRegistration;
+import org.springframework.web.socket.handler.WebSocketHandlerDecorator;
 
 /**
  * 原生 WebSocket + STOMP，broker 用 RabbitMQ relay（61613）。
@@ -21,6 +25,7 @@ import org.springframework.web.socket.config.annotation.WebSocketTransportRegist
 public class NotificationWebSocketConfiguration implements WebSocketMessageBrokerConfigurer {
 
     private final StompAuthChannelInterceptor authInterceptor;
+    private final StompSessionRegistry sessionRegistry;
     private final ThreadPoolTaskScheduler taskScheduler;
     private final String relayHost;
     private final int relayPort;
@@ -31,6 +36,7 @@ public class NotificationWebSocketConfiguration implements WebSocketMessageBroke
 
     public NotificationWebSocketConfiguration(
             StompAuthChannelInterceptor authInterceptor,
+            StompSessionRegistry sessionRegistry,
             @Qualifier("notificationWebSocketTaskScheduler") ThreadPoolTaskScheduler notificationWebSocketTaskScheduler,
             @Value("${infra.rabbitmq-host}") String relayHost,
             @Value("${infra.rabbitmq-stomp-port:61613}") int relayPort,
@@ -39,6 +45,7 @@ public class NotificationWebSocketConfiguration implements WebSocketMessageBroke
             @Value("${infra.rabbitmq-password}") String relayPassword,
             @Value("${wisdomhub.notification.allowed-origins:http://localhost:5173,http://127.0.0.1:5173}") String allowedOrigins) {
         this.authInterceptor = authInterceptor;
+        this.sessionRegistry = sessionRegistry;
         this.taskScheduler = notificationWebSocketTaskScheduler;
         this.relayHost = relayHost;
         this.relayPort = relayPort;
@@ -85,5 +92,19 @@ public class NotificationWebSocketConfiguration implements WebSocketMessageBroke
         registration.setMessageSizeLimit(64 * 1024);
         registration.setSendBufferSizeLimit(512 * 1024);
         registration.setSendTimeLimit(20_000);
+        // 抓取 WebSocketSession 引用，供登出/到期时主动关闭
+        registration.addDecoratorFactory(handler -> new WebSocketHandlerDecorator(handler) {
+            @Override
+            public void afterConnectionEstablished(WebSocketSession session) throws Exception {
+                sessionRegistry.attach(session);
+                super.afterConnectionEstablished(session);
+            }
+
+            @Override
+            public void afterConnectionClosed(WebSocketSession session, CloseStatus closeStatus) throws Exception {
+                sessionRegistry.detach(session.getId());
+                super.afterConnectionClosed(session, closeStatus);
+            }
+        });
     }
 }
