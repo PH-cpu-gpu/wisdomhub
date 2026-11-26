@@ -13,4 +13,7 @@ public class UploadProperties {
 
     /** 预签名 URL 有效期（秒） */
     private int ticketTtlSeconds = 900;
+
+    /** 待上传资产超时（分钟）：须覆盖凭证有效期与大文件慢速直传，超时置失败避免孤儿资产 */
+    private int uploadTimeoutMinutes = 120;
 }

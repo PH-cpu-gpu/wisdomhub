@@ -3,6 +3,7 @@ package com.wisdomhub.video.job;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.wisdomhub.video.config.MpsTaskProperties;
+import com.wisdomhub.video.config.UploadProperties;
 import com.wisdomhub.video.config.VideoAuditProperties;
 import com.wisdomhub.video.constants.MediaAssetConstants;
 import com.wisdomhub.video.domain.AuditResult;
@@ -36,17 +37,20 @@ public class VideoTranscodePollJob {
     private final VideoAuditService videoAuditService;
     private final VideoAuditProperties auditProperties;
     private final VideoQuotaService videoQuotaService;
+    private final UploadProperties uploadProperties;
 
     @XxlJob("videoTranscodePollHandler")
     public void poll() {
         try {
             PollCounts counts = pollRunning();
+            int uploadTimeouts = markUploadTimeouts();
             int transcodeTimeouts = markTimeouts();
             int auditTimeouts = markAuditTimeouts();
             String summary = "视频转码轮询完成: 就绪 " + counts.ready()
                     + "，审核拒绝 " + counts.rejected()
                     + "，待审核 " + counts.pending()
                     + "，失败 " + counts.failed()
+                    + "，上传超时 " + uploadTimeouts
                     + "，转码超时 " + transcodeTimeouts
                     + "，审核超时 " + auditTimeouts;
             XxlJobHelper.log(summary);
@@ -188,6 +192,30 @@ public class VideoTranscodePollJob {
             log.warn("视频转码失败, assetId={}, reason={}", asset.getId(), failReason);
         }
         return affected > 0;
+    }
+
+    /** 凭证发出去后用户可能再也没上传，超时置失败，避免资产行永久停在待上传。 */
+    private int markUploadTimeouts() {
+        LocalDateTime cutoff = LocalDateTime.now(ZoneOffset.UTC)
+                .minusMinutes(Math.max(1, uploadProperties.getUploadTimeoutMinutes()));
+        List<MediaAsset> stale = mediaAssetMapper.selectList(new LambdaQueryWrapper<MediaAsset>()
+                .eq(MediaAsset::getStatus, MediaAssetConstants.UPLOADING)
+                .lt(MediaAsset::getUpdateTime, cutoff)
+                .last("LIMIT 100"));
+        int failed = 0;
+        for (MediaAsset asset : stale) {
+            int affected = mediaAssetMapper.update(null, new LambdaUpdateWrapper<MediaAsset>()
+                    .set(MediaAsset::getStatus, MediaAssetConstants.FAILED)
+                    .set(MediaAsset::getFailReason, "上传超时")
+                    .set(MediaAsset::getUpdateTime, LocalDateTime.now(ZoneOffset.UTC))
+                    .eq(MediaAsset::getId, asset.getId())
+                    .eq(MediaAsset::getStatus, MediaAssetConstants.UPLOADING));
+            if (affected > 0) {
+                log.warn("上传超时，资产置失败, assetId={}", asset.getId());
+                failed++;
+            }
+        }
+        return failed;
     }
 
     private int markTimeouts() {
