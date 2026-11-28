@@ -16,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -39,6 +40,19 @@ public class InterestProfileServiceImpl implements InterestProfileService {
 
     private static final String TOKEN_SEPARATOR = "[\\s\\p{P}]+";
 
+    /** KEYS: 去重 key、画像 ZSet；ARGV: 权重、去重 TTL 秒、画像 TTL 秒、tagId... */
+    private static final DefaultRedisScript<Long> RECORD_SCRIPT = new DefaultRedisScript<>("""
+            if redis.call('EXISTS', KEYS[1]) == 1 then
+                return 0
+            end
+            for i = 4, #ARGV do
+                redis.call('ZINCRBY', KEYS[2], ARGV[1], ARGV[i])
+            end
+            redis.call('SET', KEYS[1], '1', 'EX', ARGV[2])
+            redis.call('EXPIRE', KEYS[2], ARGV[3])
+            return 1
+            """, Long.class);
+
     private final StringRedisTemplate stringRedisTemplate;
 
     private final ContentFeign contentFeign;
@@ -50,21 +64,25 @@ public class InterestProfileServiceImpl implements InterestProfileService {
             .build();
 
     @Override
-    public void record(BehaviorRecordedPayload payload) {
+    public boolean record(String eventId, BehaviorRecordedPayload payload) {
         double weight = weightOf(payload.getBehaviorType());
         if (weight <= 0) {
             log.warn("未知行为类型, 跳过画像: {}", payload.getBehaviorType());
-            return;
+            return false;
         }
         List<Long> tagIds = resolveTagIds(payload);
-        if (tagIds.isEmpty()) {
-            return;
-        }
-        String key = profileKey(payload.getUserId(), LocalDate.now());
+        List<String> args = new ArrayList<>(tagIds.size() + 3);
+        args.add(String.valueOf(weight));
+        args.add(String.valueOf(RecommendationRedisConstants.BEHAVIOR_DEDUP_TTL.getSeconds()));
+        args.add(String.valueOf(RecommendationRedisConstants.PROFILE_BUCKET_TTL.getSeconds()));
         for (Long tagId : tagIds) {
-            stringRedisTemplate.opsForZSet().incrementScore(key, tagId.toString(), weight);
+            args.add(tagId.toString());
         }
-        stringRedisTemplate.expire(key, RecommendationRedisConstants.PROFILE_BUCKET_TTL);
+        Long written = stringRedisTemplate.execute(RECORD_SCRIPT,
+                List.of(RecommendationRedisConstants.BEHAVIOR_DEDUP_KEY + eventId,
+                        profileKey(payload.getUserId(), LocalDate.now())),
+                args.toArray());
+        return written != null && written > 0;
     }
 
     @Override
@@ -73,8 +91,7 @@ public class InterestProfileServiceImpl implements InterestProfileService {
         LocalDate now = LocalDate.now();
         for (int i = 0; i < InterestProfileConstants.MONTH_FACTORS.length; i++) {
             String key = profileKey(userId, now.minusMonths(i));
-            Set<ZSetOperations.TypedTuple<String>> tuples =
-                    stringRedisTemplate.opsForZSet().reverseRangeWithScores(key, 0, -1);
+            Set<ZSetOperations.TypedTuple<String>> tuples = stringRedisTemplate.opsForZSet().reverseRangeWithScores(key, 0, -1);
             if (tuples == null) {
                 continue;
             }

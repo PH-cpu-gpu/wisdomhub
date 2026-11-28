@@ -21,7 +21,6 @@ public class BehaviorRecordedPayload implements Serializable {
 
     private Long articleId;
 
-    /** 视频行为用；文章事件保持 articleId 不变 */
     private Long videoId;
 
     private List<Long> tagIds;

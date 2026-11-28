@@ -60,8 +60,7 @@ public class RecommendationServiceImpl implements RecommendationService {
             return hotHome(limit, videoQuota);
         }
 
-        List<ScoredArticleVO> scoredArticles = recommendationScorer.score(
-                dedupe(recallArticles(tagIds, limit)), userId, profile);
+        List<ScoredArticleVO> scoredArticles = recommendationScorer.score(dedupe(recallArticles(tagIds, limit)), userId, profile);
         if (videoQuota == 0) {
             return toItems(scoredArticles.stream().limit(limit).map(ScoredArticleVO::getArticle).toList());
         }
