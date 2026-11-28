@@ -48,14 +48,22 @@ public class LikeServiceImpl implements LikeService {
     public int like(Integer targetType, Long targetId) {
         int type = resolveTargetType(targetType);
         Long userId = CurrentUserUtil.id();
-        // 取消后的冷却期内直接拒绝，别把反复切换的流量放到库上
-        if (interactionGate.cooling(InteractionRedisKeyConstants.likeCooldown(type, userId, targetId))) {
+        String stateKey = InteractionRedisKeyConstants.likeState(type, userId, targetId);
+        // 冷却中拒绝、已赞幂等，只有无状态才去抢状态
+        InteractionGate.LikeState state = interactionGate.likeState(stateKey);
+        if (state == InteractionGate.LikeState.COOLING) {
             throw new BusinessException(CommonErrorCode.TOO_MANY_REQUESTS);
+        }
+        if (state == InteractionGate.LikeState.LIKED) {
+            return readLikeCount(type, targetId);
         }
         targetValidator.requireVisible(type, targetId);
 
-        String gateKey = InteractionRedisKeyConstants.likeGate(type, userId, targetId);
-        if (!interactionGate.pass(gateKey)) {
+        if (!interactionGate.markLiked(stateKey)) {
+            // 并发请求先抢到了状态：按改写后的状态处理
+            if (interactionGate.likeState(stateKey) == InteractionGate.LikeState.COOLING) {
+                throw new BusinessException(CommonErrorCode.TOO_MANY_REQUESTS);
+            }
             return readLikeCount(type, targetId);
         }
 
@@ -66,7 +74,7 @@ public class LikeServiceImpl implements LikeService {
                     .userId(userId)
                     .build());
         } catch (DuplicateKeyException e) {
-            // Redis 丢过 key 但关系行还在：幂等返回，不加计数
+            // Redis 丢过状态但关系行还在：幂等返回，不加计数
             return readLikeCount(type, targetId);
         }
 
@@ -75,7 +83,7 @@ public class LikeServiceImpl implements LikeService {
             // 插入后再校验一次：校验之后被并发下架/删除时回滚这次点赞
             target = targetValidator.requireVisible(type, targetId);
         } catch (RuntimeException e) {
-            interactionGate.clear(gateKey);
+            interactionGate.clear(stateKey);
             throw e;
         }
 
@@ -99,9 +107,14 @@ public class LikeServiceImpl implements LikeService {
     public int unlike(Integer targetType, Long targetId) {
         int type = resolveTargetType(targetType);
         Long userId = CurrentUserUtil.id();
+        String stateKey = InteractionRedisKeyConstants.likeState(type, userId, targetId);
+        // 冷却中拒绝重复取消，取消接口自身也不能被刷
+        if (interactionGate.likeState(stateKey) == InteractionGate.LikeState.COOLING) {
+            throw new BusinessException(CommonErrorCode.TOO_MANY_REQUESTS);
+        }
+        // 一条命令完成「撤已赞 + 置冷却」，不留旧流程 clear 与 cooldown 之间的窗口
+        interactionGate.markCooling(stateKey, RedisTtl.LIKE_COOLDOWN);
         targetValidator.requireVisible(type, targetId);
-        // 先撤 gate：不撤的话用户在这个窗口内没法再点回来
-        interactionGate.clear(InteractionRedisKeyConstants.likeGate(type, userId, targetId));
 
         int deleted = contentLikeMapper.delete(new LambdaQueryWrapper<ContentLike>()
                 .eq(ContentLike::getTargetType, (byte) type)
@@ -113,9 +126,6 @@ public class LikeServiceImpl implements LikeService {
         interactionCountMapper.addLikeCount(IdWorker.getId(), type, targetId, -1,
                 LocalDateTime.now(ZoneOffset.UTC));
         interactionCountCache.evictAfterCommit(type, targetId);
-        // 冷却期内 like() 拒绝，挡住“取消→立刻再点”的抖动
-        interactionGate.cooldown(InteractionRedisKeyConstants.likeCooldown(type, userId, targetId),
-                RedisTtl.LIKE_COOLDOWN);
         return readLikeCount(type, targetId);
     }
 
